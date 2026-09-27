@@ -55,6 +55,21 @@ class AssistantApplicationTest {
     }
 
     @Test
+    void systemEndpointIncludesDeviceAndWindowsSpecifications() throws Exception {
+        HttpResponse<String> response = HttpClient.newHttpClient().send(
+                HttpRequest.newBuilder(URI.create("http://127.0.0.1:" + port + "/api/system")).GET().build(),
+                HttpResponse.BodyHandlers.ofString());
+
+        assertThat(response.statusCode()).isEqualTo(200);
+        assertThat(response.body()).contains("\"device\"");
+        assertThat(response.body()).contains("\"processorName\"");
+        assertThat(response.body()).contains("\"graphics\"");
+        assertThat(response.body()).contains("\"windows\"");
+        assertThat(response.body()).contains("\"edition\"");
+        assertThat(response.body()).contains("\"build\"");
+    }
+
+    @Test
     void iCloudCalendarStartsDisconnectedWithoutStoredCredentials() throws Exception {
         HttpResponse<String> response = HttpClient.newHttpClient().send(
                 HttpRequest.newBuilder(URI.create("http://127.0.0.1:" + port

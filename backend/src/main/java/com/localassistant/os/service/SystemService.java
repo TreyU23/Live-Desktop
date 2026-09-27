@@ -20,6 +20,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.TimeUnit;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -45,6 +46,7 @@ public class SystemService {
 
     private final Path workspaceRoot;
     private final ObjectMapper objectMapper = new ObjectMapper();
+    private volatile WindowsDetails cachedWindowsDetails;
 
     public SystemService(AssistantProperties properties) {
         workspaceRoot = Path.of(properties.getWorkspaceRoot()).toAbsolutePath().normalize();
@@ -59,6 +61,7 @@ public class SystemService {
                 .map(Path::toFile)
                 .orElse(workspaceRoot.toFile());
         NetworkInfo network = networkInfo();
+        WindowsDetails windowsDetails = windowsDetails(totalMemory);
 
         return new SystemSnapshot(
                 Instant.now().toString(),
@@ -77,7 +80,151 @@ public class SystemService {
                         Math.max(0, disk.getTotalSpace()),
                         network,
                         batteryInfo()),
-                controls(network));
+                controls(network),
+                windowsDetails.device(),
+                windowsDetails.windows());
+    }
+
+    private WindowsDetails windowsDetails(long fallbackMemoryBytes) {
+        WindowsDetails current = cachedWindowsDetails;
+        if (current != null) {
+            return current;
+        }
+        synchronized (this) {
+            if (cachedWindowsDetails == null) {
+                cachedWindowsDetails = readWindowsDetails(fallbackMemoryBytes);
+            }
+            return cachedWindowsDetails;
+        }
+    }
+
+    private WindowsDetails readWindowsDetails(long fallbackMemoryBytes) {
+        WindowsDetails fallback = fallbackWindowsDetails(fallbackMemoryBytes);
+        if (!isWindows()) {
+            return fallback;
+        }
+        String script = """
+                $ErrorActionPreference='SilentlyContinue'
+                $computer=Get-CimInstance Win32_ComputerSystem
+                $processor=Get-CimInstance Win32_Processor | Select-Object -First 1
+                $graphics=@(Get-CimInstance Win32_VideoController | Where-Object {$_.Name} | ForEach-Object {
+                  [pscustomobject]@{name=[string]$_.Name;driverVersion=[string]$_.DriverVersion}
+                })
+                $os=Get-CimInstance Win32_OperatingSystem
+                $currentVersion=Get-ItemProperty 'HKLM:\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion'
+                $sqm=Get-ItemProperty 'HKLM:\\SOFTWARE\\Microsoft\\SQMClient'
+                [pscustomobject]@{
+                  device=[pscustomobject]@{
+                    manufacturer=[string]$computer.Manufacturer
+                    model=[string]$computer.Model
+                    processorName=[string]$processor.Name
+                    processorCores=[int]$processor.NumberOfCores
+                    processorLogicalProcessors=[int]$processor.NumberOfLogicalProcessors
+                    maxClockMhz=[int]$processor.MaxClockSpeed
+                    installedMemoryBytes=[long]$computer.TotalPhysicalMemory
+                    graphics=$graphics
+                    systemType=[string]$computer.SystemType
+                    productId=[string]$currentVersion.ProductId
+                    deviceId=[string]$sqm.MachineId
+                  }
+                  windows=[pscustomobject]@{
+                    edition=[string]$os.Caption
+                    version=[string]$currentVersion.DisplayVersion
+                    osVersion=[string]$os.Version
+                    build=(([string]$os.BuildNumber)+'.'+([string]$currentVersion.UBR))
+                    installedOn=if($os.InstallDate){$os.InstallDate.ToUniversalTime().ToString('o')}else{''}
+                    architecture=[string]$os.OSArchitecture
+                  }
+                } | ConvertTo-Json -Depth 5 -Compress
+                """;
+        try {
+            Process process = new ProcessBuilder(
+                    "powershell.exe", "-NoProfile", "-NonInteractive", "-Command", script)
+                    .redirectErrorStream(true)
+                    .start();
+            if (!process.waitFor(8, TimeUnit.SECONDS)) {
+                process.destroyForcibly();
+                return fallback;
+            }
+            String output = new String(process.getInputStream().readAllBytes()).trim();
+            JsonNode root = objectMapper.readTree(output);
+            JsonNode device = root.path("device");
+            JsonNode windows = root.path("windows");
+            List<GraphicsInfo> graphics = new java.util.ArrayList<>();
+            windowsArray(device.path("graphics")).forEach(item -> graphics.add(new GraphicsInfo(
+                    text(item, "name", "Unknown graphics adapter"),
+                    text(item, "driverVersion", "Unavailable"))));
+            DeviceInfo deviceInfo = new DeviceInfo(
+                    text(device, "manufacturer", fallback.device().manufacturer()),
+                    text(device, "model", fallback.device().model()),
+                    text(device, "processorName", fallback.device().processorName()),
+                    integer(device, "processorCores", fallback.device().processorCores()),
+                    integer(device, "processorLogicalProcessors", fallback.device().processorLogicalProcessors()),
+                    integer(device, "maxClockMhz", fallback.device().maxClockMhz()),
+                    longValue(device, "installedMemoryBytes", fallback.device().installedMemoryBytes()),
+                    graphics.isEmpty() ? fallback.device().graphics() : List.copyOf(graphics),
+                    text(device, "systemType", fallback.device().systemType()),
+                    text(device, "productId", "Unavailable"),
+                    text(device, "deviceId", "Unavailable"));
+            WindowsInfo windowsInfo = new WindowsInfo(
+                    text(windows, "edition", fallback.windows().edition()),
+                    text(windows, "version", "Unavailable"),
+                    text(windows, "osVersion", fallback.windows().osVersion()),
+                    text(windows, "build", fallback.windows().build()),
+                    text(windows, "installedOn", "Unavailable"),
+                    text(windows, "architecture", fallback.windows().architecture()));
+            return new WindowsDetails(deviceInfo, windowsInfo);
+        } catch (Exception ignored) {
+            return fallback;
+        }
+    }
+
+    private WindowsDetails fallbackWindowsDetails(long memoryBytes) {
+        String architecture = System.getProperty("os.arch", "Unknown");
+        DeviceInfo device = new DeviceInfo(
+                "Unavailable",
+                "Unavailable",
+                environment("PROCESSOR_IDENTIFIER", "Unavailable"),
+                Runtime.getRuntime().availableProcessors(),
+                Runtime.getRuntime().availableProcessors(),
+                0,
+                memoryBytes,
+                List.of(),
+                architecture,
+                "Unavailable",
+                "Unavailable");
+        WindowsInfo windows = new WindowsInfo(
+                System.getProperty("os.name", "Windows"),
+                "Unavailable",
+                System.getProperty("os.version", "Unknown"),
+                System.getProperty("os.version", "Unknown"),
+                "Unavailable",
+                architecture);
+        return new WindowsDetails(device, windows);
+    }
+
+    private List<JsonNode> windowsArray(JsonNode node) {
+        if (node.isArray()) {
+            java.util.ArrayList<JsonNode> values = new java.util.ArrayList<>();
+            node.forEach(values::add);
+            return values;
+        }
+        return node.isObject() ? List.of(node) : List.of();
+    }
+
+    private String text(JsonNode node, String field, String fallback) {
+        String value = node.path(field).asText("").trim();
+        return value.isBlank() ? fallback : value;
+    }
+
+    private int integer(JsonNode node, String field, int fallback) {
+        int value = node.path(field).asInt(0);
+        return value > 0 ? value : fallback;
+    }
+
+    private long longValue(JsonNode node, String field, long fallback) {
+        long value = node.path(field).asLong(0);
+        return value > 0 ? value : fallback;
     }
 
     public List<RunningApp> runningApps() {
@@ -384,7 +531,9 @@ public class SystemService {
             String capturedAt,
             HostInfo host,
             ResourceInfo resources,
-            List<SystemControl> controls) {}
+            List<SystemControl> controls,
+            DeviceInfo device,
+            WindowsInfo windows) {}
 
     public record HostInfo(String name, String user, String os, String osVersion, String architecture, int javaVersion) {}
 
@@ -400,6 +549,29 @@ public class SystemService {
     public record NetworkInfo(String name, String address, boolean connected) {}
 
     public record BatteryInfo(boolean available, Integer percent, String detail) {}
+
+    public record DeviceInfo(
+            String manufacturer,
+            String model,
+            String processorName,
+            int processorCores,
+            int processorLogicalProcessors,
+            int maxClockMhz,
+            long installedMemoryBytes,
+            List<GraphicsInfo> graphics,
+            String systemType,
+            String productId,
+            String deviceId) {}
+
+    public record GraphicsInfo(String name, String driverVersion) {}
+
+    public record WindowsInfo(
+            String edition,
+            String version,
+            String osVersion,
+            String build,
+            String installedOn,
+            String architecture) {}
 
     public record SystemControl(String id, String label, boolean enabled, boolean available, String detail) {}
 
@@ -426,4 +598,6 @@ public class SystemService {
     private record AppDefinition(String name, String detail, String icon) {}
 
     private record PhoneDevice(String displayName, String manufacturer, String model, String osName, Instant lastSeenAt) {}
+
+    private record WindowsDetails(DeviceInfo device, WindowsInfo windows) {}
 }

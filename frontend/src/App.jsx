@@ -65,6 +65,27 @@ const FALLBACK_SYSTEM = {
     available: true,
     detail: "Opens Windows settings after approval",
   })),
+  device: {
+    manufacturer: "Unavailable",
+    model: "Unavailable",
+    processorName: "Processor information unavailable",
+    processorCores: 0,
+    processorLogicalProcessors: 0,
+    maxClockMhz: 0,
+    installedMemoryBytes: 32 * 1024 ** 3,
+    graphics: [],
+    systemType: "x64-based PC",
+    productId: "Unavailable",
+    deviceId: "Unavailable",
+  },
+  windows: {
+    edition: "Windows",
+    version: "Unavailable",
+    osVersion: "Unavailable",
+    build: "Unavailable",
+    installedOn: "Unavailable",
+    architecture: "x64",
+  },
 };
 
 const FALLBACK_APPS = [
@@ -111,6 +132,7 @@ function emptyMusicPlayerFor(providerId) {
 
 const NAV_ITEMS = [
   { id: "home", label: "Home", icon: "House" },
+  { id: "system", label: "System Info", icon: "Monitor" },
   { id: "music", label: "Music", icon: "Music2" },
   { id: "approvals", label: "Approvals", icon: "ShieldCheck" },
   { id: "memories", label: "Memories", icon: "Bookmark" },
@@ -305,7 +327,7 @@ function BrandIcon({ app }) {
   );
 }
 
-function SystemHealth({ system, connected, configured }) {
+function SystemHealth({ system, connected, configured, onOpenSystem }) {
   const resources = system.resources;
   const memoryPercent = percent(resources.memoryUsedBytes, resources.memoryTotalBytes);
   const storagePercent = percent(resources.storageUsedBytes, resources.storageTotalBytes);
@@ -380,7 +402,7 @@ function SystemHealth({ system, connected, configured }) {
         <InfoLine icon="Layers3" label="Backend" value={connected ? "Local API connected" : "Unavailable"} healthy={connected} />
         <InfoLine icon="Bot" label="OpenAI" value={configured ? "Connected" : "API key needed"} healthy={configured} />
       </div>
-      <button className="text-action" type="button" onClick={() => document.getElementById("system-controls")?.focus()}>
+      <button className="text-action" type="button" onClick={onOpenSystem}>
         System details <Icon name="ChevronRight" size={15} />
       </button>
     </section>
@@ -679,6 +701,100 @@ function ConversationsView({ conversations, selected, onSelect, onSend, busy }) 
 
 function ViewShell({ eyebrow, title, detail, children }) {
   return <main className="view-shell"><header><span>{eyebrow}</span><h1>{title}</h1><p>{detail}</p></header>{children}</main>;
+}
+
+function formatInstalledDate(value) {
+  if (!value || value === "Unavailable") return "Unavailable";
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? value : parsed.toLocaleDateString(undefined, { year: "numeric", month: "long", day: "numeric" });
+}
+
+function DetailRows({ rows }) {
+  return (
+    <dl className="system-detail-list">
+      {rows.map((row) => (
+        <div key={row.label}>
+          <dt>{row.label}</dt>
+          <dd title={String(row.value)}>{row.value}</dd>
+        </div>
+      ))}
+    </dl>
+  );
+}
+
+function SystemInfoView({ system, connected, configured, onCopy }) {
+  const resources = system.resources;
+  const device = system.device || FALLBACK_SYSTEM.device;
+  const windows = system.windows || FALLBACK_SYSTEM.windows;
+  const graphics = device.graphics?.length ? device.graphics : [{ name: "Unavailable", driverVersion: "Unavailable" }];
+  const memoryPercent = percent(resources.memoryUsedBytes, resources.memoryTotalBytes);
+  const storagePercent = percent(resources.storageUsedBytes, resources.storageTotalBytes);
+  const processorDetail = [
+    device.processorCores ? `${device.processorCores} cores` : null,
+    device.processorLogicalProcessors ? `${device.processorLogicalProcessors} logical processors` : null,
+    device.maxClockMhz ? `${(device.maxClockMhz / 1000).toFixed(2)} GHz max` : null,
+  ].filter(Boolean).join(" · ") || "Windows processor information unavailable";
+  const deviceRows = [
+    { label: "Device name", value: system.host.name },
+    { label: "Manufacturer", value: device.manufacturer },
+    { label: "Model", value: device.model },
+    { label: "Processor", value: device.processorName },
+    { label: "Installed RAM", value: formatBytes(device.installedMemoryBytes || resources.memoryTotalBytes) },
+    { label: "Graphics", value: graphics.map((item) => item.name).join(", ") },
+    { label: "System type", value: device.systemType },
+    { label: "Device ID", value: device.deviceId },
+    { label: "Product ID", value: device.productId },
+  ];
+  const windowsRows = [
+    { label: "Edition", value: windows.edition },
+    { label: "Version", value: windows.version },
+    { label: "Installed on", value: formatInstalledDate(windows.installedOn) },
+    { label: "OS build", value: windows.build },
+    { label: "OS version", value: windows.osVersion },
+    { label: "Architecture", value: windows.architecture },
+  ];
+  const liveRows = [
+    { label: "Network", value: resources.network.connected ? `${resources.network.name} · ${resources.network.address}` : "Offline" },
+    { label: "Battery", value: resources.battery.available ? `${resources.battery.percent}% · ${resources.battery.detail}` : resources.battery.detail },
+    { label: "Backend", value: connected ? "Local API connected" : "Unavailable" },
+    { label: "OpenAI", value: configured ? "Connected" : "API key needed" },
+    { label: "Java runtime", value: `Java ${system.host.javaVersion}` },
+    { label: "Last refreshed", value: system.capturedAt ? new Date(system.capturedAt).toLocaleString() : "Preview data" },
+  ];
+
+  return (
+    <main className="system-info-view">
+      <header className="system-info-heading">
+        <div><span>System</span><h1>About this PC</h1><p>Device specifications, Windows information, and live resource status reported by this PC.</p></div>
+        <span className={`status-label ${connected ? "status-label--good" : "status-label--warn"}`}><Icon name={connected ? "CircleCheck" : "CircleAlert"} size={14} />{connected ? "Live Windows data" : "Offline preview"}</span>
+      </header>
+
+      <section className="system-summary-grid" aria-label="Resource summary">
+        <article><Icon name="Cpu" size={18} /><span>Processor</span><strong>{device.processorName}</strong><small>{resources.cpuPercent}% in use · {processorDetail}</small></article>
+        <article><Icon name="MemoryStick" size={18} /><span>Installed RAM</span><strong>{formatBytes(device.installedMemoryBytes || resources.memoryTotalBytes)}</strong><small>{formatBytes(resources.memoryUsedBytes)} in use · {memoryPercent}%</small></article>
+        <article><Icon name="Monitor" size={18} /><span>Graphics</span><strong>{graphics[0].name}</strong><small>{graphics[0].driverVersion !== "Unavailable" ? `Driver ${graphics[0].driverVersion}` : "Driver information unavailable"}</small></article>
+        <article><Icon name="HardDrive" size={18} /><span>Storage</span><strong>{formatBytes(resources.storageTotalBytes, 0)}</strong><small>{formatBytes(resources.storageUsedBytes)} used · {storagePercent}%</small></article>
+      </section>
+
+      <section className="system-identity-bar"><div><strong>{system.host.name}</strong><span>{device.manufacturer} {device.model}</span></div><button className="secondary-button" type="button" onClick={onCopy}><Icon name="Copy" size={15} /> Copy system info</button></section>
+
+      <div className="system-spec-grid">
+        <section className="system-spec-panel" aria-labelledby="device-info-title">
+          <header><span className="system-spec-icon"><Icon name="Info" size={18} /></span><div><h2 id="device-info-title">Device specifications</h2><p>Hardware and identifiers exposed by Windows.</p></div></header>
+          <DetailRows rows={deviceRows} />
+        </section>
+        <section className="system-spec-panel" aria-labelledby="windows-info-title">
+          <header><span className="system-spec-icon"><Icon name="PanelsTopLeft" size={18} /></span><div><h2 id="windows-info-title">Windows specifications</h2><p>Installed Windows edition, version, and build.</p></div></header>
+          <DetailRows rows={windowsRows} />
+        </section>
+        <section className="system-spec-panel system-spec-panel--wide" aria-labelledby="live-info-title">
+          <header><span className="system-spec-icon"><Icon name="Activity" size={18} /></span><div><h2 id="live-info-title">Live system status</h2><p>The same local status shown on the Home dashboard, collected in one place.</p></div></header>
+          <DetailRows rows={liveRows} />
+        </section>
+      </div>
+      <p className="system-privacy-note"><Icon name="ShieldCheck" size={15} /> Read locally from Windows, the Java runtime, and the workspace drive. No administrator access is requested.</p>
+    </main>
+  );
 }
 
 function ShutdownDialog({ onCancel, onConfirm }) {
@@ -1134,6 +1250,33 @@ export function App() {
     }
   };
 
+  const copySystemInfo = async () => {
+    const device = system.device || FALLBACK_SYSTEM.device;
+    const windows = system.windows || FALLBACK_SYSTEM.windows;
+    const graphics = device.graphics?.map((item) => item.name).join(", ") || "Unavailable";
+    const summary = [
+      `Device name: ${system.host.name}`,
+      `Manufacturer: ${device.manufacturer}`,
+      `Model: ${device.model}`,
+      `Processor: ${device.processorName}`,
+      `Installed RAM: ${formatBytes(device.installedMemoryBytes || system.resources.memoryTotalBytes)}`,
+      `Graphics: ${graphics}`,
+      `System type: ${device.systemType}`,
+      `Device ID: ${device.deviceId}`,
+      `Product ID: ${device.productId}`,
+      `Windows edition: ${windows.edition}`,
+      `Windows version: ${windows.version}`,
+      `OS build: ${windows.build}`,
+      `Architecture: ${windows.architecture}`,
+    ].join("\n");
+    try {
+      await navigator.clipboard.writeText(summary);
+      notify("System information copied.", "success");
+    } catch {
+      notify("Clipboard access is unavailable in this browser.", "error");
+    }
+  };
+
   const runLifecycle = async (action) => {
     if (lifecycleState !== "idle") return;
     setShutdownOpen(false);
@@ -1319,7 +1462,7 @@ export function App() {
             <section className="today-panel">
               <header><h1>Today on your PC</h1><p>Sunday, August 2, 2026</p></header>
               <div className="today-columns">
-                <SystemHealth system={system} connected={health.connected} configured={health.configured} />
+                <SystemHealth system={system} connected={health.connected} configured={health.configured} onOpenSystem={() => setActiveView("system")} />
                 <RecentApps apps={apps} />
                 <CalendarAndMedia calendar={calendar} calendarRefreshing={calendarRefreshing} musicProvider={musicProvider} musicPlayer={musicPlayer} musicConfigured={Boolean(musicConnection.embedUrl)} onCalendarDateChange={(date) => refreshCalendar(date, false)} onRefreshCalendar={(date) => refreshCalendar(date, true)} onOpenCalendarSettings={() => setActiveView("settings")} onOpenMusic={() => setActiveView("music")} onMusicAction={controlMusic} />
               </div>
@@ -1336,6 +1479,8 @@ export function App() {
           {activeView === "home" ? <AssistantBar onSubmit={sendMessage} busy={assistantBusy} /> : null}
           {activeView === "home" ? <p className="privacy-note">Local first. Private by design.</p> : null}
       </main> : null}
+
+      {activeView === "system" ? <SystemInfoView system={system} connected={health.connected} configured={health.configured} onCopy={copySystemInfo} /> : null}
 
       {activeView === "approvals" ? <ApprovalsView actions={actions} loading={false} onApprove={(id) => updateAction(id, "approve")} onReject={(id) => updateAction(id, "reject")} /> : null}
       {activeView === "memories" ? <MemoriesView memories={memories} onCreate={createMemory} onDelete={deleteMemory} /> : null}

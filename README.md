@@ -8,7 +8,7 @@ This is a desktop-style assistant application, not an operating-system kernel. T
 
 - Local profile picker with profile names, uploaded avatars, isolated app data, credentials, integration links, and appearance preferences.
 - True-black dashboard with a per-profile persistent dark/light appearance preference.
-- Live CPU, memory, storage, network, battery, Windows, backend, and OpenAI status.
+- A dedicated **System Info** tab with live CPU, memory, storage, network, battery, backend, and OpenAI status plus Windows-reported processor, graphics, device, and OS specifications.
 - Approval-backed shortcuts to Windows Wi-Fi, Bluetooth, Focus, Night light, microphone privacy, and battery-saver settings.
 - OpenAI-powered conversations using the official Java SDK.
 - Token-conscious assistant context: each prompt receives only relevant live dashboard sections, with an on-demand tool for additional bounded context.
@@ -215,6 +215,8 @@ The backend reads local Phone Link package metadata and running-process informat
 
 ## Local data and security
 
+The System Info tab uses read-only, non-admin Windows CIM, registry, environment, network-interface, file-system, and Java runtime data. The complete field-by-field inventory, local source, refresh behavior, and assistant-context boundary are documented in [System information access](docs/SYSTEM_INFORMATION.md).
+
 | Data | Location | Protection |
 | --- | --- | --- |
 | Default profile conversations, memories, approvals | `data\assistant-state.json` | Local JSON, user-readable |
@@ -271,7 +273,7 @@ The frontend build writes the browser assets to `frontend\dist\client`, the Site
 | Method | Route | Purpose |
 | --- | --- | --- |
 | `GET` | `/health` | Backend and OpenAI configuration status |
-| `GET` | `/api/system` | Live system/resource/control snapshot |
+| `GET` | `/api/system` | Live resource/control snapshot plus cached Windows device and OS specifications |
 | `GET` | `/api/system/apps` | Detected running applications |
 | `POST` | `/api/system/controls/{id}` | Propose opening a Windows setting |
 | `GET` | `/api/runtime` | Frontend/backend lifecycle status |
