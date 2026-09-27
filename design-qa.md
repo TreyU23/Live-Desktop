@@ -53,7 +53,7 @@
 **Findings**
 
 - No actionable P0, P1, or P2 issue remains.
-- P3: true Windows system toggles still use the existing approval-to-Windows-settings safety path. The dashboard now stays in place when an approval is queued, but Windows Settings remains external by design.
+- P3: Wi-Fi and Bluetooth now use approval-backed Windows radio controls and confirm the resulting state in the dashboard. Focus, Night light, microphone privacy, and Battery saver remain clearly labeled external Windows Settings actions because no equivalent supported consumer toggle API is available to this unpackaged app.
 
 **Implementation checklist**
 

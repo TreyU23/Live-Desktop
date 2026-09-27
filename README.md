@@ -9,7 +9,7 @@ This is a desktop-style assistant application, not an operating-system kernel. T
 - Local profile picker with profile names, uploaded avatars, isolated app data, credentials, integration links, and appearance preferences.
 - True-black dashboard with a per-profile persistent dark/light appearance preference.
 - A dedicated **System Info** tab with live CPU, memory, storage, network, battery, backend, and OpenAI status plus Windows-reported processor, graphics, device, and OS specifications.
-- Approval-backed shortcuts to Windows Wi-Fi, Bluetooth, Focus, Night light, microphone privacy, and battery-saver settings.
+- Approval-backed direct Wi-Fi and Bluetooth toggles using the supported Windows radio API, plus explicit Windows Settings shortcuts for Focus, Night light, microphone privacy, and Battery saver.
 - OpenAI-powered conversations using the official Java SDK.
 - Token-conscious assistant context: each prompt receives only relevant live dashboard sections, with an on-demand tool for additional bounded context.
 - Inspectable local memories and conversation history.
@@ -229,7 +229,7 @@ DPAPI-protected values can only be decrypted by the same Windows user profile. D
 
 The selected music provider and both provider links are profile-specific. Authentication inside each embedded player remains controlled by that provider and the browser's third-party cookie storage, so the app never copies or stores a provider password or session token. The browser may reuse an embedded-player sign-in between local profiles.
 
-The model cannot execute arbitrary shell commands. System toggles create approval-backed actions that open the matching Windows Settings page. Phone Link launch uses the same approval path. Restart and confirmed shutdown are explicit local lifecycle operations.
+The model cannot execute arbitrary shell commands. Wi-Fi and Bluetooth changes are strictly allowlisted, require approval, and use Windows' radio API; Live Desktop re-reads the radio state before reporting success. Windows can deny a change because of user permission, hardware controls, or system policy. Focus, Night light, microphone privacy, and Battery saver do not have equivalent supported consumer toggle APIs for this unpackaged desktop application, so those controls still create approval-backed actions that open the matching Windows Settings page. Live Desktop deliberately does not use undocumented registry edits or UI automation for them. Phone Link launch uses the same approval path. Restart and confirmed shutdown are explicit local lifecycle operations.
 
 ### Assistant access to dashboard information
 
@@ -275,7 +275,7 @@ The frontend build writes the browser assets to `frontend\dist\client`, the Site
 | `GET` | `/health` | Backend and OpenAI configuration status |
 | `GET` | `/api/system` | Live resource/control snapshot plus cached Windows device and OS specifications |
 | `GET` | `/api/system/apps` | Detected running applications |
-| `POST` | `/api/system/controls/{id}` | Propose opening a Windows setting |
+| `POST` | `/api/system/controls/{id}` | Propose a direct Wi-Fi/Bluetooth change with `{ "enabled": true|false }`, or open the matching Windows setting for other controls |
 | `GET` | `/api/runtime` | Frontend/backend lifecycle status |
 | `POST` | `/api/runtime/{action}` | Restart or stop both services; `action` is `restart` or `shutdown` |
 | `POST` | `/api/chat` | Send `{ "message": "...", "conversationId": "optional" }` |

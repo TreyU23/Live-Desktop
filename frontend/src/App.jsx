@@ -63,7 +63,8 @@ const FALLBACK_SYSTEM = {
     label: CONTROL_META[id].label,
     enabled: ["wifi", "bluetooth", "night-light", "microphone"].includes(id),
     available: true,
-    detail: "Opens Windows settings after approval",
+    direct: ["wifi", "bluetooth"].includes(id),
+    detail: ["wifi", "bluetooth"].includes(id) ? "On" : "Opens Windows Settings after approval",
   })),
   device: {
     manufacturer: "Unavailable",
@@ -233,14 +234,16 @@ function AppLogo({ small = false }) {
   );
 }
 
-function Toggle({ enabled, pending, disabled, onClick, label }) {
+function Toggle({ enabled, pending, disabled, direct, onClick, label }) {
   return (
     <button
       className={`toggle ${enabled ? "toggle--on" : ""}`}
       type="button"
       role="switch"
       aria-checked={enabled}
-      aria-label={`${label}: ${enabled ? "on" : "off"}. Open Windows setting`}
+      aria-label={direct
+        ? `${label}: ${enabled ? "on" : "off"}. Request ${enabled ? "off" : "on"}`
+        : `Open Windows ${label} settings`}
       disabled={disabled || pending}
       onClick={onClick}
     >
@@ -1218,8 +1221,17 @@ export function App() {
   const queueControl = async (id) => {
     setPendingControl(id);
     try {
-      await api(`/api/system/controls/${id}`, { method: "POST" });
-      notify(`${CONTROL_META[id].label} settings added to approvals.`, "success");
+      const control = controls.find((item) => item.id === id);
+      await api(`/api/system/controls/${id}`, {
+        method: "POST",
+        body: JSON.stringify({ enabled: !control?.enabled }),
+      });
+      notify(
+        control?.direct
+          ? `${CONTROL_META[id].label} change added to approvals.`
+          : `${CONTROL_META[id].label} settings added to approvals.`,
+        "success",
+      );
       await loadDashboard();
     } catch (error) {
       notify(error.message, "error");
@@ -1450,13 +1462,13 @@ export function App() {
             {controls.map((control) => (
               <div className="control-item" key={control.id}>
                 <Icon name={control.icon} size={26} className={control.enabled ? "control-icon--active" : ""} />
-                <div><strong>{control.label}</strong><span>{control.detail === "Opens Windows settings after approval" ? CONTROL_META[control.id].detail : control.detail}</span></div>
-                <Toggle enabled={control.enabled} pending={pendingControl === control.id} disabled={!control.available} onClick={() => queueControl(control.id)} label={control.label} />
+                <div><strong>{control.label}</strong><span>{control.detail}</span></div>
+                <Toggle enabled={control.enabled} pending={pendingControl === control.id} disabled={!control.available} direct={control.direct} onClick={() => queueControl(control.id)} label={control.label} />
               </div>
             ))}
           </section>
           <button className="capability-notice" type="button" onClick={() => setActiveView("approvals")}>
-            <Icon name="Info" size={18} /><span>System controls open the matching Windows setting after your approval.</span><b>Review device control</b><Icon name="ChevronRight" size={16} />
+            <Icon name="Info" size={18} /><span>Wi-Fi and Bluetooth change here after approval. Other controls open Windows Settings.</span><b>Review device control</b><Icon name="ChevronRight" size={16} />
           </button>
           <div className="dashboard-grid">
             <section className="today-panel">

@@ -2,6 +2,9 @@ package com.localassistant.os.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 import com.localassistant.os.config.AssistantProperties;
 import com.localassistant.os.profile.ProfilePaths;
@@ -19,6 +22,7 @@ class ActionServiceTest {
 
     private ActionService actions;
     private MemoryService memories;
+    private WindowsSystemControlService systemControls;
 
     @BeforeEach
     void setUp() throws Exception {
@@ -28,7 +32,9 @@ class ActionServiceTest {
         StateStore store = new StateStore(new ProfilePaths(properties));
         WorkspaceService workspace = new WorkspaceService(properties);
         memories = new MemoryService(store);
-        actions = new ActionService(store, workspace, memories);
+        systemControls = mock(WindowsSystemControlService.class);
+        when(systemControls.supports("wifi")).thenReturn(true);
+        actions = new ActionService(store, workspace, memories, systemControls);
     }
 
     @Test
@@ -71,5 +77,30 @@ class ActionServiceTest {
                 "Should not queue."))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("approved capability list");
+    }
+
+    @Test
+    void directWindowsControlsDoNothingUntilApproved() throws Exception {
+        when(systemControls.set("wifi", false)).thenReturn(Map.of("available", true, "enabled", false));
+
+        var action = actions.propose(
+                "windows_set_control",
+                Map.of("control", "wifi", "enabled", false),
+                "Turn Wi-Fi off.");
+
+        assertThat(action.status()).isEqualTo("pending");
+        verify(systemControls, org.mockito.Mockito.never()).set("wifi", false);
+        assertThat(actions.approve(action.id()).status()).isEqualTo("completed");
+        verify(systemControls).set("wifi", false);
+    }
+
+    @Test
+    void unknownDirectWindowsControlsAreRejectedBeforeQueueing() {
+        assertThatThrownBy(() -> actions.propose(
+                "windows_set_control",
+                Map.of("control", "night-light", "enabled", true),
+                "Should not queue."))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("approved direct-control list");
     }
 }

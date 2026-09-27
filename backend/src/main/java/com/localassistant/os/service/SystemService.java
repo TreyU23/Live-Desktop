@@ -26,12 +26,12 @@ import org.springframework.stereotype.Service;
 @Service
 public class SystemService {
     private static final Map<String, ControlDefinition> CONTROL_DEFINITIONS = Map.of(
-            "wifi", new ControlDefinition("wifi", "Wi-Fi", "ms-settings:network-wifi"),
-            "bluetooth", new ControlDefinition("bluetooth", "Bluetooth", "ms-settings:bluetooth"),
-            "focus", new ControlDefinition("focus", "Focus", "ms-settings:quiethours"),
-            "night-light", new ControlDefinition("night-light", "Night light", "ms-settings:nightlight"),
-            "microphone", new ControlDefinition("microphone", "Mic privacy", "ms-settings:privacy-microphone"),
-            "battery-saver", new ControlDefinition("battery-saver", "Battery saver", "ms-settings:batterysaver"));
+            "wifi", new ControlDefinition("wifi", "Wi-Fi", "ms-settings:network-wifi", true),
+            "bluetooth", new ControlDefinition("bluetooth", "Bluetooth", "ms-settings:bluetooth", true),
+            "focus", new ControlDefinition("focus", "Focus", "ms-settings:quiethours", false),
+            "night-light", new ControlDefinition("night-light", "Night light", "ms-settings:nightlight", false),
+            "microphone", new ControlDefinition("microphone", "Mic privacy", "ms-settings:privacy-microphone", false),
+            "battery-saver", new ControlDefinition("battery-saver", "Battery saver", "ms-settings:batterysaver", false));
 
     private static final Map<String, AppDefinition> KNOWN_APPS = Map.ofEntries(
             Map.entry("code", new AppDefinition("Visual Studio Code", "Working in your local workspace", "code")),
@@ -45,11 +45,13 @@ public class SystemService {
             Map.entry("teams", new AppDefinition("Microsoft Teams", "Collaboration active", "teams")));
 
     private final Path workspaceRoot;
+    private final WindowsSystemControlService systemControls;
     private final ObjectMapper objectMapper = new ObjectMapper();
     private volatile WindowsDetails cachedWindowsDetails;
 
-    public SystemService(AssistantProperties properties) {
+    public SystemService(AssistantProperties properties, WindowsSystemControlService systemControls) {
         workspaceRoot = Path.of(properties.getWorkspaceRoot()).toAbsolutePath().normalize();
+        this.systemControls = systemControls;
     }
 
     public SystemSnapshot snapshot() {
@@ -80,7 +82,7 @@ public class SystemService {
                         Math.max(0, disk.getTotalSpace()),
                         network,
                         batteryInfo()),
-                controls(network),
+                controls(),
                 windowsDetails.device(),
                 windowsDetails.windows());
     }
@@ -415,18 +417,36 @@ public class SystemService {
         return definition;
     }
 
-    private List<SystemControl> controls(NetworkInfo network) {
+    private List<SystemControl> controls() {
         boolean windows = isWindows();
-        String networkName = network.name().toLowerCase(Locale.ROOT);
+        Map<String, Object> directSnapshot = windows ? systemControls.snapshot() : Map.of();
         return CONTROL_DEFINITIONS.values().stream()
                 .sorted(Comparator.comparing(ControlDefinition::id))
-                .map(definition -> new SystemControl(
-                        definition.id(),
-                        definition.label(),
-                        definition.id().equals("wifi") && (networkName.contains("wi-fi") || networkName.contains("wlan")),
-                        windows,
-                        windows ? "Opens the matching Windows setting after approval" : "Windows only"))
+                .map(definition -> {
+                    Map<?, ?> state = directState(directSnapshot, definition.id());
+                    boolean directAvailable = definition.direct() && Boolean.TRUE.equals(state.get("available"));
+                    boolean enabled = directAvailable && Boolean.TRUE.equals(state.get("enabled"));
+                    String detail = !windows
+                            ? "Windows only"
+                            : directAvailable
+                                    ? (enabled ? "On" : "Off")
+                                    : definition.direct()
+                                            ? "Direct control unavailable"
+                                            : "Opens Windows Settings after approval";
+                    return new SystemControl(
+                            definition.id(),
+                            definition.label(),
+                            enabled,
+                            definition.direct() ? directAvailable : windows,
+                            detail,
+                            definition.direct());
+                })
                 .toList();
+    }
+
+    private Map<?, ?> directState(Map<String, Object> snapshot, String id) {
+        Object value = snapshot.get(id);
+        return value instanceof Map<?, ?> map ? map : Map.of();
     }
 
     private NetworkInfo networkInfo() {
@@ -573,9 +593,10 @@ public class SystemService {
             String installedOn,
             String architecture) {}
 
-    public record SystemControl(String id, String label, boolean enabled, boolean available, String detail) {}
+    public record SystemControl(
+            String id, String label, boolean enabled, boolean available, String detail, boolean direct) {}
 
-    public record ControlDefinition(String id, String label, String settingsUri) {}
+    public record ControlDefinition(String id, String label, String settingsUri, boolean direct) {}
 
     public record RunningApp(String id, String name, String detail, String icon, boolean running) {}
 

@@ -213,17 +213,34 @@ public class AssistantController {
     }
 
     @PostMapping("/api/system/controls/{id}")
-    public ResponseEntity<?> openSystemControl(@PathVariable String id) {
+    public ResponseEntity<?> openSystemControl(
+            @PathVariable String id,
+            @RequestBody(required = false) SystemControlRequest request) {
         try {
             var control = system.control(id);
-            var action = actions.propose(
-                    "windows_open_uri",
-                    Map.of("uri", control.settingsUri()),
-                    "Open Windows " + control.label() + " settings.");
+            var action = control.direct()
+                    ? proposeDirectSystemControl(control, request)
+                    : actions.propose(
+                            "windows_open_uri",
+                            Map.of("uri", control.settingsUri()),
+                            "Open Windows " + control.label() + " settings.");
             return ResponseEntity.status(HttpStatus.ACCEPTED).body(action);
         } catch (Exception error) {
             return ResponseEntity.badRequest().body(error(error));
         }
+    }
+
+    private Object proposeDirectSystemControl(
+            SystemService.ControlDefinition control,
+            SystemControlRequest request) throws IOException {
+        if (request == null || request.enabled() == null) {
+            throw new IllegalArgumentException("enabled is required for direct Windows controls.");
+        }
+        boolean enabled = request.enabled();
+        return actions.propose(
+                "windows_set_control",
+                Map.of("control", control.id(), "enabled", enabled),
+                "Turn " + control.label() + " " + (enabled ? "on" : "off") + ".");
     }
 
     @PostMapping("/api/integrations/phone-link/open")
@@ -315,5 +332,6 @@ public class AssistantController {
 
     public record ICloudCalendarRequest(String email, String appSpecificPassword) {}
     public record OpenAiKeyRequest(String apiKey) {}
+    public record SystemControlRequest(Boolean enabled) {}
 
 }

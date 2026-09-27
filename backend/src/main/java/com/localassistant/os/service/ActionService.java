@@ -25,11 +25,17 @@ public class ActionService {
     private final StateStore store;
     private final WorkspaceService workspace;
     private final MemoryService memories;
+    private final WindowsSystemControlService systemControls;
 
-    public ActionService(StateStore store, WorkspaceService workspace, MemoryService memories) {
+    public ActionService(
+            StateStore store,
+            WorkspaceService workspace,
+            MemoryService memories,
+            WindowsSystemControlService systemControls) {
         this.store = store;
         this.workspace = workspace;
         this.memories = memories;
+        this.systemControls = systemControls;
     }
 
     public List<AssistantAction> list(String status) {
@@ -72,6 +78,15 @@ public class ActionService {
             }
             case "browser_open_url" -> parseWebUri(requireString(arguments.get("url"), "url", 1, 2_000));
             case "windows_open_uri" -> parseWindowsUri(requireString(arguments.get("uri"), "uri", 1, 200));
+            case "windows_set_control" -> {
+                String control = requireString(arguments.get("control"), "control", 1, 40);
+                if (!systemControls.supports(control)) {
+                    throw new IllegalArgumentException("Windows control is not in the approved direct-control list.");
+                }
+                if (!(arguments.get("enabled") instanceof Boolean)) {
+                    throw new IllegalArgumentException("enabled must be a boolean.");
+                }
+            }
             case "remember" -> {
                 requireString(arguments.get("content"), "content", 1, 2_000);
                 requireString(arguments.get("category"), "category", 1, 32);
@@ -104,6 +119,11 @@ public class ActionService {
             }
             new ProcessBuilder("explorer.exe", uri).start();
             return Map.of("opened", uri);
+        }
+        if (action.kind().equals("windows_set_control")) {
+            return systemControls.set(
+                    String.valueOf(action.arguments().get("control")),
+                    Boolean.TRUE.equals(action.arguments().get("enabled")));
         }
         return memories.add(
                 String.valueOf(action.arguments().get("content")),
