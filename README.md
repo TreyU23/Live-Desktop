@@ -9,7 +9,7 @@ This is a desktop-style assistant application, not an operating-system kernel. T
 - Local profile picker with profile names, uploaded avatars, isolated app data, credentials, integration links, and appearance preferences.
 - True-black dashboard with a per-profile persistent dark/light appearance preference.
 - A dedicated **System Info** tab with live CPU, memory, storage, network, battery, backend, and OpenAI status plus Windows-reported processor, graphics, device, and OS specifications.
-- Approval-backed direct Wi-Fi and Bluetooth toggles using the supported Windows radio API, plus explicit Windows Settings shortcuts for Focus, Night light, microphone privacy, and Battery saver.
+- One-time approval-backed direct Wi-Fi and Bluetooth toggles using the supported Windows radio API, plus explicit Windows Settings shortcuts for Focus, Night light, microphone privacy, and Battery saver. After a capability is approved for the active profile, later matching button presses run immediately.
 - OpenAI-powered conversations using the official Java SDK.
 - Token-conscious assistant context: each prompt receives only relevant live dashboard sections, with an on-demand tool for additional bounded context.
 - Inspectable local memories and conversation history.
@@ -211,7 +211,7 @@ No Apple or Spotify password is stored by this integration. Each provider's shar
 3. Keep Phone Link running in the background if you want current connection and sync information.
 4. Use the refresh button on the Live Desktop phone widget if its status is stale.
 
-The backend reads local Phone Link package metadata and running-process information. It reports the paired device name/model, battery when available, last-seen/sync timestamps, and whether the local companion metadata indicates notifications. Live Desktop does not display private notification contents. **Open app** creates an approval to launch Phone Link externally with the `ms-phone:` URI.
+The backend reads local Phone Link package metadata and running-process information. It reports the paired device name/model, battery when available, last-seen/sync timestamps, and whether the local companion metadata indicates notifications. Live Desktop does not display private notification contents. The first use of **Open app** creates an approval to launch Phone Link externally with the `ms-phone:` URI; after that approval, the button launches Phone Link immediately for the active profile.
 
 ## Local data and security
 
@@ -219,7 +219,7 @@ The System Info tab uses read-only, non-admin Windows CIM, registry, environment
 
 | Data | Location | Protection |
 | --- | --- | --- |
-| Default profile conversations, memories, approvals | `data\assistant-state.json` | Local JSON, user-readable |
+| Default profile conversations, memories, actions, and reusable approvals | `data\assistant-state.json` | Local JSON, user-readable |
 | Additional profile backend data | `data\profiles\<profile-id>\` | Separate local files per profile |
 | iCloud account and OpenAI key records | Default under `data\`; additional profiles under `data\profiles\<profile-id>\` | Secrets encrypted with Windows DPAPI |
 | Profile names, avatars, theme, accent color, selected music provider, and Apple Music/Spotify links | Browser local storage | Namespaced by local profile; uploaded avatars remain in this browser |
@@ -229,7 +229,9 @@ DPAPI-protected values can only be decrypted by the same Windows user profile. D
 
 The selected music provider and both provider links are profile-specific. Authentication inside each embedded player remains controlled by that provider and the browser's third-party cookie storage, so the app never copies or stores a provider password or session token. The browser may reuse an embedded-player sign-in between local profiles.
 
-The model cannot execute arbitrary shell commands. Wi-Fi and Bluetooth changes are strictly allowlisted, require approval, and use Windows' radio API; Live Desktop re-reads the radio state before reporting success. Windows can deny a change because of user permission, hardware controls, or system policy. Focus, Night light, microphone privacy, and Battery saver do not have equivalent supported consumer toggle APIs for this unpackaged desktop application, so those controls still create approval-backed actions that open the matching Windows Settings page. Live Desktop deliberately does not use undocumented registry edits or UI automation for them. Phone Link launch uses the same approval path. Restart and confirmed shutdown are explicit local lifecycle operations.
+The model cannot execute arbitrary shell commands. Wi-Fi and Bluetooth changes are strictly allowlisted and use Windows' radio API; Live Desktop re-reads the radio state before reporting success. The first request for each control requires approval, and later presses of that control run immediately in the same local profile (the approval covers both on and off). Windows can still deny a change because of user permission, hardware controls, or system policy. Focus, Night light, microphone privacy, and Battery saver do not have equivalent supported consumer toggle APIs for this unpackaged desktop application, so those controls open the matching Windows Settings page after their one-time approval. Live Desktop deliberately does not use undocumented registry edits or UI automation for them. Phone Link launch uses the same one-time approval path. Restart and confirmed shutdown are explicit local lifecycle operations.
+
+Reusable approvals are profile-scoped and inferred from that profile's approved action history. Matching is intentionally limited to the same capability: a Windows control ID, an exact Windows URI, an exact web URL, a normalized workspace file path, or a memory category. A different target still creates a new pending approval. Both completed actions and actions that failed after approval count as approved, so a transient execution failure does not force another approval. Removing a non-default profile also removes its reusable approvals; deleting the default profile's `assistant-state.json` while Live Desktop is stopped resets its approvals together with its conversations, memories, and action history.
 
 ### Assistant access to dashboard information
 
@@ -275,14 +277,14 @@ The frontend build writes the browser assets to `frontend\dist\client`, the Site
 | `GET` | `/health` | Backend and OpenAI configuration status |
 | `GET` | `/api/system` | Live resource/control snapshot plus cached Windows device and OS specifications |
 | `GET` | `/api/system/apps` | Detected running applications |
-| `POST` | `/api/system/controls/{id}` | Propose a direct Wi-Fi/Bluetooth change with `{ "enabled": true|false }`, or open the matching Windows setting for other controls |
+| `POST` | `/api/system/controls/{id}` | Request a direct Wi-Fi/Bluetooth change with `{ "enabled": true|false }`, or open the matching Windows setting; returns `pending` on first use and executes immediately after prior approval |
 | `GET` | `/api/runtime` | Frontend/backend lifecycle status |
 | `POST` | `/api/runtime/{action}` | Restart or stop both services; `action` is `restart` or `shutdown` |
 | `POST` | `/api/chat` | Send `{ "message": "...", "conversationId": "optional" }` |
 | `GET` | `/api/conversations` | List conversations |
 | `GET` | `/api/conversations/{id}` | Read one conversation |
 | `GET` | `/api/actions?status=pending` | List approval actions |
-| `POST` | `/api/actions/{id}/approve` | Approve and execute an action |
+| `POST` | `/api/actions/{id}/approve` | Approve and execute an action, remembering its matching capability for the active profile |
 | `POST` | `/api/actions/{id}/reject` | Reject an action |
 | `GET` | `/api/memories` | List memories |
 | `POST` | `/api/memories` | Create a memory |
@@ -292,7 +294,7 @@ The frontend build writes the browser assets to `frontend\dist\client`, the Site
 | `DELETE` | `/api/profile/openai-key` | Remove the current profile's saved OpenAI key |
 | `DELETE` | `/api/profile/data` | Delete all app-owned backend data for a non-default profile |
 | `GET` | `/api/integrations/phone-link` | Read current Phone Link metadata |
-| `POST` | `/api/integrations/phone-link/open` | Propose launching Phone Link |
+| `POST` | `/api/integrations/phone-link/open` | Request a Phone Link launch; first use is pending approval and later uses launch immediately |
 | `GET` | `/api/integrations/icloud-calendar?date=YYYY-MM-DD` | Read the selected day |
 | `POST` | `/api/integrations/icloud-calendar/connect` | Verify and save iCloud credentials |
 | `DELETE` | `/api/integrations/icloud-calendar` | Disconnect iCloud and remove credentials |

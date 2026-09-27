@@ -8,6 +8,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import org.springframework.stereotype.Service;
@@ -46,7 +47,11 @@ public class ActionService {
 
     public AssistantAction propose(String kind, Map<String, Object> arguments, String reason) throws IOException {
         validate(kind, arguments);
-        return store.addAction(kind, arguments, requireString(reason, "reason", 1, 2_000));
+        String approvalKey = approvalKey(kind, arguments);
+        boolean previouslyApproved = hasPreviousApproval(approvalKey);
+        AssistantAction action = store.addAction(
+                kind, arguments, requireString(reason, "reason", 1, 2_000));
+        return previouslyApproved ? approve(action.id()) : action;
     }
 
     public AssistantAction reject(String id) throws IOException {
@@ -93,6 +98,35 @@ public class ActionService {
             }
             default -> throw new IllegalArgumentException("Unknown action kind.");
         }
+    }
+
+    private boolean hasPreviousApproval(String approvalKey) throws IOException {
+        for (AssistantAction action : store.snapshot().actions()) {
+            if (Set.of("approved", "completed", "failed").contains(action.status())
+                    && approvalKey(action.kind(), action.arguments()).equals(approvalKey)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private String approvalKey(String kind, Map<String, Object> arguments) throws IOException {
+        return switch (kind) {
+            case "workspace_write_file" -> {
+                Path path = workspace.resolveSafePath(String.valueOf(arguments.get("path")));
+                yield kind + ":" + workspace.root().relativize(path).normalize().toString()
+                        .toLowerCase(Locale.ROOT);
+            }
+            case "browser_open_url" -> kind + ":"
+                    + parseWebUri(String.valueOf(arguments.get("url"))).normalize();
+            case "windows_open_uri" -> kind + ":"
+                    + parseWindowsUri(String.valueOf(arguments.get("uri"))).toLowerCase(Locale.ROOT);
+            case "windows_set_control" -> kind + ":"
+                    + String.valueOf(arguments.get("control")).toLowerCase(Locale.ROOT);
+            case "remember" -> kind + ":"
+                    + String.valueOf(arguments.get("category")).toLowerCase(Locale.ROOT);
+            default -> throw new IllegalArgumentException("Unknown action kind.");
+        };
     }
 
     private Object execute(AssistantAction action) throws IOException {

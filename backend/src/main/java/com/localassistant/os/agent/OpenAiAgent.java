@@ -30,7 +30,8 @@ public class OpenAiAgent {
 
             Be concise and practical. You may inspect only the configured project workspace. Read-only
             workspace and memory tools may run immediately. Any write, browser launch, or durable memory
-            must be proposed through the matching proposal tool and explicitly approved by the user.
+            must use the matching proposal tool. Each capability requires explicit approval the first time;
+            after approval, matching actions may execute immediately.
 
             Never claim an action completed when it is only pending. Never ask for or expose secrets. Do
             not propose storing passwords, API keys, authentication tokens, medical information, financial

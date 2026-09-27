@@ -40,7 +40,7 @@ public final class AssistantTools {
     }
 
     @JsonTypeName("propose_write_file")
-    @JsonClassDescription("Queues a workspace file write for user approval. Never writes immediately.")
+    @JsonClassDescription("Requests a workspace file write. The first write to a file waits for user approval; later writes to that approved file run immediately.")
     public static class ProposeWriteFile {
         public String path;
         public String content;
@@ -48,14 +48,14 @@ public final class AssistantTools {
     }
 
     @JsonTypeName("propose_open_url")
-    @JsonClassDescription("Queues opening an HTTP or HTTPS URL in the Windows browser for user approval.")
+    @JsonClassDescription("Requests opening an HTTP or HTTPS URL in the Windows browser. The first request for that URL waits for approval; later matching requests run immediately.")
     public static class ProposeOpenUrl {
         public String url;
         public String reason;
     }
 
     @JsonTypeName("propose_memory")
-    @JsonClassDescription("Queues a useful durable memory for user approval.")
+    @JsonClassDescription("Requests a useful durable memory. The first memory in a category waits for approval; later memories in that approved category are saved immediately.")
     public static class ProposeMemory {
         public String content;
         @JsonPropertyDescription("One of preference, project, fact, or instruction.")

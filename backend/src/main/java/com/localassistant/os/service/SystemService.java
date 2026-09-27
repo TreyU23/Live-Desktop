@@ -432,7 +432,7 @@ public class SystemService {
                                     ? (enabled ? "On" : "Off")
                                     : definition.direct()
                                             ? "Direct control unavailable"
-                                            : "Opens Windows Settings after approval";
+                                            : "Opens Windows Settings after one-time approval";
                     return new SystemControl(
                             definition.id(),
                             definition.label(),

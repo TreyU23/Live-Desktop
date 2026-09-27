@@ -64,7 +64,7 @@ const FALLBACK_SYSTEM = {
     enabled: ["wifi", "bluetooth", "night-light", "microphone"].includes(id),
     available: true,
     direct: ["wifi", "bluetooth"].includes(id),
-    detail: ["wifi", "bluetooth"].includes(id) ? "On" : "Opens Windows Settings after approval",
+    detail: ["wifi", "bluetooth"].includes(id) ? "On" : "Opens Windows Settings after one-time approval",
   })),
   device: {
     manufacturer: "Unavailable",
@@ -633,7 +633,7 @@ function EmptyState({ icon, title, detail }) {
 
 function ApprovalsView({ actions, loading, onApprove, onReject }) {
   return (
-    <ViewShell eyebrow="Safety center" title="Approvals" detail="Review every change before it reaches your files, browser, or Windows settings.">
+    <ViewShell eyebrow="Safety center" title="Approvals" detail="Approve each capability once. Later matching actions run immediately.">
       <div className="view-toolbar"><span>{actions.filter((action) => action.status === "pending").length} pending</span></div>
       {loading ? <EmptyState icon="LoaderCircle" title="Loading approvals" detail="Checking the local action queue." /> : null}
       {!loading && !actions.length ? <EmptyState icon="ShieldCheck" title="Nothing needs review" detail="New assistant and system actions will appear here." /> : null}
@@ -1222,14 +1222,18 @@ export function App() {
     setPendingControl(id);
     try {
       const control = controls.find((item) => item.id === id);
-      await api(`/api/system/controls/${id}`, {
+      const action = await api(`/api/system/controls/${id}`, {
         method: "POST",
         body: JSON.stringify({ enabled: !control?.enabled }),
       });
       notify(
-        control?.direct
-          ? `${CONTROL_META[id].label} change added to approvals.`
-          : `${CONTROL_META[id].label} settings added to approvals.`,
+        action.status === "completed"
+          ? (control?.direct
+              ? `${CONTROL_META[id].label} changed.`
+              : `${CONTROL_META[id].label} settings opened.`)
+          : (control?.direct
+              ? `${CONTROL_META[id].label} needs first-time approval.`
+              : `${CONTROL_META[id].label} settings need first-time approval.`),
         "success",
       );
       await loadDashboard();
@@ -1243,8 +1247,13 @@ export function App() {
   const openPhone = async () => {
     setPendingControl("phone");
     try {
-      await api("/api/integrations/phone-link/open", { method: "POST" });
-      notify("Phone Link launch added to approvals. The dashboard will stay open.", "success");
+      const action = await api("/api/integrations/phone-link/open", { method: "POST" });
+      notify(
+        action.status === "completed"
+          ? "Phone Link opened. The dashboard will stay open."
+          : "Phone Link needs first-time approval. The dashboard will stay open.",
+        "success",
+      );
       await loadDashboard();
     } catch (error) {
       notify(error.message, "error");
@@ -1468,7 +1477,7 @@ export function App() {
             ))}
           </section>
           <button className="capability-notice" type="button" onClick={() => setActiveView("approvals")}>
-            <Icon name="Info" size={18} /><span>Wi-Fi and Bluetooth change here after approval. Other controls open Windows Settings.</span><b>Review device control</b><Icon name="ChevronRight" size={16} />
+            <Icon name="Info" size={18} /><span>Approve each device control once; later presses run immediately.</span><b>Review device control</b><Icon name="ChevronRight" size={16} />
           </button>
           <div className="dashboard-grid">
             <section className="today-panel">
