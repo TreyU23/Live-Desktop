@@ -1,5 +1,5 @@
 param(
-    [ValidateSet("snapshot", "set")]
+    [ValidateSet("snapshot", "set", "worker")]
     [string]$Action = "snapshot",
     [ValidateSet("wifi", "bluetooth")]
     [string]$Control = "wifi",
@@ -12,6 +12,11 @@ $ProgressPreference = "SilentlyContinue"
 
 function Write-Result($value) {
     [Console]::Out.Write(($value | ConvertTo-Json -Compress -Depth 4))
+}
+
+function Write-WorkerResult($value) {
+    [Console]::Out.WriteLine(($value | ConvertTo-Json -Compress -Depth 4))
+    [Console]::Out.Flush()
 }
 
 function Await-WinRt($operation, $resultType) {
@@ -46,6 +51,75 @@ function Radio-State($radios, $control) {
     }
 }
 
+function Invoke-Control($action, $control, $target) {
+    try {
+        if ($null -eq $script:Radios) {
+            $script:Radios = @(Get-Radios)
+        }
+
+        if ($action -eq "snapshot") {
+            return [pscustomobject]@{
+                available = $true
+                wifi = Radio-State $script:Radios "wifi"
+                bluetooth = Radio-State $script:Radios "bluetooth"
+            }
+        }
+
+        $radio = Find-Radio $script:Radios $control
+        if ($null -eq $radio) {
+            $script:Radios = @(Get-Radios)
+            $radio = Find-Radio $script:Radios $control
+        }
+        if ($null -eq $radio) {
+            throw "$control radio is not available on this PC."
+        }
+
+        $access = Await-WinRt `
+            ([Windows.Devices.Radios.Radio]::RequestAccessAsync()) `
+            ([Windows.Devices.Radios.RadioAccessStatus])
+        if ($access.ToString() -ne "Allowed") {
+            throw "Windows denied access to the $control radio ($access)."
+        }
+
+        $targetState = if ($target -eq "on") {
+            [Windows.Devices.Radios.RadioState]::On
+        } else {
+            [Windows.Devices.Radios.RadioState]::Off
+        }
+        $result = Await-WinRt `
+            ($radio.SetStateAsync($targetState)) `
+            ([Windows.Devices.Radios.RadioAccessStatus])
+        if ($result.ToString() -ne "Allowed") {
+            throw "Windows rejected the $control change ($result)."
+        }
+
+        $expected = $target -eq "on"
+        $expectedState = if ($expected) { "On" } else { "Off" }
+        $verification = [System.Diagnostics.Stopwatch]::StartNew()
+        while ($radio.State.ToString() -ne $expectedState -and $verification.ElapsedMilliseconds -lt 1500) {
+            Start-Sleep -Milliseconds 50
+        }
+        $updatedState = $radio.State.ToString()
+        if ($updatedState -ne $expectedState) {
+            throw "Windows accepted the request, but the $control radio did not reach the requested state."
+        }
+
+        return [pscustomobject]@{
+            available = $true
+            control = $control
+            enabled = $expected
+            state = $updatedState
+            status = "completed"
+        }
+    } catch {
+        return [pscustomobject]@{
+            available = $false
+            control = $control
+            detail = $_.Exception.Message
+        }
+    }
+}
+
 if (-not [System.Environment]::OSVersion.Platform.ToString().StartsWith("Win")) {
     Write-Result ([pscustomobject]@{ available = $false; detail = "Windows system controls are available on Windows only." })
     exit 0
@@ -54,55 +128,24 @@ if (-not [System.Environment]::OSVersion.Platform.ToString().StartsWith("Win")) 
 try {
     Add-Type -AssemblyName System.Runtime.WindowsRuntime
     $null = [Windows.Devices.Radios.Radio, Windows.Devices.Radios, ContentType = WindowsRuntime]
-    $radios = Get-Radios
+    $script:Radios = $null
 
-    if ($Action -eq "snapshot") {
-        Write-Result ([pscustomobject]@{
-            available = $true
-            wifi = Radio-State $radios "wifi"
-            bluetooth = Radio-State $radios "bluetooth"
-        })
+    if ($Action -eq "worker") {
+        while ($null -ne ($line = [Console]::In.ReadLine())) {
+            try {
+                $request = $line | ConvertFrom-Json
+                $response = Invoke-Control ([string]$request.action) ([string]$request.control) ([string]$request.target)
+            } catch {
+                $response = [pscustomobject]@{ available = $false; detail = $_.Exception.Message }
+            }
+            Write-WorkerResult $response
+        }
         exit 0
     }
 
-    $radio = Find-Radio $radios $Control
-    if ($null -eq $radio) {
-        throw "$Control radio is not available on this PC."
-    }
-
-    $access = Await-WinRt `
-        ([Windows.Devices.Radios.Radio]::RequestAccessAsync()) `
-        ([Windows.Devices.Radios.RadioAccessStatus])
-    if ($access.ToString() -ne "Allowed") {
-        throw "Windows denied access to the $Control radio ($access)."
-    }
-
-    $targetState = if ($Target -eq "on") {
-        [Windows.Devices.Radios.RadioState]::On
-    } else {
-        [Windows.Devices.Radios.RadioState]::Off
-    }
-    $result = Await-WinRt `
-        ($radio.SetStateAsync($targetState)) `
-        ([Windows.Devices.Radios.RadioAccessStatus])
-    if ($result.ToString() -ne "Allowed") {
-        throw "Windows rejected the $Control change ($result)."
-    }
-
-    Start-Sleep -Milliseconds 350
-    $updated = Radio-State (Get-Radios) $Control
-    $expected = $Target -eq "on"
-    if (-not $updated.available -or $updated.enabled -ne $expected) {
-        throw "Windows accepted the request, but the $Control radio did not reach the requested state."
-    }
-
-    Write-Result ([pscustomobject]@{
-        available = $true
-        control = $Control
-        enabled = $updated.enabled
-        state = $updated.state
-        status = "completed"
-    })
+    $response = Invoke-Control $Action $Control $Target
+    Write-Result $response
+    if (-not $response.available) { exit 1 }
 } catch {
     Write-Result ([pscustomobject]@{
         available = $false

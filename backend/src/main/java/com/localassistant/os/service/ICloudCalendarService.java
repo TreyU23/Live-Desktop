@@ -97,7 +97,10 @@ public class ICloudCalendarService {
         return CalendarSnapshot.disconnected(LocalDate.now());
     }
 
-    public synchronized void clearCurrentCache() { cache.remove(ProfileContext.currentId()); }
+    public synchronized void clearCurrentCache() {
+        cache.remove(ProfileContext.currentId());
+        credentials.clearCurrentCache();
+    }
 
     private CalendarSnapshot fetch(ICloudCredentialStore.Credentials account, LocalDate date) throws Exception {
         String auth = "Basic " + Base64.getEncoder().encodeToString(

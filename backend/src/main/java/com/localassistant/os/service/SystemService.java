@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.localassistant.os.config.AssistantProperties;
 import com.sun.management.OperatingSystemMXBean;
+import jakarta.annotation.PostConstruct;
 import java.io.File;
 import java.lang.management.ManagementFactory;
 import java.net.NetworkInterface;
@@ -11,6 +12,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
 import java.time.OffsetDateTime;
+import java.time.Duration;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayDeque;
 import java.util.Comparator;
@@ -20,11 +22,13 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import org.springframework.stereotype.Service;
 
 @Service
 public class SystemService {
+    private static final Duration BATTERY_CACHE_TTL = Duration.ofMinutes(5);
     private static final Map<String, ControlDefinition> CONTROL_DEFINITIONS = Map.of(
             "wifi", new ControlDefinition("wifi", "Wi-Fi", "ms-settings:network-wifi", true),
             "bluetooth", new ControlDefinition("bluetooth", "Bluetooth", "ms-settings:bluetooth", true),
@@ -47,14 +51,30 @@ public class SystemService {
     private final Path workspaceRoot;
     private final WindowsSystemControlService systemControls;
     private final ObjectMapper objectMapper = new ObjectMapper();
+    private final Object batteryLock = new Object();
     private volatile WindowsDetails cachedWindowsDetails;
+    private volatile CachedBattery cachedBattery;
 
     public SystemService(AssistantProperties properties, WindowsSystemControlService systemControls) {
         workspaceRoot = Path.of(properties.getWorkspaceRoot()).toAbsolutePath().normalize();
         this.systemControls = systemControls;
     }
 
+    @PostConstruct
+    void warmStableSystemData() {
+        if (!isWindows()) {
+            return;
+        }
+        CompletableFuture.runAsync(this::batteryInfo);
+        CompletableFuture.runAsync(() -> {
+            OperatingSystemMXBean osBean = (OperatingSystemMXBean) ManagementFactory.getOperatingSystemMXBean();
+            windowsDetails(Math.max(0, osBean.getTotalMemorySize()));
+        });
+    }
+
     public SystemSnapshot snapshot() {
+        CompletableFuture<BatteryInfo> battery = CompletableFuture.supplyAsync(this::batteryInfo);
+        CompletableFuture<List<SystemControl>> controls = CompletableFuture.supplyAsync(this::controls);
         OperatingSystemMXBean osBean = (OperatingSystemMXBean) ManagementFactory.getOperatingSystemMXBean();
         long totalMemory = Math.max(0, osBean.getTotalMemorySize());
         long freeMemory = Math.max(0, osBean.getFreeMemorySize());
@@ -81,8 +101,8 @@ public class SystemService {
                         Math.max(0, disk.getTotalSpace() - disk.getUsableSpace()),
                         Math.max(0, disk.getTotalSpace()),
                         network,
-                        batteryInfo()),
-                controls(),
+                        battery.join()),
+                controls.join(),
                 windowsDetails.device(),
                 windowsDetails.windows());
     }
@@ -504,6 +524,24 @@ public class SystemService {
     }
 
     private BatteryInfo batteryInfo() {
+        CachedBattery current = cachedBattery;
+        Instant now = Instant.now();
+        if (current != null && now.isBefore(current.expiresAt())) {
+            return current.value();
+        }
+        synchronized (batteryLock) {
+            current = cachedBattery;
+            now = Instant.now();
+            if (current != null && now.isBefore(current.expiresAt())) {
+                return current.value();
+            }
+            BatteryInfo value = readBatteryInfo();
+            cachedBattery = new CachedBattery(value, now.plus(BATTERY_CACHE_TTL));
+            return value;
+        }
+    }
+
+    private BatteryInfo readBatteryInfo() {
         if (!isWindows()) {
             return new BatteryInfo(false, null, "Unavailable");
         }
@@ -597,6 +635,7 @@ public class SystemService {
             String id, String label, boolean enabled, boolean available, String detail, boolean direct) {}
 
     public record ControlDefinition(String id, String label, String settingsUri, boolean direct) {}
+    private record CachedBattery(BatteryInfo value, Instant expiresAt) {}
 
     public record RunningApp(String id, String name, String detail, String icon, boolean running) {}
 

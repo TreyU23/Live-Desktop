@@ -2,7 +2,7 @@
 
 The frontend is a React 19/Vite 6 true-black Windows dashboard. It includes local profile creation/switching/editing, a dedicated System Info tab for Windows-reported device and OS specifications, one-time-approval-backed direct Wi-Fi and Bluetooth toggles, explicit external-setting controls for unsupported Windows toggles, conversations, memories, approvals, iCloud Calendar, a persistent provider-switchable Apple Music/Spotify player, Phone Link status with platform-matched iPhone and Android artwork, settings, and frontend/backend lifecycle controls. The first press of an unapproved capability adds it to Approvals; after approval, later matching presses run immediately for that profile. The Home page's **System details** action opens the System Info tab. Profile names, uploaded avatars, theme, preset or custom hex accent color, selected music provider, and provider links stay in browser local storage and are namespaced per profile. For contrast, the Black accent renders as white in dark mode and black in light mode.
 
-The System Info page consumes `GET /api/system`; it does not query Windows directly from the browser. See the root [system information access inventory](../docs/SYSTEM_INFORMATION.md) for the exact fields and sources.
+The System Info page consumes `GET /api/system`; it does not query Windows directly from the browser. Completed Wi-Fi and Bluetooth actions apply their returned state immediately instead of waiting for a full dashboard reload. See the root [system information access inventory](../docs/SYSTEM_INFORMATION.md) for the exact fields and sources.
 
 Use the complete first-time setup, integration, security, build, and troubleshooting instructions in the [project README](../README.md).
 

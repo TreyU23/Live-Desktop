@@ -25,6 +25,20 @@ class CredentialStoreTest {
                 "person@icloud.com", "abcd-efgh-ijkl-mnop"));
     }
 
+    @Test
+    void reportsAndRestoresProfileOpenAiKeyWithoutExposingItInStatusChecks() throws Exception {
+        ProfileCredentialStore store = new ProfileCredentialStore(new ProfilePaths(properties()));
+        String apiKey = "sk-test-profile-key-1234567890";
+
+        store.saveOpenAiKey(apiKey);
+
+        assertThat(store.hasOpenAiKey()).isTrue();
+        assertThat(store.loadOpenAiKey()).contains(apiKey);
+        store.clearOpenAiKey();
+        assertThat(store.hasOpenAiKey()).isFalse();
+        assertThat(store.loadOpenAiKey()).isEmpty();
+    }
+
     private AssistantProperties properties() {
         AssistantProperties properties = new AssistantProperties();
         properties.setDataDir(tempDir.toString());

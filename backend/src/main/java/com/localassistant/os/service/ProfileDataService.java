@@ -13,11 +13,17 @@ public class ProfileDataService {
     private final ProfilePaths paths;
     private final StateStore state;
     private final ICloudCalendarService calendar;
+    private final ProfileCredentialStore profileCredentials;
 
-    public ProfileDataService(ProfilePaths paths, StateStore state, ICloudCalendarService calendar) {
+    public ProfileDataService(
+            ProfilePaths paths,
+            StateStore state,
+            ICloudCalendarService calendar,
+            ProfileCredentialStore profileCredentials) {
         this.paths = paths;
         this.state = state;
         this.calendar = calendar;
+        this.profileCredentials = profileCredentials;
     }
 
     public void deleteCurrent() throws IOException {
@@ -29,6 +35,7 @@ public class ProfileDataService {
         }
         state.clearCurrentCache();
         calendar.clearCurrentCache();
+        profileCredentials.clearCurrentCache();
         if (Files.notExists(target)) return;
         try (var files = Files.walk(target)) {
             for (Path path : files.sorted(Comparator.reverseOrder()).toList()) Files.deleteIfExists(path);

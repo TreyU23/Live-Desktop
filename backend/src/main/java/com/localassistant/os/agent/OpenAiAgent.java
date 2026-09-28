@@ -67,11 +67,14 @@ public class OpenAiAgent {
     }
 
     public boolean configured() {
-        return apiKey() != null;
+        if (profileKeyConfigured()) return true;
+        if (!ProfileContext.DEFAULT_PROFILE.equals(ProfileContext.currentId())) return false;
+        String fallback = properties.getOpenaiApiKey();
+        return fallback != null && !fallback.isBlank();
     }
 
     public boolean profileKeyConfigured() {
-        return credentials.loadOpenAiKey().isPresent();
+        return credentials.hasOpenAiKey();
     }
 
     private String apiKey() {

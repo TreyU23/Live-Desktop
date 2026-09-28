@@ -8,6 +8,7 @@ import {
   normalizeMusicUrl,
 } from "./musicProviders.js";
 import { ACCENT_PRESETS, accentForegroundColor, accentSoftColor, effectiveAccentColor, normalizeHexColor, readAccentColor } from "./accentColors.js";
+import { applyCompletedControlAction, upsertAction } from "./systemControls.js";
 
 const ICON_COMPONENTS = {
   Activity: "FiActivity", AppWindow: "FiSquare", BatteryCharging: "FiBatteryCharging",
@@ -1226,6 +1227,8 @@ export function App() {
         method: "POST",
         body: JSON.stringify({ enabled: !control?.enabled }),
       });
+      setActions((current) => upsertAction(current, action));
+      setSystem((current) => applyCompletedControlAction(current, action));
       notify(
         action.status === "completed"
           ? (control?.direct
@@ -1236,7 +1239,6 @@ export function App() {
               : `${CONTROL_META[id].label} settings need first-time approval.`),
         "success",
       );
-      await loadDashboard();
     } catch (error) {
       notify(error.message, "error");
     } finally {
@@ -1248,13 +1250,13 @@ export function App() {
     setPendingControl("phone");
     try {
       const action = await api("/api/integrations/phone-link/open", { method: "POST" });
+      setActions((current) => upsertAction(current, action));
       notify(
         action.status === "completed"
           ? "Phone Link opened. The dashboard will stay open."
           : "Phone Link needs first-time approval. The dashboard will stay open.",
         "success",
       );
-      await loadDashboard();
     } catch (error) {
       notify(error.message, "error");
     } finally {
@@ -1321,8 +1323,9 @@ export function App() {
   const updateAction = async (id, verb) => {
     try {
       const updated = await api(`/api/actions/${id}/${verb}`, { method: "POST" });
+      setActions((current) => upsertAction(current, updated));
+      setSystem((current) => applyCompletedControlAction(current, updated));
       notify(verb === "approve" ? (updated.status === "completed" ? "Action completed." : "Action could not complete.") : "Action rejected.", updated.status === "failed" ? "error" : "success");
-      await loadDashboard();
     } catch (error) {
       notify(error.message, "error");
     }
