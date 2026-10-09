@@ -170,4 +170,23 @@ class ActionServiceTest {
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("approved direct-control list");
     }
+
+    @Test
+    @org.junit.jupiter.api.condition.EnabledOnOs(org.junit.jupiter.api.condition.OS.WINDOWS)
+    void settingsShortcutsUseNativeLauncherOnlyAfterApproval() throws Exception {
+        for (String uri : new String[]{
+                "ms-settings:nightlight", "ms-settings:batterysaver",
+                "ms-settings:quiethours", "ms-settings:privacy-microphone"}) {
+            when(systemControls.open("windows.openUri", uri)).thenReturn(Map.of("opened", uri));
+            var proposed = actions.propose("windows_open_uri", Map.of("uri", uri), "Open this Windows setting.");
+            assertThat(proposed.status()).isEqualTo("pending");
+            verify(systemControls, org.mockito.Mockito.never()).open("windows.openUri", uri);
+            assertThat(actions.approve(proposed.id()).status()).isEqualTo("completed");
+            verify(systemControls).open("windows.openUri", uri);
+
+            var repeated = actions.propose("windows_open_uri", Map.of("uri", uri), "Open the same setting again.");
+            assertThat(repeated.status()).isEqualTo("completed");
+            verify(systemControls, org.mockito.Mockito.times(2)).open("windows.openUri", uri);
+        }
+    }
 }

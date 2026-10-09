@@ -143,16 +143,14 @@ public class ActionService {
             if (!System.getProperty("os.name", "").toLowerCase().contains("windows")) {
                 throw new IllegalStateException("The browser launcher is currently implemented for Windows only.");
             }
-            new ProcessBuilder("rundll32.exe", "url.dll,FileProtocolHandler", uri.toString()).start();
-            return Map.of("opened", uri.toString());
+            return systemControls.open("browser.openUrl", uri.toString());
         }
         if (action.kind().equals("windows_open_uri")) {
             String uri = parseWindowsUri(String.valueOf(action.arguments().get("uri")));
             if (!System.getProperty("os.name", "").toLowerCase().contains("windows")) {
                 throw new IllegalStateException("Windows settings are available on Windows only.");
             }
-            new ProcessBuilder("explorer.exe", uri).start();
-            return Map.of("opened", uri);
+            return systemControls.open("windows.openUri", uri);
         }
         if (action.kind().equals("windows_set_control")) {
             return systemControls.set(

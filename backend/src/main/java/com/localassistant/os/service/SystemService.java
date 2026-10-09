@@ -23,7 +23,6 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.TimeUnit;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -50,6 +49,7 @@ public class SystemService {
 
     private final Path workspaceRoot;
     private final WindowsSystemControlService systemControls;
+    private final WindowsBridgeClient bridge;
     private final ObjectMapper objectMapper = new ObjectMapper();
     private final Object batteryLock = new Object();
     private volatile WindowsDetails cachedWindowsDetails;
@@ -58,6 +58,7 @@ public class SystemService {
     public SystemService(AssistantProperties properties, WindowsSystemControlService systemControls) {
         workspaceRoot = Path.of(properties.getWorkspaceRoot()).toAbsolutePath().normalize();
         this.systemControls = systemControls;
+        this.bridge = systemControls.bridge();
     }
 
     @PostConstruct
@@ -125,51 +126,10 @@ public class SystemService {
         if (!isWindows()) {
             return fallback;
         }
-        String script = """
-                $ErrorActionPreference='SilentlyContinue'
-                $computer=Get-CimInstance Win32_ComputerSystem
-                $processor=Get-CimInstance Win32_Processor | Select-Object -First 1
-                $graphics=@(Get-CimInstance Win32_VideoController | Where-Object {$_.Name} | ForEach-Object {
-                  [pscustomobject]@{name=[string]$_.Name;driverVersion=[string]$_.DriverVersion}
-                })
-                $os=Get-CimInstance Win32_OperatingSystem
-                $currentVersion=Get-ItemProperty 'HKLM:\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion'
-                $sqm=Get-ItemProperty 'HKLM:\\SOFTWARE\\Microsoft\\SQMClient'
-                [pscustomobject]@{
-                  device=[pscustomobject]@{
-                    manufacturer=[string]$computer.Manufacturer
-                    model=[string]$computer.Model
-                    processorName=[string]$processor.Name
-                    processorCores=[int]$processor.NumberOfCores
-                    processorLogicalProcessors=[int]$processor.NumberOfLogicalProcessors
-                    maxClockMhz=[int]$processor.MaxClockSpeed
-                    installedMemoryBytes=[long]$computer.TotalPhysicalMemory
-                    graphics=$graphics
-                    systemType=[string]$computer.SystemType
-                    productId=[string]$currentVersion.ProductId
-                    deviceId=[string]$sqm.MachineId
-                  }
-                  windows=[pscustomobject]@{
-                    edition=[string]$os.Caption
-                    version=[string]$currentVersion.DisplayVersion
-                    osVersion=[string]$os.Version
-                    build=(([string]$os.BuildNumber)+'.'+([string]$currentVersion.UBR))
-                    installedOn=if($os.InstallDate){$os.InstallDate.ToUniversalTime().ToString('o')}else{''}
-                    architecture=[string]$os.OSArchitecture
-                  }
-                } | ConvertTo-Json -Depth 5 -Compress
-                """;
         try {
-            Process process = new ProcessBuilder(
-                    "powershell.exe", "-NoProfile", "-NonInteractive", "-Command", script)
-                    .redirectErrorStream(true)
-                    .start();
-            if (!process.waitFor(8, TimeUnit.SECONDS)) {
-                process.destroyForcibly();
-                return fallback;
-            }
-            String output = new String(process.getInputStream().readAllBytes()).trim();
-            JsonNode root = objectMapper.readTree(output);
+            Map<String, Object> result = bridge.request("system.staticSnapshot", Map.of());
+            if (!result.containsKey("device")) return fallback;
+            JsonNode root = objectMapper.valueToTree(result);
             JsonNode device = root.path("device");
             JsonNode windows = root.path("windows");
             List<GraphicsInfo> graphics = new java.util.ArrayList<>();
@@ -251,20 +211,13 @@ public class SystemService {
 
     public List<RunningApp> runningApps() {
         Map<String, RunningApp> found = new LinkedHashMap<>();
-        ProcessHandle.allProcesses().forEach(process -> {
-            String command = process.info().command().orElse("");
-            if (command.isBlank()) {
-                return;
-            }
-            String filename = Path.of(command).getFileName().toString().toLowerCase(Locale.ROOT);
-            int extension = filename.lastIndexOf('.');
-            String key = extension > 0 ? filename.substring(0, extension) : filename;
+        JsonNode processes = objectMapper.valueToTree(bridge.request("process.knownApps", Map.of()).getOrDefault("processes", List.of()));
+        for (JsonNode process : processes) {
+            String key = process.asText("");
             AppDefinition definition = KNOWN_APPS.get(key);
-            if (definition != null) {
-                found.putIfAbsent(key, new RunningApp(
-                        key, definition.name(), definition.detail(), definition.icon(), true));
-            }
-        });
+            if (definition != null) found.putIfAbsent(key,
+                    new RunningApp(key, definition.name(), definition.detail(), definition.icon(), true));
+        }
         return found.values().stream()
                 .sorted(Comparator.comparing(RunningApp::name))
                 .limit(6)
@@ -274,9 +227,9 @@ public class SystemService {
     public PhoneLinkInfo phoneLink() {
         boolean windows = isWindows();
         Path packagePath = Path.of(environment("LOCALAPPDATA", "."), "Packages", "Microsoft.YourPhone_8wekyb3d8bbwe");
-        boolean installed = windows && Files.isDirectory(packagePath);
-        boolean running = ProcessHandle.allProcesses().anyMatch(process ->
-                process.info().command().orElse("").toLowerCase(Locale.ROOT).matches(".*(phoneexperiencehost|crossdevice).*"));
+        Map<String, Object> phoneState = windows ? bridge.request("phoneLink.snapshot", Map.of()) : Map.of();
+        boolean installed = Boolean.TRUE.equals(phoneState.get("phoneLinkInstalled"));
+        boolean running = Boolean.TRUE.equals(phoneState.get("phoneLinkRunning"));
 
         Path metadataPath = packagePath.resolve("LocalCache").resolve("DeviceMetadataStorage.json");
         Path companionPath = packagePath.resolve("LocalState").resolve("StartMenu").resolve("StartMenuCompanion.json");
@@ -542,38 +495,12 @@ public class SystemService {
     }
 
     private BatteryInfo readBatteryInfo() {
-        if (!isWindows()) {
-            return new BatteryInfo(false, null, "Unavailable");
-        }
-        try {
-            Process process = new ProcessBuilder(
-                    "powershell.exe",
-                    "-NoProfile",
-                    "-NonInteractive",
-                    "-Command",
-                    "$b=Get-CimInstance Win32_Battery | Select-Object -First 1; if($b){Write-Output ($b.EstimatedChargeRemaining.ToString()+'|'+$b.BatteryStatus.ToString())}")
-                    .redirectErrorStream(true)
-                    .start();
-            if (!process.waitFor(3, java.util.concurrent.TimeUnit.SECONDS)) {
-                process.destroyForcibly();
-                return new BatteryInfo(false, null, "Unavailable");
-            }
-            String output = new String(process.getInputStream().readAllBytes()).trim();
-            String[] parts = output.split("\\|");
-            if (parts.length == 2) {
-                int percent = Integer.parseInt(parts[0].trim());
-                int status = Integer.parseInt(parts[1].trim());
-                String detail = switch (status) {
-                    case 2 -> "Discharging";
-                    case 6, 7, 8, 9 -> "Charging";
-                    default -> "Connected";
-                };
-                return new BatteryInfo(true, percent, detail);
-            }
-        } catch (Exception ignored) {
-            // Desktops and restricted Windows accounts may not expose a battery.
-        }
-        return new BatteryInfo(false, null, "Desktop power");
+        if (!isWindows()) return new BatteryInfo(false, null, "Unavailable");
+        Map<String, Object> result = bridge.request("power.snapshot", Map.of());
+        boolean available = Boolean.TRUE.equals(result.get("available"));
+        Object percent = result.get("percent");
+        return new BatteryInfo(available, percent instanceof Number value ? value.intValue() : null,
+                String.valueOf(result.getOrDefault("detail", "Unavailable")));
     }
 
     private boolean isWindows() {

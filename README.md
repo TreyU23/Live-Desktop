@@ -23,6 +23,7 @@ This is a desktop-style assistant application, not an operating-system kernel. T
 ```text
 backend/    Java 21 + Spring Boot API and local integrations
 frontend/   React 19 + Vite 6 dashboard
+native/     C++/WinRT Windows bridge and JNI DPAPI credential protection
 data/       Local state, encrypted integration records, and lifecycle log
 scripts/    Java bootstrap, launch, restart, and shutdown scripts
 artifacts/  Local design and QA artifacts
@@ -36,6 +37,18 @@ Required:
 - Java 21. The included bootstrap script can install a project-local Temurin JDK.
 - Node.js 20 or later and pnpm for a fresh frontend install. The Codex desktop environment is detected automatically when its bundled runtime is available.
 - Network access while installing dependencies and while using OpenAI, iCloud Calendar, Apple Music, or Spotify.
+
+Native Windows integration is required: install Visual Studio 2022 Build Tools with Desktop development with C++, a Windows SDK containing C++/WinRT headers, and CMake tools. Java 21 JNI headers are required for the credential DLL. The build script discovers bundled CMake automatically. Build and run the read-only smoke test after installing Java, before launch:
+
+```powershell
+.\scripts\build-windows-bridge.ps1
+.\scripts\test-windows-bridge.ps1
+.\start.cmd
+```
+
+Radios, media sessions, battery status, system specifications, known-app detection, Phone Link package/process detection, and allowlisted app/URL launching use one backend-owned C++ bridge. Credentials use an in-process JNI DPAPI DLL; secrets never travel through the pipe. There is no PowerShell integration provider, provider setting, or fallback. The private pipe accepts only the owning backend PID. A later request can reconnect after failure, but failed changes are never replayed. Refresh state before retrying an ambiguous mutation. See [native build and protocol instructions](native/README.md). Java retains profiles, approvals, persistence, calendar/network work, and Phone Link metadata parsing. Launch/restart/shutdown scripts remain PowerShell pending the separate fast-startup plan.
+
+See [current migration scope and validation](docs/WINDOWS_NATIVE_MIGRATION.md). Native read-only tests and credential compatibility are verified; actual radio toggles, media actions, sleep/resume, and cross-user pipe access still require live validation. Both native artifacts must exist before launch; nothing is compiled or downloaded on startup. Rebuild after native source changes, stopping the backend first if Windows reports a locked DLL.
 
 Optional accounts depend on the features you use:
 
@@ -174,6 +187,10 @@ Lifecycle logs are written to `data\runtime-control.log`. Background process out
 
 ## Integration setup
 
+### Windows control capabilities
+
+Night light, Battery saver, Focus, and microphone privacy retain their Settings-shortcut behavior, executed by the C++ bridge after profile-scoped approval. They do not report a verified on/off change. The [supported API audit and exact native route](docs/WINDOWS_CONTROL_CAPABILITIES.md) explain why gamma changes, power-plan changes, and microphone mute are not substituted for these settings. Focus-session write APIs require additional Microsoft-issued limited-access permission. Java remains the approval authority; it does not launch these settings through PowerShell or Explorer.
+
 ### iCloud Calendar
 
 Do not enter your normal Apple Account password. Live Desktop uses an Apple app-specific password for CalDAV.
@@ -215,7 +232,7 @@ The backend reads local Phone Link package metadata and running-process informat
 
 ## Local data and security
 
-The System Info tab uses read-only, non-admin Windows CIM, registry, environment, network-interface, file-system, and Java runtime data. The complete field-by-field inventory, local source, refresh behavior, and assistant-context boundary are documented in [System information access](docs/SYSTEM_INFORMATION.md).
+The System Info tab uses read-only, non-admin Windows native APIs, fixed registry queries, environment, network-interface, file-system, and Java runtime data. The complete field-by-field inventory, local source, refresh behavior, and assistant-context boundary are documented in [System information access](docs/SYSTEM_INFORMATION.md).
 
 | Data | Location | Protection |
 | --- | --- | --- |
@@ -225,11 +242,11 @@ The System Info tab uses read-only, non-admin Windows CIM, registry, environment
 | Profile names, avatars, theme, accent color, selected music provider, and Apple Music/Spotify links | Browser local storage | Namespaced by local profile; uploaded avatars remain in this browser |
 | Lifecycle history | `data\runtime-control.log` | Local text log |
 
-DPAPI-protected values can only be decrypted by the same Windows user profile. After first use, the running backend keeps decrypted credentials in profile-isolated memory so routine dashboard polls and assistant requests do not repeatedly start PowerShell; replacing or removing a credential, deleting its profile, or restarting the backend clears the applicable cache. Disconnect an integration in Settings to delete its saved credential record. Creating, renaming, switching, and uploading an avatar are available from the profile icon in the top bar. Deleting an additional profile removes its app-owned backend folder and browser profile metadata; the original default profile cannot be deleted.
+DPAPI-protected values can only be decrypted by the same Windows user profile. After first use, the running backend keeps decrypted credentials in profile-isolated memory so routine dashboard polls and assistant requests do not repeatedly decrypt credentials; replacing or removing a credential, deleting its profile, or restarting the backend clears the applicable cache. Disconnect an integration in Settings to delete its saved credential record. Creating, renaming, switching, and uploading an avatar are available from the profile icon in the top bar. Deleting an additional profile removes its app-owned backend folder and browser profile metadata; the original default profile cannot be deleted.
 
 The selected music provider and both provider links are profile-specific. Authentication inside each embedded player remains controlled by that provider and the browser's third-party cookie storage, so the app never copies or stores a provider password or session token. The browser may reuse an embedded-player sign-in between local profiles.
 
-The model cannot execute arbitrary shell commands. Wi-Fi and Bluetooth changes are strictly allowlisted and use Windows' radio API; Live Desktop verifies the returned radio state before reporting success and applies that result to the dashboard immediately. The backend starts one private radio worker and reuses it, avoiding a new PowerShell and Windows Runtime startup on every button press; if that worker exits, the request falls back to the one-shot control path and a later request starts a fresh worker. The first request for each control requires approval, and later presses of that control run immediately in the same local profile (the approval covers both on and off). Stable Windows device data and battery state are warmed during backend startup. Radio snapshots are cached for up to 30 seconds and battery information for up to five minutes; dashboard-initiated radio changes update the cache immediately, while changes made elsewhere in Windows can take up to 30 seconds to appear. Windows can still deny a change because of user permission, hardware controls, or system policy. Focus, Night light, microphone privacy, and Battery saver do not have equivalent supported consumer toggle APIs for this unpackaged desktop application, so those controls open the matching Windows Settings page after their one-time approval. Live Desktop deliberately does not use undocumented registry edits or UI automation for them. Phone Link launch uses the same one-time approval path. Restart and confirmed shutdown are explicit local lifecycle operations.
+The model cannot execute arbitrary shell commands. Wi-Fi and Bluetooth changes are strictly allowlisted and use Windows' radio API; Live Desktop verifies the returned radio state before reporting success and applies that result to the dashboard immediately. Windows integrations share one private C++ bridge; it never falls back to PowerShell or replays a failed change. The first request for each control requires approval, and later presses of that control run immediately in the same local profile (the approval covers both on and off). Stable Windows device data and battery state are warmed during backend startup. Radio snapshots are cached for up to 30 seconds and battery information for up to five minutes; dashboard-initiated radio changes update the cache immediately, while changes made elsewhere in Windows can take up to 30 seconds to appear. Windows can still deny a change because of user permission, hardware controls, or system policy. Focus, Night light, microphone privacy, and Battery saver do not have equivalent supported consumer toggle APIs for this unpackaged desktop application, so those controls open the matching Windows Settings page after their one-time approval. Live Desktop deliberately does not use undocumented registry edits or UI automation for them. Phone Link launch uses the same one-time approval path. Restart and confirmed shutdown are explicit local lifecycle operations.
 
 Reusable approvals are profile-scoped and inferred from that profile's approved action history. Matching is intentionally limited to the same capability: a Windows control ID, an exact Windows URI, an exact web URL, a normalized workspace file path, or a memory category. A different target still creates a new pending approval. Both completed actions and actions that failed after approval count as approved, so a transient execution failure does not force another approval. Removing a non-default profile also removes its reusable approvals; deleting the default profile's `assistant-state.json` while Live Desktop is stopped resets its approvals together with its conversations, memories, and action history.
 
@@ -251,10 +268,11 @@ The backend listens only on `127.0.0.1` by default. The Vite development fronten
 
 ## Build and test
 
-Run the backend suite and package from the repository root:
+Build native first, then run the backend suite and package from the repository root:
 
 ```powershell
 $env:JAVA_HOME = (Resolve-Path '.tools\jdk-21').Path
+.\scripts\build-windows-bridge.ps1
 .\mvnw.cmd test
 .\mvnw.cmd -pl backend package
 ```
