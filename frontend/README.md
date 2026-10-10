@@ -18,7 +18,7 @@ For frontend-only development after the backend is already running:
 .\scripts\run-frontend.ps1
 ```
 
-Open [http://localhost:4173](http://localhost:4173). Vite proxies `/health` and `/api` to `http://127.0.0.1:4317`.
+Open [http://localhost:4173](http://localhost:4173). Production serves `dist/client` through `scripts/serve-production.mjs`, launched directly by the C++ supervisor using Node.js 20 or later. It binds to `127.0.0.1:4173`, proxies `/health` and `/api` to `http://127.0.0.1:4317`, and rejects unexpected Host and Origin headers. It requires no pnpm or Vite process at startup. Build all production artifacts with `scripts/build-production.ps1` from the repository root before first launch and after source changes. Frontend-only development still uses Vite and its development proxy.
 
 For a fresh dependency install and production verification:
 

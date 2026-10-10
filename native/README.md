@@ -1,5 +1,15 @@
 # Native Windows integration
 
+## Production launcher
+
+`live-desktop-launcher.exe` starts the packaged backend and built frontend, supervises their process handles, and owns their descendants in an unnamed Windows Job Object with kill-on-close. Children are created suspended, assigned to the job, then resumed; only their log/NUL handles are inherited. A supervisor failure closes the job and kills its services, including the backend-owned bridge. It never discovers kill targets by port, process name, or PID file.
+
+Build all production artifacts with `scripts/build-production.ps1`. `start.cmd` calls `live-desktop-launcher.exe start`. Direct commands are `start`, `restart`, `shutdown`, and `status`; `--root PATH` selects a workspace (default inferred from the executable's Release location). `start` reuses an existing supervisor; `restart` replaces its owned service tree; `shutdown` is idempotent. Start/restart wait for backend `/health` and frontend `/` HTTP 200 responses, with a 60-second readiness budget. If either service exits, both are cleaned up and the supervisor exits with an error. Logs append in the workspace.
+
+Current-user-only mutexes and events are keyed by canonical workspace path in the [global Windows namespace](https://learn.microsoft.com/en-us/windows/win32/termserv/kernel-object-namespaces), so they span Windows sessions. Commands are serialized, and the supervisor holds an instance mutex for its entire lifetime. Dashboard controls use `--request` to signal it, allow 750 ms for the API response, and then stop/restart its job. Readiness means HTTP availability, not completion of every external integration or visual rendering. An occupied port fails without killing its owner. Older unmanaged development processes must be stopped explicitly. Production serves built frontend assets with Node; Java selection is project-local JDK, JAVA_HOME, then PATH. Runtime startup compiles/downloads nothing.
+
+Run `scripts/test-production-startup.ps1` after building, with ports 4173/4317 free. It copies artifacts into an isolated temporary workspace, uses separate data, and tests duplicate/concurrent starts, CLI and dashboard API lifecycle controls, a surviving unrelated listener, service/supervisor failure, bridge-descendant cleanup, and a missing JAR. It deletes only its verified temporary workspace. Job cleanup terminates processes forcibly; it does not drain in-flight backend requests.
+
 The required x64 C++20 bridge replaces PowerShell for normal Windows integrations. A separate JNI DLL handles current-user DPAPI in the JVM; credentials never enter IPC.
 
 ## Build and verify
@@ -12,7 +22,7 @@ winget install --id Microsoft.VisualStudio.2022.BuildTools --exact --source wing
 .\scripts\test-windows-bridge.ps1
 ```
 
-The build locates bundled CMake through `vswhere`, uses Java JNI headers from `JAVA_HOME` or `.tools/jdk-21`, builds Release, and runs CTest. Outputs are `native/build/Release/live-desktop-windows-bridge.exe` and `live-desktop-credentials.dll`; both are required before launch. There is no provider setting or PowerShell fallback. Stop the backend before rebuilding a DLL that Windows has locked; restart after a rebuild. Startup does not compile or download native artifacts.
+The native build locates bundled CMake through `vswhere`, uses Java JNI headers from `JAVA_HOME` or `.tools/jdk-21`, builds Release, and runs CTest. Outputs in `native/build/Release` are `live-desktop-launcher.exe`, `live-desktop-windows-bridge.exe`, and `live-desktop-credentials.dll`. The full production build additionally packages Java and builds frontend assets. There is no provider setting or PowerShell fallback. Stop Live Desktop before rebuilding a DLL that Windows has locked; restart after a rebuild. Startup does not compile or download native artifacts.
 
 The integration smoke test starts/stops only its own bridge, reads radios, power, specifications, app/package state, and each media provider; it checks rejected protocol/operation/URI requests. It does not toggle hardware, control playback, open apps, or touch saved credentials. Its timing through integration checks is not a full application-startup measurement.
 

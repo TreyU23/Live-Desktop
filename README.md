@@ -2,7 +2,7 @@
 
 Live Desktop is a local-first Windows dashboard and assistant. A React/Vite frontend provides system controls, system information, conversations, memories, approvals, iCloud Calendar, a custom Apple Music or Spotify player, Phone Link status, and one-click project lifecycle controls. A Java 21/Spring Boot backend owns local state, OpenAI requests, Windows inspection, integrations, and approved actions.
 
-This is a desktop-style assistant application, not an operating-system kernel. The backend binds to `127.0.0.1:4317`; the development frontend runs at `http://localhost:4173` and proxies `/api` and `/health` to the backend.
+This is a desktop-style assistant application, not an operating-system kernel. The backend binds to `127.0.0.1:4317`; the frontend runs at `http://localhost:4173` and proxies `/api` and `/health` to the backend. Production uses a C++ supervisor, a prebuilt Java JAR, and a Node server for the built frontend.
 
 ## Current capabilities
 
@@ -23,9 +23,9 @@ This is a desktop-style assistant application, not an operating-system kernel. T
 ```text
 backend/    Java 21 + Spring Boot API and local integrations
 frontend/   React 19 + Vite 6 dashboard
-native/     C++/WinRT Windows bridge and JNI DPAPI credential protection
+native/     C++ launcher, C++/WinRT Windows bridge, JNI DPAPI protection
 data/       Local state, encrypted integration records, and lifecycle log
-scripts/    Java bootstrap, launch, restart, and shutdown scripts
+scripts/    Java bootstrap, production build, and development scripts
 artifacts/  Local design and QA artifacts
 ```
 
@@ -33,22 +33,22 @@ artifacts/  Local design and QA artifacts
 
 Required:
 
-- Windows 10 or Windows 11 with PowerShell.
+- Windows 10 or Windows 11. PowerShell is used for setup/build and development; production startup uses C++.
 - Java 21. The included bootstrap script can install a project-local Temurin JDK.
-- Node.js 20 or later and pnpm for a fresh frontend install. The Codex desktop environment is detected automatically when its bundled runtime is available.
+- Node.js 20 or later at runtime and pnpm for a fresh frontend install. The launcher checks PATH, then the Codex bundled Node runtime.
 - Network access while installing dependencies and while using OpenAI, iCloud Calendar, Apple Music, or Spotify.
 
 Native Windows integration is required: install Visual Studio 2022 Build Tools with Desktop development with C++, a Windows SDK containing C++/WinRT headers, and CMake tools. Java 21 JNI headers are required for the credential DLL. The build script discovers bundled CMake automatically. Build and run the read-only smoke test after installing Java, before launch:
 
 ```powershell
-.\scripts\build-windows-bridge.ps1
+.\scripts\build-production.ps1
 .\scripts\test-windows-bridge.ps1
 .\start.cmd
 ```
 
-Radios, media sessions, battery status, system specifications, known-app detection, Phone Link package/process detection, and allowlisted app/URL launching use one backend-owned C++ bridge. Credentials use an in-process JNI DPAPI DLL; secrets never travel through the pipe. There is no PowerShell integration provider, provider setting, or fallback. The private pipe accepts only the owning backend PID. A later request can reconnect after failure, but failed changes are never replayed. Refresh state before retrying an ambiguous mutation. See [native build and protocol instructions](native/README.md). Java retains profiles, approvals, persistence, calendar/network work, and Phone Link metadata parsing. Launch/restart/shutdown scripts remain PowerShell pending the separate fast-startup plan.
+Radios, media sessions, battery status, system specifications, known-app detection, Phone Link package/process detection, and allowlisted app/URL launching use one backend-owned C++ bridge. Credentials use an in-process JNI DPAPI DLL; secrets never travel through the pipe. There is no PowerShell integration provider, provider setting, or fallback. The private pipe accepts only the owning backend PID. A later request can reconnect after failure, but failed changes are never replayed. Refresh state before retrying an ambiguous mutation. See [native build and protocol instructions](native/README.md). Java retains profiles, approvals, persistence, calendar/network work, and Phone Link metadata parsing. Production start/restart/shutdown use the C++ launcher, including the dashboard controls.
 
-See [current migration scope and validation](docs/WINDOWS_NATIVE_MIGRATION.md). Native read-only tests and credential compatibility are verified; actual radio toggles, media actions, sleep/resume, and cross-user pipe access still require live validation. Both native artifacts must exist before launch; nothing is compiled or downloaded on startup. Rebuild after native source changes, stopping the backend first if Windows reports a locked DLL.
+See [current migration scope and validation](docs/WINDOWS_NATIVE_MIGRATION.md). Native read-only tests and credential compatibility are verified; actual radio toggles, media actions, sleep/resume, and cross-user pipe access still require live validation. The launcher, bridge, credential DLL, packaged backend, and built frontend must exist before launch; nothing is compiled or downloaded on startup. Stop Live Desktop before rebuilding native artifacts. Run `scripts/build-production.ps1` after source changes to refresh all production artifacts.
 
 Optional accounts depend on the features you use:
 
@@ -145,7 +145,17 @@ From the repository root, run:
 .\start.cmd
 ```
 
-This starts both the Java backend and React frontend in the background. If an older Live Desktop instance is already using ports `4317` or `4173`, the launcher safely replaces those project processes first. When startup finishes, open [http://localhost:4173](http://localhost:4173).
+This starts the prebuilt backend and frontend in the background and returns success after both answer HTTP readiness checks (up to 60 seconds). Repeated starts reuse the existing supervisor. Open [http://localhost:4173](http://localhost:4173).
+
+Build before the first launch and after source changes:
+
+```powershell
+.\scripts\build-production.ps1
+```
+
+The build runs native compilation/CTest, Maven package/tests, and the frontend build. Startup directly runs `java -jar backend/target/live-desktop-backend.jar` and Node's built-frontend server; it invokes no Maven, pnpm, Vite, or PowerShell. Java selection is `.tools/jdk-21`, then `JAVA_HOME`, then PATH. The backend works from `backend/`, preserving `../.env` and `../data` defaults; `WORKSPACE_ROOT` and loopback host/port are set by the supervisor. Production frontend binds only to `127.0.0.1:4173`.
+
+The supervisor owns its backend, frontend, and their descendants in a Windows Job Object. Shutdown, restart, supervisor termination, or an unexpected service exit clean up that job only. A current-user-only workspace lock prevents duplicate supervisors, including across Windows sessions. An occupied port causes an error; the launcher never kills a process based on its name, port, or saved PID. Stop older development terminals explicitly before switching to production. Logs append to `.launcher.log`, `.backend-preview.out.log`, `.backend-preview.err.log`, `.frontend-preview.out.log`, and `.frontend-preview.err.log`.
 
 ### Visible development terminals
 
@@ -167,10 +177,10 @@ Open [http://localhost:4173](http://localhost:4173). The backend health endpoint
 
 ### Direct lifecycle command
 
-`start.cmd` wraps the following lifecycle command. You can still invoke it directly when troubleshooting:
+`start.cmd` calls the native launcher's `start` command. To explicitly restart an owned instance:
 
 ```powershell
-.\scripts\project-lifecycle.ps1 -Action restart -WorkspaceRoot (Get-Location).Path
+.\native\build\Release\live-desktop-launcher.exe restart
 ```
 
 Use this command for either an initial background start or a restart. Once the dashboard is online, the circular-arrow button in its top bar runs the same restart workflow.
@@ -180,7 +190,7 @@ Use this command for either an initial background start or a restart. Once the d
 Use the power button in the dashboard and confirm, or run:
 
 ```powershell
-.\scripts\project-lifecycle.ps1 -Action shutdown -WorkspaceRoot (Get-Location).Path
+.\native\build\Release\live-desktop-launcher.exe shutdown
 ```
 
 Lifecycle logs are written to `data\runtime-control.log`. Background process output is written to `.backend-preview.out.log`, `.backend-preview.err.log`, `.frontend-preview.out.log`, and `.frontend-preview.err.log` in the repository root.
@@ -264,7 +274,7 @@ The assistant can access live dashboard information, but the application does no
 
 If the automatic context is insufficient, the model has a `get_dashboard_context` tool limited to four explicitly requested topics per call. Credentials, API keys, Apple app-specific passwords, local credential files, artwork blobs, unrelated memories, and unrelated dashboard sections are never included. Prompts unrelated to the dashboard receive no dashboard payload at all.
 
-The backend listens only on `127.0.0.1` by default. The Vite development frontend starts with `--host 0.0.0.0`, so Windows Firewall may make port `4173` reachable from the local network. Do not expose either service to the internet; there is no multi-user authentication, CSRF protection, or remote-deployment hardening.
+Production binds both services to `127.0.0.1`; the frontend rejects unexpected Host and Origin headers. The Vite development frontend starts with `--host 0.0.0.0`, so Windows Firewall may make port `4173` reachable from the local network. Do not expose either service to the internet; there is no multi-user authentication or remote-deployment hardening. Native job ownership uses forced process termination for cleanup; it does not provide graceful request draining.
 
 ## Build and test
 
@@ -339,13 +349,13 @@ ChatGPT subscriptions and OpenAI API billing are separate. Confirm that the API 
 
 ### Port 4173 or 4317 is already in use
 
-Use the project lifecycle command, which resolves only this project’s two listeners and their related Node/Java process trees:
+For an instance owned by the native supervisor, use:
 
 ```powershell
-.\scripts\project-lifecycle.ps1 -Action restart -WorkspaceRoot (Get-Location).Path
+.\native\build\Release\live-desktop-launcher.exe restart
 ```
 
-To inspect the listeners without changing them:
+If another program or an older development terminal owns either port, stop it explicitly. The launcher leaves it untouched. To inspect the listeners:
 
 ```powershell
 Get-NetTCPConnection -State Listen | Where-Object LocalPort -In 4173,4317

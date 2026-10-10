@@ -17,5 +17,12 @@ target_compile_definitions(live-desktop-credentials PRIVATE WIN32_LEAN_AND_MEAN 
 target_compile_options(live-desktop-credentials PRIVATE /W4 /EHsc)
 target_link_libraries(live-desktop-credentials PRIVATE crypt32)
 install(TARGETS live-desktop-credentials RUNTIME DESTINATION bin)
+
+add_executable(live-desktop-launcher launcher/main.cpp)
+target_compile_features(live-desktop-launcher PRIVATE cxx_std_20)
+target_compile_definitions(live-desktop-launcher PRIVATE UNICODE _UNICODE WIN32_LEAN_AND_MEAN NOMINMAX _WIN32_WINNT=0x0A00)
+target_compile_options(live-desktop-launcher PRIVATE /W4 /EHsc /permissive-)
+target_link_libraries(live-desktop-launcher PRIVATE advapi32 ws2_32 winhttp iphlpapi)
+install(TARGETS live-desktop-launcher RUNTIME DESTINATION bin)
 enable_testing()
 add_test(NAME bridge-protocol COMMAND live-desktop-windows-bridge --self-test)

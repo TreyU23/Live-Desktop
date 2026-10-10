@@ -6,7 +6,7 @@ One shared C++ bridge handles radios, media sessions, battery status, device/Win
 
 Credential protection uses `live-desktop-credentials.dll` through JNI, with current-user DPAPI and unchanged saved-record formats. Secrets do not pass through the bridge. Existing profile-isolated decrypted-credential caches remain; replacing/removing credentials, deleting their profile, or restarting clears the applicable cache. Additional profiles use `data/profiles/<profile-id>`; the default retains records directly under `data`. Never commit `.env` or `data`.
 
-Approval behavior is unchanged: the first matching control/URI/URL/path/category action requires approval for its profile. Unsupported consumer toggles remain approved Settings shortcuts, not undocumented registry edits. Phone Link device metadata is still parsed locally by Java; package/process detection is native. Startup/restart/shutdown remain PowerShell until the separate lifecycle/startup migration.
+Approval behavior is unchanged: the first matching control/URI/URL/path/category action requires approval for its profile. Unsupported consumer toggles remain approved Settings shortcuts, not undocumented registry edits. Phone Link device metadata is still parsed locally by Java; package/process detection is native. Production lifecycle controls signal the C++ supervisor; requests fail if no supervisor owns the workspace. Development terminals must be stopped manually.
 
 Night light, Battery saver, Focus, and microphone privacy shortcuts already use C++ `windows.openUri`/`ShellExecuteExW`; their results mean a Settings URI opened, not that Windows changed a toggle. See the [remaining-control API audit and regression coverage](../docs/WINDOWS_CONTROL_CAPABILITIES.md). A different microphone mute or power-plan operation is not substituted for the current feature.
 
@@ -16,12 +16,14 @@ From the repository root, after installing Visual Studio 2022 C++ Build Tools an
 
 ```powershell
 .\scripts\bootstrap-java.ps1
-.\scripts\build-windows-bridge.ps1
+.\scripts\build-production.ps1
 .\scripts\test-windows-bridge.ps1
 .\start.cmd
 ```
 
 For backend-only development use `scripts/run-backend.ps1`. It checks that both native artifacts exist before launching Maven. Nothing is compiled/downloaded by that check. Rebuild after native changes; stop the backend first if Windows locks the DLL. Restart after rebuilding. Java and native artifacts must be x64.
+
+Production uses `backend/target/live-desktop-backend.jar`, packaged by Maven at build time. The native launcher starts Java directly from the `backend/` working directory and sets `WORKSPACE_ROOT`, `HOST=127.0.0.1`, and `PORT=4317`. Existing `../.env` and `../data` defaults remain. After backend edits, rebuild production artifacts before restarting. Native job ownership includes the backend's lazily created Windows bridge.
 
 ```powershell
 $env:JAVA_HOME = (Resolve-Path '.tools\jdk-21').Path
