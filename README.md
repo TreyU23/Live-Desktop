@@ -2,7 +2,7 @@
 
 Live Desktop is a local-first Windows dashboard and assistant. A React/Vite frontend provides system controls, system information, conversations, memories, approvals, iCloud Calendar, a custom Apple Music or Spotify player, Phone Link status, and one-click project lifecycle controls. A Java 21/Spring Boot backend owns local state, OpenAI requests, Windows inspection, integrations, and approved actions.
 
-This is a desktop-style assistant application, not an operating-system kernel. The backend binds to `127.0.0.1:4317`; the frontend runs at `http://localhost:4173` and proxies `/api` and `/health` to the backend. Production uses a C++ supervisor, a prebuilt Java JAR, and a Node server for the built frontend.
+This is a desktop-style assistant application, not an operating-system kernel. The backend binds to `127.0.0.1:4317`; the frontend runs at `http://localhost:4173` and proxies `/api` and `/health` to the backend. Production uses a C++ supervisor, a prebuilt Java JAR, and a lightweight C++ host for the built frontend.
 
 ## Current capabilities
 
@@ -23,7 +23,7 @@ This is a desktop-style assistant application, not an operating-system kernel. T
 ```text
 backend/    Java 21 + Spring Boot API and local integrations
 frontend/   React 19 + Vite 6 dashboard
-native/     C++ launcher, C++/WinRT Windows bridge, JNI DPAPI protection
+native/     C++ launcher/HTTP host, C++/WinRT Windows bridge, JNI DPAPI protection
 data/       Local state, encrypted integration records, and lifecycle log
 scripts/    Java bootstrap, production build, and development scripts
 artifacts/  Local design and QA artifacts
@@ -35,10 +35,10 @@ Required:
 
 - Windows 10 or Windows 11. PowerShell is used for setup/build and development; production startup uses C++.
 - Java 21. The included bootstrap script can install a project-local Temurin JDK.
-- Node.js 20 or later at runtime and pnpm for a fresh frontend install. The launcher checks PATH, then the Codex bundled Node runtime.
+- Node.js 20 or later and pnpm for building/developing the frontend. Neither is required for normal use or for an extracted runtime package.
 - Network access while installing dependencies and while using OpenAI, iCloud Calendar, Apple Music, or Spotify.
 
-Native Windows integration is required: install Visual Studio 2022 Build Tools with Desktop development with C++, a Windows SDK containing C++/WinRT headers, and CMake tools. Java 21 JNI headers are required for the credential DLL. The build script discovers bundled CMake automatically. Build and run the read-only smoke test after installing Java, before launch:
+To build from source, install Visual Studio 2022 Build Tools with Desktop development with C++, a Windows SDK containing C++/WinRT headers, and CMake tools. Java 21 JNI headers are required for the credential DLL. The build script discovers bundled CMake automatically. Build and run the read-only smoke test after installing Java, before launch:
 
 ```powershell
 .\scripts\build-production.ps1
@@ -48,7 +48,7 @@ Native Windows integration is required: install Visual Studio 2022 Build Tools w
 
 Radios, media sessions, battery status, system specifications, known-app detection, Phone Link package/process detection, and allowlisted app/URL launching use one backend-owned C++ bridge. Credentials use an in-process JNI DPAPI DLL; secrets never travel through the pipe. There is no PowerShell integration provider, provider setting, or fallback. The private pipe accepts only the owning backend PID. A later request can reconnect after failure, but failed changes are never replayed. Refresh state before retrying an ambiguous mutation. See [native build and protocol instructions](native/README.md). Java retains profiles, approvals, persistence, calendar/network work, and Phone Link metadata parsing. Production start/restart/shutdown use the C++ launcher, including the dashboard controls.
 
-See [current migration scope and validation](docs/WINDOWS_NATIVE_MIGRATION.md). Native read-only tests and credential compatibility are verified; actual radio toggles, media actions, sleep/resume, and cross-user pipe access still require live validation. The launcher, bridge, credential DLL, packaged backend, and built frontend must exist before launch; nothing is compiled or downloaded on startup. Stop Live Desktop before rebuilding native artifacts. Run `scripts/build-production.ps1` after source changes to refresh all production artifacts.
+See [current migration scope and validation](docs/WINDOWS_NATIVE_MIGRATION.md). Native read-only tests and credential compatibility are verified; actual radio toggles, media actions, sleep/resume, and cross-user pipe access still require live validation. The launcher, native frontend host, bridge, credential DLL, packaged backend, and built frontend must exist before launch; nothing is compiled or downloaded on startup. Stop Live Desktop before rebuilding native artifacts. Run `scripts/build-production.ps1` after source changes to refresh all production artifacts.
 
 Optional accounts depend on the features you use:
 
@@ -145,7 +145,7 @@ From the repository root, run:
 .\start.cmd
 ```
 
-This starts the prebuilt backend and frontend in the background and returns success after both answer HTTP readiness checks (up to 60 seconds). Repeated starts reuse the existing supervisor. Open [http://localhost:4173](http://localhost:4173).
+This starts the prebuilt backend and frontend in the background and returns success after the native host identity, backend `/health`, proxied `/health`, and dashboard `/` pass readiness checks (up to 60 seconds). Repeated starts reuse the existing supervisor. Open [http://localhost:4173](http://localhost:4173).
 
 Build before the first launch and after source changes:
 
@@ -153,9 +153,32 @@ Build before the first launch and after source changes:
 .\scripts\build-production.ps1
 ```
 
-The build runs native compilation/CTest, Maven package/tests, and the frontend build. Startup directly runs `java -jar backend/target/live-desktop-backend.jar` and Node's built-frontend server; it invokes no Maven, pnpm, Vite, or PowerShell. Java selection is `.tools/jdk-21`, then `JAVA_HOME`, then PATH. The backend works from `backend/`, preserving `../.env` and `../data` defaults; `WORKSPACE_ROOT` and loopback host/port are set by the supervisor. Production frontend binds only to `127.0.0.1:4173`.
+The build runs native compilation/CTest, Maven package/tests, and the frontend build. Startup directly runs `java -jar backend/target/live-desktop-backend.jar` and `live-desktop-host.exe` for built assets and the API proxy; it invokes no Node, Maven, pnpm, Vite, or PowerShell. Java selection is `.tools/jdk-21`, then `JAVA_HOME`, then PATH. The backend works from `backend/`, preserving `../.env` and `../data` defaults; `WORKSPACE_ROOT` and loopback host/port are set by the supervisor. Production frontend binds only to `127.0.0.1:4173`.
 
 The supervisor owns its backend, frontend, and their descendants in a Windows Job Object. Shutdown, restart, supervisor termination, or an unexpected service exit clean up that job only. A current-user-only workspace lock prevents duplicate supervisors, including across Windows sessions. An occupied port causes an error; the launcher never kills a process based on its name, port, or saved PID. Stop older development terminals explicitly before switching to production. Logs append to `.launcher.log`, `.backend-preview.out.log`, `.backend-preview.err.log`, `.frontend-preview.out.log`, and `.frontend-preview.err.log`.
+
+Readiness reports elapsed launch-to-ready time and appends `.startup-metrics.jsonl`. `services-ready` records native host, Java backend, API proxy, and all-services times from supervisor cycle start; `launch-ready` records elapsed time from launcher entry, action, and whether an existing instance was reused. Restart includes shutdown time in the command measurement. These are HTTP availability measurements; external integrations and browser rendering can finish later. Missing artifacts fail immediately with the exact path. Child exits name the service and exit code; timeout errors identify incomplete readiness stages and point to component logs. Supervisor failure details also appear in the calling terminal.
+
+### Install a runtime package
+
+To create a Windows x64 ZIP from a source checkout:
+
+```powershell
+.\scripts\package-production.ps1
+# After a successful build, optionally include the project-local Java 21 installation:
+.\scripts\package-production.ps1 -SkipBuild -IncludeJavaRuntime
+```
+
+Output: `dist/Live-Desktop-windows-x64.zip`. Extract the entire `Live-Desktop` folder to a writable, private directory, then run its `start.cmd`. The package contains all four native binaries, the backend JAR, built client assets, setup documentation, `.env.example`, and a SHA-256 inventory in `manifest.json`. Saved data, credentials, `.env`, logs, Node dependencies, and build caches are excluded. Native binaries link the MSVC runtime statically. The runtime package needs Windows 10/11 x64 and Java 21; it needs no Node, pnpm, Maven, CMake, or Visual Studio installation. Without `-IncludeJavaRuntime`, install Java 21/set `JAVA_HOME` or use the included `scripts/bootstrap-java.ps1`. Source rebuild instructions apply to a full source checkout, not the runtime ZIP. Stop the application before replacing its files.
+
+Verify with free ports 4173/4317:
+
+```powershell
+.\scripts\test-native-host.ps1
+.\scripts\test-production-startup.ps1 -PackagePath .\dist\Live-Desktop-windows-x64.zip
+```
+
+The first test uses Node only as a build-time test driver and mock backend. It verifies native serving, proxy bodies/streaming, Host/Origin restrictions, path confinement, and backend failure. The second verifies packaged hashes and runs lifecycle/readiness checks in an isolated workspace with separate data.
 
 ### Visible development terminals
 

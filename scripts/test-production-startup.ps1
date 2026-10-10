@@ -1,3 +1,4 @@
+param([string]$PackagePath)
 $ErrorActionPreference = 'Stop'
 $projectRoot = Split-Path -Parent $PSScriptRoot
 $testParent = (Resolve-Path -LiteralPath (Join-Path $projectRoot 'backend\target')).Path
@@ -6,11 +7,17 @@ $launcher = Join-Path $testRoot 'native\build\Release\live-desktop-launcher.exe'
 $savedJava = $env:JAVA_HOME
 $savedData = $env:DATA_DIR
 $sentinel = $null
+$nodePath = (Get-Command node).Source
 
 function Assert-True($condition, $message) { if (-not $condition) { throw $message } }
 function Invoke-Launcher([string]$action) {
-    & $launcher $action --root $testRoot
-    Assert-True ($LASTEXITCODE -eq 0) "Launcher $action failed."
+    $testSavedPath = $env:PATH
+    try {
+        # Direct Java selection works while Node and build tools are absent from PATH.
+        $env:PATH = Join-Path $env:SystemRoot 'System32'
+        & $launcher $action --root $testRoot
+        Assert-True ($LASTEXITCODE -eq 0) "Launcher $action failed."
+    } finally { $env:PATH = $testSavedPath }
 }
 function Read-Children {
     $matches = [regex]::Matches((Get-Content -LiteralPath (Join-Path $testRoot '.launcher.log') -Raw), 'Backend PID (\d+), frontend PID (\d+)')
@@ -27,19 +34,37 @@ function Wait-Stopped($ids) {
     throw 'Owned service processes survived cleanup.'
 }
 try {
-    foreach ($folder in @('native\build\Release', 'backend\target', 'frontend\scripts', 'frontend\dist')) {
-        New-Item -ItemType Directory -Path (Join-Path $testRoot $folder) -Force | Out-Null
+    if (-not $PackagePath) {
+        foreach ($folder in @('native\build\Release', 'backend\target', 'frontend\dist')) {
+            New-Item -ItemType Directory -Path (Join-Path $testRoot $folder) -Force | Out-Null
+        }
+        foreach ($name in @('live-desktop-launcher.exe', 'live-desktop-host.exe', 'live-desktop-windows-bridge.exe', 'live-desktop-credentials.dll')) {
+            Copy-Item -LiteralPath (Join-Path $projectRoot "native\build\Release\$name") -Destination (Join-Path $testRoot "native\build\Release\$name")
+        }
+        Copy-Item -LiteralPath (Join-Path $projectRoot 'backend\target\live-desktop-backend.jar') -Destination (Join-Path $testRoot 'backend\target')
+        Copy-Item -LiteralPath (Join-Path $projectRoot 'frontend\dist\client') -Destination (Join-Path $testRoot 'frontend\dist') -Recurse
     }
-    foreach ($name in @('live-desktop-launcher.exe', 'live-desktop-windows-bridge.exe', 'live-desktop-credentials.dll')) {
-        Copy-Item -LiteralPath (Join-Path $projectRoot "native\build\Release\$name") -Destination (Join-Path $testRoot "native\build\Release\$name")
+    if ($PackagePath) {
+        $packageExtract = Join-Path $testRoot 'extracted'
+        Expand-Archive -LiteralPath (Resolve-Path -LiteralPath $PackagePath).Path -DestinationPath $packageExtract
+        $runtimePackage = Join-Path $packageExtract 'Live-Desktop'
+        $manifest = Get-Content -LiteralPath (Join-Path $runtimePackage 'manifest.json') -Raw | ConvertFrom-Json
+        foreach ($entry in $manifest.files) {
+            $file = Join-Path $runtimePackage $entry.path
+            Assert-True ((Get-FileHash -LiteralPath $file -Algorithm SHA256).Hash.ToLowerInvariant() -eq $entry.sha256) "Package hash mismatch: $($entry.path)"
+        }
+        foreach ($entry in Get-ChildItem -LiteralPath $runtimePackage -Force) {
+            Copy-Item -LiteralPath $entry.FullName -Destination $testRoot -Recurse -Force
+        }
     }
-    Copy-Item -LiteralPath (Join-Path $projectRoot 'backend\target\live-desktop-backend.jar') -Destination (Join-Path $testRoot 'backend\target')
-    Copy-Item -LiteralPath (Join-Path $projectRoot 'frontend\dist\client') -Destination (Join-Path $testRoot 'frontend\dist') -Recurse
-    Copy-Item -LiteralPath (Join-Path $projectRoot 'frontend\scripts\serve-production.mjs') -Destination (Join-Path $testRoot 'frontend\scripts')
-    $env:JAVA_HOME = (Resolve-Path -LiteralPath (Join-Path $projectRoot '.tools\jdk-21')).Path
+    $env:JAVA_HOME = if ($PackagePath -and $manifest.includesJavaRuntime) { '' } else { (Resolve-Path -LiteralPath (Join-Path $projectRoot '.tools\jdk-21')).Path }
     $env:DATA_DIR = Join-Path $testRoot 'data'
     Invoke-Launcher start
     $first = Read-Children
+    Assert-True ((Get-Process -Id $first[1]).ProcessName -eq 'live-desktop-host') 'Production frontend is not native.'
+    $measurements = @(Get-Content -LiteralPath (Join-Path $testRoot '.startup-metrics.jsonl') | ForEach-Object { $_ | ConvertFrom-Json })
+    Assert-True (@($measurements | Where-Object { $_.event -eq 'services-ready' -and $_.host_ready_ms -gt 0 -and $_.proxy_ready_ms -gt 0 }).Count -gt 0) 'Readiness stage metrics missing.'
+    Assert-True (@($measurements | Where-Object { $_.event -eq 'launch-ready' -and $_.launch_to_ready_ms -gt 0 }).Count -gt 0) 'Launch timing missing.'
     Invoke-Launcher start
     $duplicate = Read-Children
     Assert-True (($duplicate -join ',') -eq ($first -join ',')) 'Duplicate start created new services.'
@@ -74,7 +99,6 @@ try {
     # Sentinel listener is created by this test and must survive a failed start.
     $sentinelScript = Join-Path $testRoot 'sentinel.cjs'
     Set-Content -LiteralPath $sentinelScript -Value "require('node:http').createServer((q,s)=>{s.setHeader('content-type','text/plain');s.end('sentinel')}).listen(4173,'127.0.0.1');"
-    $nodePath = (Get-Command node).Source
     $sentinel = Start-Process -FilePath $nodePath -ArgumentList @(('"' + $sentinelScript + '"')) -WindowStyle Hidden -PassThru -RedirectStandardError (Join-Path $testRoot 'sentinel.err.log')
     $deadline = [DateTime]::UtcNow.AddSeconds(10)
     do {
@@ -105,10 +129,22 @@ try {
     $supervisorId = [int]$supervisorMatches[$supervisorMatches.Count - 1].Groups[1].Value
     Stop-Process -Id $supervisorId -Force
     Wait-Stopped ($fourth + $bridges)
+    $hostExe = Join-Path $testRoot 'native\build\Release\live-desktop-host.exe'
+    Move-Item -LiteralPath $hostExe -Destination ($hostExe + '.missing')
+    $missingOutput = (& $launcher start --root $testRoot 2>&1 | Out-String)
+    Assert-True ($LASTEXITCODE -ne 0 -and $missingOutput.Contains('live-desktop-host.exe')) 'Missing native host diagnostic failed.'
+    Copy-Item -LiteralPath $launcher -Destination $hostExe
+    $failureOutput = (& $launcher start --root $testRoot 2>&1 | Out-String)
+    Assert-True ($LASTEXITCODE -ne 0 -and $failureOutput.Contains('Native frontend host exited with code')) 'Native child failure diagnostic failed.'
+    Move-Item -LiteralPath ($hostExe + '.missing') -Destination $hostExe -Force
     $jar = Join-Path $testRoot 'backend\target\live-desktop-backend.jar'
     Move-Item -LiteralPath $jar -Destination ($jar + '.missing')
     & $launcher start --root $testRoot
     Assert-True ($LASTEXITCODE -ne 0) 'Missing packaged backend was accepted.'
+    $metrics = @(Get-Content -LiteralPath (Join-Path $testRoot '.startup-metrics.jsonl') | ForEach-Object { $_ | ConvertFrom-Json })
+    $times = @($metrics | Where-Object { $_.event -eq 'launch-ready' -and -not $_.reused } | ForEach-Object { $_.launch_to_ready_ms } | Sort-Object)
+    Write-Output ("Fresh launch/restart measurements (ms): " + ($times -join ', '))
+    Write-Output ("Native host readiness from supervisor entry (ms): " + (($metrics | Where-Object event -eq 'services-ready' | ForEach-Object host_ready_ms) -join ', '))
     Write-Output 'PASS: duplicate/concurrent start, HTTP proxy, CLI/API restart/shutdown, occupied-port isolation, service failure, supervisor termination with bridge cleanup, missing artifact.'
 } finally {
     if ($sentinel -and -not $sentinel.HasExited) { Stop-Process -InputObject $sentinel -Force }

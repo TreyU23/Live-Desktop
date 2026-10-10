@@ -21,4 +21,4 @@ if ($LASTEXITCODE -ne 0) { throw "Native bridge configuration failed." }
 if ($LASTEXITCODE -ne 0) { throw "Native bridge build failed." }
 & $ctestPath --test-dir (Join-Path $projectRoot "native\build") -C Release --output-on-failure
 if ($LASTEXITCODE -ne 0) { throw "Native bridge protocol tests failed." }
-Write-Output "Built native/build/Release/live-desktop-launcher.exe, live-desktop-windows-bridge.exe and live-desktop-credentials.dll"
+Write-Output "Built native/build/Release/live-desktop-launcher.exe, live-desktop-host.exe, live-desktop-windows-bridge.exe and live-desktop-credentials.dll"

@@ -1,6 +1,6 @@
 # Windows-native integration migration
 
-Implementation status: the Windows integration section is native-only. The separate fast-startup/lifecycle section is not implemented by this change.
+Implementation status: the Windows integration section is native-only. Production lifecycle, native frontend hosting/proxy, readiness instrumentation, and runtime packaging are implemented; further JVM startup work remains pending.
 
 ## Completed scope
 
@@ -30,6 +30,6 @@ No normal integration request now launches PowerShell. The media manager and rad
 
 [Historical radio-only measurements](PHASE_1_RADIO_VALIDATION.md) are a limited warm-cache development benchmark, not measurements for the expanded bridge or full application startup. The expanded smoke test's launch-through-integration-checks time includes several different operations and cannot be compared directly with that historical first-radio result.
 
-Production lifecycle now uses `native/launcher/main.cpp`; `RuntimeService` signals that supervisor directly. The old port-based PowerShell lifecycle script is removed. Production starts a packaged Java JAR and a built-frontend Node server; Maven and Vite remain build/development tools. Setup/build/development PowerShell scripts remain. See [launcher operation and ownership](../native/README.md) and [startup validation](STARTUP_VALIDATION.md). AppCDS/GraalVM and further JVM startup work remain unimplemented; there is no measured before/after speedup claim.
+Production lifecycle now uses `native/launcher/main.cpp`; `RuntimeService` signals that supervisor directly. The old port-based PowerShell lifecycle script is removed. Production starts a packaged Java JAR and the native built-frontend HTTP host; Maven and Vite remain build/development tools. Setup/build/development PowerShell scripts remain. See [launcher operation and ownership](../native/README.md) and [startup validation](STARTUP_VALIDATION.md). AppCDS/GraalVM and further JVM startup work remain unimplemented; there is no measured before/after speedup claim.
 
 See [native operations, security bounds, and setup](../native/README.md). Credential APIs follow Windows [DPAPI](https://learn.microsoft.com/en-us/windows/win32/SecCrypto/example-c-program-using-cryptprotectdata); JNI preserves current-user scope and no optional entropy to match previous records.

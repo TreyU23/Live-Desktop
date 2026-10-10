@@ -10,6 +10,8 @@
 #include <vector>
 #include <stdexcept>
 #include <cwctype>
+#include <fstream>
+#include <sstream>
 
 namespace fs = std::filesystem;
 struct Handle {
@@ -98,21 +100,29 @@ struct MutexLock {
 void fileRequired(const fs::path& p) {
     if (!fs::is_regular_file(p)) throw std::runtime_error("Required prebuilt artifact is missing: " + p.string() + ". Run scripts/build-production.ps1.");
 }
-fs::path runtime(const fs::path& root, bool java) {
-    if (java) {
-        auto local = root / L".tools/jdk-21/bin/java.exe";
-        if (fs::is_regular_file(local)) return local;
-        auto home = env(L"JAVA_HOME");
-        if (!home.empty() && fs::is_regular_file(fs::path(home) / L"bin/java.exe")) return fs::path(home) / L"bin/java.exe";
-    }
+fs::path runtime(const fs::path& root) {
+    auto local = root / L".tools/jdk-21/bin/java.exe";
+    if (fs::is_regular_file(local)) return local;
+    auto home = env(L"JAVA_HOME");
+    if (!home.empty() && fs::is_regular_file(fs::path(home) / L"bin/java.exe")) return fs::path(home) / L"bin/java.exe";
     std::wstring buffer(32768, L'\0');
-    DWORD n = SearchPathW(nullptr, java ? L"java.exe" : L"node.exe", nullptr, static_cast<DWORD>(buffer.size()), buffer.data(), nullptr);
+    DWORD n = SearchPathW(nullptr, L"java.exe", nullptr, static_cast<DWORD>(buffer.size()), buffer.data(), nullptr);
     if (n && n < buffer.size()) { buffer.resize(n); return buffer; }
-    if (!java) {
-        auto bundled = fs::path(env(L"USERPROFILE")) / L".cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node.exe";
-        if (fs::is_regular_file(bundled)) return bundled;
-    }
-    throw std::runtime_error(java ? "Java 21 is required." : "Node.js 20 or later is required.");
+    throw std::runtime_error("Java 21 is required. Run scripts/bootstrap-java.ps1 or set JAVA_HOME to a Java 21 installation.");
+}
+void preflight(const fs::path& root) {
+    for (const auto& path : {L"backend/target/live-desktop-backend.jar", L"frontend/dist/client/index.html",
+         L"native/build/Release/live-desktop-host.exe", L"native/build/Release/live-desktop-windows-bridge.exe",
+         L"native/build/Release/live-desktop-credentials.dll"}) fileRequired(root / path);
+    runtime(root);
+}
+std::string logTail(const fs::path& path, std::streamoff offset) {
+    std::ifstream file(path, std::ios::binary);
+    if (!file) return "";
+    file.seekg(0, std::ios::end);
+    auto end = static_cast<std::streamoff>(file.tellg());
+    file.seekg(std::max(offset, end - 4096));
+    return std::string(std::istreambuf_iterator<char>(file), {});
 }
 // Inspect listening sockets only: recently closed connections in TIME_WAIT must not block restart.
 // The services' own binds remain authoritative if another listener races this preflight.
@@ -165,7 +175,7 @@ Handle child(const fs::path& app, const std::vector<std::wstring>& args, const f
     }
     return h;
 }
-bool httpReady(INTERNET_PORT port, const wchar_t* path) {
+bool httpReady(INTERNET_PORT port, const wchar_t* path, const std::string& expected = "") {
     HINTERNET session = WinHttpOpen(L"LiveDesktopLauncher/1", WINHTTP_ACCESS_TYPE_NO_PROXY, nullptr, nullptr, 0);
     if (!session) return false;
     WinHttpSetTimeouts(session, 250, 250, 250, 250);
@@ -174,6 +184,10 @@ bool httpReady(INTERNET_PORT port, const wchar_t* path) {
     DWORD status = 0, size = sizeof(status);
     bool ok = request && WinHttpSendRequest(request, nullptr, 0, nullptr, 0, 0, 0) && WinHttpReceiveResponse(request, nullptr)
         && WinHttpQueryHeaders(request, WINHTTP_QUERY_STATUS_CODE | WINHTTP_QUERY_FLAG_NUMBER, nullptr, &status, &size, nullptr) && status == 200;
+    if (ok && !expected.empty()) {
+        char body[4096]; DWORD read = 0;
+        ok = WinHttpReadData(request, body, sizeof(body), &read) && std::string(body, read).find(expected) != std::string::npos;
+    }
     if (request) WinHttpCloseHandle(request);
     if (connection) WinHttpCloseHandle(connection);
     WinHttpCloseHandle(session); return ok;
@@ -185,12 +199,8 @@ int supervise(const fs::path& root, Objects& objects) {
     ResetEvent(objects.ready.value); ResetEvent(objects.stop.value); ResetEvent(objects.restart.value);
     for (;;) {
         ULONGLONG started = GetTickCount64();
-        fileRequired(root / L"backend/target/live-desktop-backend.jar");
-        fileRequired(root / L"frontend/dist/client/index.html");
-        fileRequired(root / L"frontend/scripts/serve-production.mjs");
-        fileRequired(root / L"native/build/Release/live-desktop-windows-bridge.exe");
-        fileRequired(root / L"native/build/Release/live-desktop-credentials.dll");
-        auto java = runtime(root, true), node = runtime(root, false);
+        preflight(root);
+        auto java = runtime(root);
         portAvailable(4317); portAvailable(4173);
         Handle job(CreateJobObjectW(nullptr, nullptr)); require(job.value != nullptr, "Cannot create service job");
         JOBOBJECT_EXTENDED_LIMIT_INFORMATION limits{}; limits.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;
@@ -199,22 +209,45 @@ int supervise(const fs::path& root, Objects& objects) {
         SetEnvironmentVariableW(L"WORKSPACE_ROOT", root.c_str());
         SetEnvironmentVariableW(L"HOST", L"127.0.0.1"); SetEnvironmentVariableW(L"PORT", L"4317");
         auto backend = child(java, {L"-jar", (root / L"backend/target/live-desktop-backend.jar").wstring()}, root / L"backend", job.value, root / L".backend-preview.out.log", root / L".backend-preview.err.log");
-        auto frontend = child(node, {(root / L"frontend/scripts/serve-production.mjs").wstring()}, root / L"frontend", job.value, root / L".frontend-preview.out.log", root / L".frontend-preview.err.log");
+        auto frontend = child(root / L"native/build/Release/live-desktop-host.exe", {L"--root", root.wstring()}, root, job.value, root / L".frontend-preview.out.log", root / L".frontend-preview.err.log");
         std::cout << "Backend PID " << GetProcessId(backend.value) << ", frontend PID " << GetProcessId(frontend.value) << std::endl;
         HANDLE waits[] = {objects.stop.value, objects.restart.value, backend.value, frontend.value};
         ULONGLONG deadline = GetTickCount64() + 60000;
         DWORD signal = WAIT_TIMEOUT;
         bool ready = false;
+        ULONGLONG hostMs = 0, backendMs = 0, proxyMs = 0;
         while (GetTickCount64() < deadline) {
             signal = WaitForMultipleObjects(4, waits, FALSE, 100);
             if (signal != WAIT_TIMEOUT) break;
-            if (httpReady(4317, L"/health") && httpReady(4173, L"/")) {
+            if (!hostMs && httpReady(4173, L"/_live/ready", "live-desktop-host/1")) hostMs = GetTickCount64() - started;
+            if (!backendMs && httpReady(4317, L"/health", "ok")) backendMs = GetTickCount64() - started;
+            if (hostMs && backendMs && !proxyMs && httpReady(4173, L"/health", "ok")) proxyMs = GetTickCount64() - started;
+            if (proxyMs && httpReady(4173, L"/")) {
                 ready = true;
                 std::cout << "HTTP ready after " << (GetTickCount64() - started) << " ms" << std::endl;
+                std::ofstream metrics(root / L".startup-metrics.jsonl", std::ios::app);
+                metrics << "{\"event\":\"services-ready\",\"host_ready_ms\":" << hostMs
+                    << ",\"backend_ready_ms\":" << backendMs << ",\"proxy_ready_ms\":" << proxyMs
+                    << ",\"services_ready_ms\":" << (GetTickCount64() - started) << "}\n";
+                metrics.close();
                 SetEvent(objects.ready.value); break;
             }
         }
-        if (ready) signal = WaitForMultipleObjects(4, waits, FALSE, INFINITE);
+        std::string failure;
+        if (!ready || (signal == WAIT_OBJECT_0 + 2 || signal == WAIT_OBJECT_0 + 3)) {
+            if (signal == WAIT_OBJECT_0 + 2 || signal == WAIT_OBJECT_0 + 3) {
+                DWORD code = 0; GetExitCodeProcess(waits[signal - WAIT_OBJECT_0], &code);
+                failure = std::string(signal == WAIT_OBJECT_0 + 2 ? "Java backend" : "Native frontend host") + " exited with code " + std::to_string(code);
+            } else failure = "Readiness timed out after 60 seconds: native host=" + std::string(hostMs ? "ready" : "unavailable")
+                + ", backend /health=" + (backendMs ? "ready" : "unavailable") + ", API proxy=" + (proxyMs ? "ready" : "unavailable");
+        }
+        if (ready) {
+            signal = WaitForMultipleObjects(4, waits, FALSE, INFINITE);
+            if (signal == WAIT_OBJECT_0 + 2 || signal == WAIT_OBJECT_0 + 3) {
+                DWORD code = 0; GetExitCodeProcess(waits[signal - WAIT_OBJECT_0], &code);
+                failure = std::string(signal == WAIT_OBJECT_0 + 2 ? "Java backend" : "Native frontend host") + " exited with code " + std::to_string(code);
+            }
+        }
         ResetEvent(objects.ready.value);
         // Give the dashboard response a brief chance to reach the browser before shutting its backend down.
         if (signal == WAIT_OBJECT_0 || signal == WAIT_OBJECT_0 + 1) Sleep(750);
@@ -236,11 +269,12 @@ int supervise(const fs::path& root, Objects& objects) {
         }
         if (signal == WAIT_OBJECT_0) return 0;
         if (signal == WAIT_OBJECT_0 + 1) continue;
-        throw std::runtime_error(ready ? "A service exited; the remaining owned processes were stopped. Check service logs." : "Services failed readiness within 60 seconds. Check service logs.");
+        throw std::runtime_error((failure.empty() ? "A service exited; remaining owned processes were stopped" : failure) + ". Check .backend-preview.err.log, .backend-preview.out.log and .frontend-preview.err.log.");
     }
 }
 int wmain(int argc, wchar_t** argv) {
     try {
+        ULONGLONG commandStarted = GetTickCount64();
         std::wstring action = argc > 1 ? argv[1] : L"start";
         fs::path root = executable().parent_path().parent_path().parent_path().parent_path();
         bool requestOnly = false;
@@ -270,6 +304,8 @@ int wmain(int argc, wchar_t** argv) {
             if (action != L"restart") throw std::runtime_error("--request requires restart or shutdown.");
             ResetEvent(objects.ready.value); SetEvent(objects.restart.value); return 0;
         }
+        if (!running || action == L"restart") preflight(root);
+        std::streamoff logOffset = fs::exists(root / L".launcher.log") ? static_cast<std::streamoff>(fs::file_size(root / L".launcher.log")) : 0;
         Handle supervisor;
         if (!running) {
             ResetEvent(objects.ready.value);
@@ -279,11 +315,16 @@ int wmain(int argc, wchar_t** argv) {
         ULONGLONG deadline = GetTickCount64() + 65000;
         while (GetTickCount64() < deadline) {
             if (WaitForSingleObject(objects.ready.value, 100) == WAIT_OBJECT_0) {
-                std::cout << "Live Desktop ready. Dashboard: http://localhost:4173\n"; return 0;
+                auto elapsed = GetTickCount64() - commandStarted;
+                std::cout << "Live Desktop ready after " << elapsed << " ms. Dashboard: http://localhost:4173\n";
+                std::ofstream metrics(root / L".startup-metrics.jsonl", std::ios::app);
+                metrics << "{\"event\":\"launch-ready\",\"action\":\"" << (action == L"restart" ? "restart" : "start")
+                    << "\",\"reused\":" << (running && action == L"start" ? "true" : "false") << ",\"launch_to_ready_ms\":" << elapsed << "}\n";
+                return 0;
             }
             if (supervisor.value && WaitForSingleObject(supervisor.value, 0) == WAIT_OBJECT_0) break;
             if (!supervisor.value && !objects.running()) break;
         }
-        throw std::runtime_error("Live Desktop did not become ready. See .launcher.log and service logs.");
+        throw std::runtime_error("Live Desktop did not become ready. Supervisor details:\n" + logTail(root / L".launcher.log", logOffset) + "\nSee .launcher.log and service logs in " + root.string());
     } catch (const std::exception& e) { std::cerr << e.what() << '\n'; return 1; }
 }

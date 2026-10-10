@@ -32,3 +32,5 @@ Invoke-RestMethod http://127.0.0.1:4317/health
 ```
 
 Build native before tests: the live pipe test skips if its executable is absent, while Windows credential tests require the DLL. Live read-only tests do not establish hardware toggle, media mutation, sleep/resume, or cross-user security behavior.
+
+Normal use forwards API traffic through the native frontend host; no Node runtime is needed. The launcher verifies backend health directly and through that proxy before returning ready. `scripts/package-production.ps1` distributes the JAR and required native binaries; Java 21 remains a runtime prerequisite unless bundled with `-IncludeJavaRuntime`. See the root README for installation, readiness measurements, and failure diagnostics.

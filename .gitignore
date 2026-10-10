@@ -9,3 +9,5 @@ data/*.json
 data/*.tmp
 *.log
 .DS_Store
+.startup-metrics.jsonl
+dist/
