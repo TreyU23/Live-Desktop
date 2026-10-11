@@ -1,0 +1,242 @@
+[
+  {
+    "pair": 1,
+    "layout": "jar",
+    "aot": true,
+    "readinessMs": 2462.845,
+    "firstSystemMs": 8.7817,
+    "workingSetBytes": 131792896
+  },
+  {
+    "pair": 1,
+    "layout": "extracted",
+    "aot": true,
+    "readinessMs": 65.6994,
+    "firstSystemMs": 2.939,
+    "workingSetBytes": 2719744
+  },
+  {
+    "pair": 1,
+    "layout": "cds",
+    "aot": true,
+    "readinessMs": 27.796,
+    "firstSystemMs": 3.0451,
+    "workingSetBytes": 2719744
+  },
+  {
+    "pair": 2,
+    "layout": "cds",
+    "aot": true,
+    "readinessMs": 23.4852,
+    "firstSystemMs": 2.813,
+    "workingSetBytes": 2719744
+  },
+  {
+    "pair": 2,
+    "layout": "extracted",
+    "aot": true,
+    "readinessMs": 19.852,
+    "firstSystemMs": 2.668,
+    "workingSetBytes": 2723840
+  },
+  {
+    "pair": 2,
+    "layout": "jar",
+    "aot": true,
+    "readinessMs": 22.5,
+    "firstSystemMs": 4.9613,
+    "workingSetBytes": 2719744
+  },
+  {
+    "pair": 3,
+    "layout": "jar",
+    "aot": true,
+    "readinessMs": 6054.6511,
+    "firstSystemMs": 651.0454,
+    "workingSetBytes": 212819968
+  },
+  {
+    "pair": 3,
+    "layout": "extracted",
+    "aot": true,
+    "readinessMs": 4430.1539,
+    "firstSystemMs": 656.1169,
+    "workingSetBytes": 217194496
+  },
+  {
+    "pair": 3,
+    "layout": "cds",
+    "aot": true,
+    "readinessMs": 3379.9508,
+    "firstSystemMs": 895.3283,
+    "workingSetBytes": 206491648
+  },
+  {
+    "pair": 4,
+    "layout": "cds",
+    "aot": true,
+    "readinessMs": 2808.7311,
+    "firstSystemMs": 520.0017,
+    "workingSetBytes": 191201280
+  },
+  {
+    "pair": 4,
+    "layout": "extracted",
+    "aot": true,
+    "readinessMs": 3936.7501,
+    "firstSystemMs": 816.2124,
+    "workingSetBytes": 229711872
+  },
+  {
+    "pair": 4,
+    "layout": "jar",
+    "aot": true,
+    "readinessMs": 5647.9095,
+    "firstSystemMs": 723.0818,
+    "workingSetBytes": 229421056
+  },
+  {
+    "pair": 5,
+    "layout": "jar",
+    "aot": true,
+    "readinessMs": 4954.3763,
+    "firstSystemMs": 552.0795,
+    "workingSetBytes": 210751488
+  },
+  {
+    "pair": 5,
+    "layout": "extracted",
+    "aot": true,
+    "readinessMs": 3890.1326,
+    "firstSystemMs": 640.2063,
+    "workingSetBytes": 214691840
+  },
+  {
+    "pair": 5,
+    "layout": "cds",
+    "aot": true,
+    "readinessMs": 2835.4277,
+    "firstSystemMs": 672.2551,
+    "workingSetBytes": 207863808
+  },
+  {
+    "pair": 6,
+    "layout": "cds",
+    "aot": true,
+    "readinessMs": 3400.6992,
+    "firstSystemMs": 1226.0642,
+    "workingSetBytes": 200077312
+  },
+  {
+    "pair": 6,
+    "layout": "extracted",
+    "aot": true,
+    "readinessMs": 5575.6894,
+    "firstSystemMs": 785.6557,
+    "workingSetBytes": 227713024
+  },
+  {
+    "pair": 6,
+    "layout": "jar",
+    "aot": true,
+    "readinessMs": 5040.5998,
+    "firstSystemMs": 502.692,
+    "workingSetBytes": 199446528
+  },
+  {
+    "pair": 7,
+    "layout": "jar",
+    "aot": true,
+    "readinessMs": 4993.1504,
+    "firstSystemMs": 499.6051,
+    "workingSetBytes": 210898944
+  },
+  {
+    "pair": 7,
+    "layout": "extracted",
+    "aot": true,
+    "readinessMs": 3969.3577,
+    "firstSystemMs": 952.2724,
+    "workingSetBytes": 237969408
+  },
+  {
+    "pair": 7,
+    "layout": "cds",
+    "aot": true,
+    "readinessMs": 2834.3074,
+    "firstSystemMs": 722.6528,
+    "workingSetBytes": 190652416
+  },
+  {
+    "pair": 8,
+    "layout": "cds",
+    "aot": true,
+    "readinessMs": 3430.0361,
+    "firstSystemMs": 955.5348,
+    "workingSetBytes": 204677120
+  },
+  {
+    "pair": 8,
+    "layout": "extracted",
+    "aot": true,
+    "readinessMs": 4983.3679,
+    "firstSystemMs": 993.4554,
+    "workingSetBytes": 218955776
+  },
+  {
+    "pair": 8,
+    "layout": "jar",
+    "aot": true,
+    "readinessMs": 9005.4988,
+    "firstSystemMs": 1773.2359,
+    "workingSetBytes": 196378624
+  },
+  {
+    "pair": 9,
+    "layout": "jar",
+    "aot": true,
+    "readinessMs": 9412.0692,
+    "firstSystemMs": 1076.0646,
+    "workingSetBytes": 189829120
+  },
+  {
+    "pair": 9,
+    "layout": "extracted",
+    "aot": true,
+    "readinessMs": 7376.943,
+    "firstSystemMs": 1530.5333,
+    "workingSetBytes": 222523392
+  },
+  {
+    "pair": 9,
+    "layout": "cds",
+    "aot": true,
+    "readinessMs": 3957.3915,
+    "firstSystemMs": 899.7955,
+    "workingSetBytes": 198254592
+  },
+  {
+    "pair": 10,
+    "layout": "cds",
+    "aot": true,
+    "readinessMs": 4193.4833,
+    "firstSystemMs": 1142.1569,
+    "workingSetBytes": 175869952
+  },
+  {
+    "pair": 10,
+    "layout": "extracted",
+    "aot": true,
+    "readinessMs": 7468.7014,
+    "firstSystemMs": 1521.846,
+    "workingSetBytes": 209117184
+  },
+  {
+    "pair": 10,
+    "layout": "jar",
+    "aot": true,
+    "readinessMs": 7705.9832,
+    "firstSystemMs": 706.6624,
+    "workingSetBytes": 203501568
+  }
+]

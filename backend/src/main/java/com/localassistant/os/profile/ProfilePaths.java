@@ -7,9 +7,11 @@ import org.springframework.stereotype.Component;
 @Component
 public class ProfilePaths {
     private final Path dataRoot;
+    private final Path workspaceRoot;
 
     public ProfilePaths(AssistantProperties properties) {
         dataRoot = Path.of(properties.getDataDir()).toAbsolutePath().normalize();
+        workspaceRoot = Path.of(properties.getWorkspaceRoot()).toAbsolutePath().normalize();
     }
 
     public Path file(String fileName) {
@@ -23,4 +25,5 @@ public class ProfilePaths {
     }
 
     public boolean currentIsDefault() { return ProfileContext.DEFAULT_PROFILE.equals(ProfileContext.currentId()); }
+    public Path workspaceRoot() { return workspaceRoot; }
 }

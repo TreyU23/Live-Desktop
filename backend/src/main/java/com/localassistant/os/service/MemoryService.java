@@ -18,7 +18,7 @@ public class MemoryService {
     }
 
     public List<Memory> list() {
-        return store.snapshot().memories();
+        return store.memories();
     }
 
     public List<Memory> search(String query, int requestedLimit) {

@@ -1,0 +1,21 @@
+{
+  "coreCommitMs": [
+    36,
+    36,
+    36,
+    36,
+    35
+  ],
+  "iframeContinuity": true,
+  "profileSwitch": true,
+  "controlPendingWithinMs": 50,
+  "baseline": false,
+  "independentlyReady": true,
+  "calendarDelayMs": 10000,
+  "visibleRequests": 156,
+  "hiddenRequests": 0,
+  "observationMs": 300000,
+  "clock": "accelerated browser timers for polling; real delayed calendar",
+  "browser": "156.0.4314.15",
+  "errors": []
+}

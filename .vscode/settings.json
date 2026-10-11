@@ -1,5 +1,6 @@
 {
   "java.configuration.updateBuildConfiguration": "automatic",
   "java.jdt.ls.java.home": "${workspaceFolder}\\.tools\\jdk-21",
-  "maven.executable.path": "${workspaceFolder}\\mvnw.cmd"
+  "maven.executable.path": "${workspaceFolder}\\mvnw.cmd",
+  "cmake.sourceDirectory": "C:/Users/treyu/Personal Code/operatingSystemChatGPT/native"
 }

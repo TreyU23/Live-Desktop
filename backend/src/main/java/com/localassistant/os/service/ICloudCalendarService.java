@@ -48,71 +48,131 @@ public class ICloudCalendarService {
             .connectTimeout(Duration.ofSeconds(15))
             .followRedirects(HttpClient.Redirect.NEVER)
             .build();
-    private final Map<String, CalendarSnapshot> cache = new HashMap<>();
-
-    public ICloudCalendarService(ICloudCredentialStore credentials) {
-        this.credentials = credentials;
+    private final Map<String, ProfileCalendar> cache = new java.util.LinkedHashMap<>(16, .75f, true);
+    private final java.util.concurrent.Semaphore fetchSlots = new java.util.concurrent.Semaphore(4, true);
+    private final ThreadLocal<Long> fetchDeadline = new ThreadLocal<>();
+    static final class ProfileCalendar {
+        boolean valid = true;
+        final Map<LocalDate, CalendarSnapshot> dates = new java.util.LinkedHashMap<>(8, .75f, true);
+        final Map<LocalDate, java.util.concurrent.CompletableFuture<CalendarSnapshot>> pending = new HashMap<>();
+        volatile List<CalendarCollection> discovery;
+        volatile Instant discoveredAt;
     }
 
-    public synchronized CalendarSnapshot snapshot(LocalDate date, boolean forceRefresh) {
-        Optional<ICloudCredentialStore.Credentials> saved = credentials.load();
-        if (saved.isEmpty()) return CalendarSnapshot.disconnected(date);
-        CalendarSnapshot cached = cache.get(ProfileContext.currentId());
-        if (!forceRefresh && cached != null && cached.date().equals(date)
-                && cached.capturedAt().isAfter(Instant.now().minus(CACHE_TTL))) {
-            return cached;
+    public ICloudCalendarService(ICloudCredentialStore credentials) { this.credentials = credentials; }
+
+    public CalendarSnapshot snapshot(LocalDate date, boolean forceRefresh) {
+        String profile = ProfileContext.currentId();
+        ICloudCredentialStore.Credentials account;
+        ProfileCalendar state;
+        CalendarSnapshot previous;
+        java.util.concurrent.CompletableFuture<CalendarSnapshot> future;
+        boolean owner;
+        synchronized (cache) {
+            var saved = credentials.load();
+            if (saved.isEmpty()) return CalendarSnapshot.disconnected(date);
+            account = saved.get();
+            state = cache.computeIfAbsent(profile, ignored -> new ProfileCalendar());
+            // Evict only idle entries. In-flight keys remain deduplicated.
+            if (cache.size() > 32) {
+                var iterator = cache.entrySet().iterator();
+                while (cache.size() > 32 && iterator.hasNext()) {
+                    var entry = iterator.next();
+                    if (!entry.getKey().equals(profile) && entry.getValue().pending.isEmpty()) {
+                        entry.getValue().valid = false; iterator.remove();
+                    }
+                }
+            }
+            if (cache.size() > 32) {
+                cache.remove(profile); state.valid = false;
+                return new CalendarSnapshot(true, account.email(), "error", "Calendar refresh is busy. Try again shortly.", date, List.of(), Instant.now());
+            }
+            previous = state.dates.get(date);
+            if (!forceRefresh && previous != null && previous.capturedAt().isAfter(Instant.now().minus("error".equals(previous.status()) ? Duration.ofSeconds(15) : CACHE_TTL))) return previous;
+            future = state.pending.get(date);
+            owner = future == null;
+            if (owner && state.pending.size() >= 8) return new CalendarSnapshot(true, account.email(), "error", "Calendar refresh is busy. Try again shortly.", date, List.of(), Instant.now());
+            if (owner) { future = new java.util.concurrent.CompletableFuture<>(); state.pending.put(date, future); }
         }
+        if (!owner) return future.join();
+        CalendarSnapshot result;
+        boolean permit = false;
+        fetchDeadline.set(System.nanoTime() + Duration.ofSeconds(15).toNanos());
         try {
-            cached = fetch(saved.get(), date);
+            permit = fetchSlots.tryAcquire(100, java.util.concurrent.TimeUnit.MILLISECONDS);
+            if (!permit) throw new IllegalStateException("Calendar refresh is busy. Try again shortly.");
+            result = fetch(account, date, state);
         } catch (Exception error) {
-            List<CalendarEvent> previous = cached != null && cached.date().equals(date) ? cached.events() : List.of();
-            cached = new CalendarSnapshot(true, saved.get().email(), "error", friendlyError(error),
-                    date, previous, Instant.now());
+            if (error instanceof InterruptedException) Thread.currentThread().interrupt();
+            result = new CalendarSnapshot(true, account.email(), "error", friendlyError(error), date,
+                    previous == null ? List.of() : previous.events(), Instant.now());
+        } finally { if (permit) fetchSlots.release(); fetchDeadline.remove(); }
+        synchronized (cache) {
+            if (!state.valid || cache.get(profile) != state) result = CalendarSnapshot.disconnected(date);
+            else {
+                state.dates.put(date, result);
+                while (state.dates.size() > 8) state.dates.remove(state.dates.keySet().iterator().next());
+            }
+            state.pending.remove(date);
+            future.complete(result);
         }
-        cache.put(ProfileContext.currentId(), cached);
-        return cached;
+        return result;
     }
 
-    public synchronized CalendarSnapshot connect(String email, String appSpecificPassword) throws Exception {
-        if (email == null || email.isBlank() || !email.contains("@")) {
-            throw new IllegalArgumentException("Enter the email address for your Apple Account.");
+    public CalendarSnapshot connect(String email, String appSpecificPassword) throws Exception {
+        if (email == null || email.isBlank() || !email.contains("@")) throw new IllegalArgumentException("Enter the email address for your Apple Account.");
+        if (appSpecificPassword == null || appSpecificPassword.replace("-", "").length() < 16) throw new IllegalArgumentException("Enter a valid Apple app-specific password.");
+        ProfileCalendar token;
+        synchronized (cache) {
+            invalidate();
+            credentials.save(email.trim(), appSpecificPassword.trim());
+            token = new ProfileCalendar(); cache.put(ProfileContext.currentId(), token);
         }
-        if (appSpecificPassword == null || appSpecificPassword.replace("-", "").length() < 16) {
-            throw new IllegalArgumentException("Enter a valid Apple app-specific password.");
-        }
-        credentials.save(email.trim(), appSpecificPassword.trim());
-        cache.remove(ProfileContext.currentId());
         CalendarSnapshot result = snapshot(LocalDate.now(), true);
         if (!"connected".equals(result.status())) {
-            credentials.clear();
-            cache.remove(ProfileContext.currentId());
+            synchronized (cache) {
+                if (cache.get(ProfileContext.currentId()) == token) { credentials.clear(); invalidate(); }
+            }
             throw new IllegalArgumentException(result.detail());
         }
         return result;
     }
 
-    public synchronized CalendarSnapshot disconnect() throws Exception {
-        credentials.clear();
-        cache.remove(ProfileContext.currentId());
+    public CalendarSnapshot disconnect() throws Exception {
+        synchronized (cache) { invalidate(); credentials.clear(); }
         return CalendarSnapshot.disconnected(LocalDate.now());
     }
 
-    public synchronized void clearCurrentCache() {
-        cache.remove(ProfileContext.currentId());
-        credentials.clearCurrentCache();
+    private void invalidate() {
+        var old = cache.remove(ProfileContext.currentId());
+        if (old != null) old.valid = false;
     }
 
-    private CalendarSnapshot fetch(ICloudCredentialStore.Credentials account, LocalDate date) throws Exception {
+    public void clearCurrentCache() {
+        synchronized (cache) { invalidate(); credentials.clearCurrentCache(); }
+    }
+
+    CalendarSnapshot fetch(ICloudCredentialStore.Credentials account, LocalDate date, ProfileCalendar state) throws Exception {
         String auth = "Basic " + Base64.getEncoder().encodeToString(
                 (account.email() + ":" + account.appSpecificPassword()).getBytes(StandardCharsets.UTF_8));
+        List<CalendarCollection> calendars = state.discovery;
+        if (calendars == null || state.discoveredAt == null || state.discoveredAt.isBefore(Instant.now().minus(Duration.ofMinutes(30)))) {
+            synchronized (state) {
+                calendars = state.discovery;
+                if (calendars == null || state.discoveredAt == null || state.discoveredAt.isBefore(Instant.now().minus(Duration.ofMinutes(30)))) {
         URI principal = resolve(ICLOUD_CALDAV, firstHref(send(ICLOUD_CALDAV, "PROPFIND", "0", auth,
                 "<?xml version=\"1.0\"?><d:propfind xmlns:d=\"DAV:\"><d:prop><d:current-user-principal/></d:prop></d:propfind>"),
                 "current-user-principal"));
         URI home = resolve(principal, firstHref(send(principal, "PROPFIND", "0", auth,
                 "<?xml version=\"1.0\"?><d:propfind xmlns:d=\"DAV:\" xmlns:c=\"urn:ietf:params:xml:ns:caldav\"><d:prop><c:calendar-home-set/></d:prop></d:propfind>"),
                 "calendar-home-set"));
-        List<CalendarCollection> calendars = calendarCollections(home, send(home, "PROPFIND", "1", auth,
+            calendars = calendarCollections(home, send(home, "PROPFIND", "1", auth,
                 "<?xml version=\"1.0\"?><d:propfind xmlns:d=\"DAV:\" xmlns:c=\"urn:ietf:params:xml:ns:caldav\"><d:prop><d:displayname/><d:resourcetype/><c:supported-calendar-component-set/></d:prop></d:propfind>"));
+
+                    state.discovery = List.copyOf(calendars); state.discoveredAt = Instant.now();
+                }
+            }
+        }
 
         ZoneId zone = ZoneId.systemDefault();
         Instant rangeStart = date.atStartOfDay(zone).toInstant();
@@ -182,11 +242,21 @@ public class ICloudCalendarService {
         return ZonedDateTime.from(value);
     }
 
+    static void validateCalendarUri(URI uri) {
+        String host = uri.getHost();
+        if (!"https".equalsIgnoreCase(uri.getScheme()) || host == null
+                || !(host.equalsIgnoreCase("icloud.com") || host.toLowerCase(Locale.ROOT).endsWith(".icloud.com"))
+                || uri.getUserInfo() != null || (uri.getPort() != -1 && uri.getPort() != 443)) {
+            throw new IllegalArgumentException("iCloud returned an untrusted calendar URL.");
+        }
+    }
+
     private String send(URI uri, String method, String depth, String authorization, String body) throws Exception {
         URI current = uri;
         for (int redirect = 0; redirect < 6; redirect++) {
+            validateCalendarUri(current);
             HttpRequest request = HttpRequest.newBuilder(current)
-                    .timeout(Duration.ofSeconds(30))
+                    .timeout(remainingBudget())
                     .header("Authorization", authorization)
                     .header("Depth", depth)
                     .header("Content-Type", "application/xml; charset=utf-8")
@@ -209,6 +279,16 @@ public class ICloudCalendarService {
         }
         throw new IllegalStateException("iCloud Calendar redirected too many times.");
     }
+
+    private Duration remainingBudget() throws java.util.concurrent.TimeoutException {
+        Long deadline = fetchDeadline.get();
+        long remaining = deadline == null ? Duration.ofSeconds(30).toNanos() : deadline - System.nanoTime();
+        if (remaining <= 0) throw new java.util.concurrent.TimeoutException("Calendar refresh timed out.");
+        return Duration.ofNanos(remaining);
+    }
+
+    @jakarta.annotation.PreDestroy
+    public void close() { http.close(); }
 
     private String firstHref(String xml, String parentLocalName) throws Exception {
         var document = parseXml(xml);

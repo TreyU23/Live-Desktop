@@ -1,30 +1,17 @@
 package com.localassistant.os.service;
 
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.localassistant.os.config.AssistantProperties;
-import java.io.IOException;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.time.Duration;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.TimeUnit;
 import org.springframework.stereotype.Service;
 
 @Service
 public class WindowsMediaSessionService {
-    private static final Duration COMMAND_TIMEOUT = Duration.ofSeconds(12);
     private static final Set<String> ACTIONS = Set.of("snapshot", "play", "pause", "next", "previous", "shuffle", "mute");
-    private final ObjectMapper objectMapper = new ObjectMapper();
-    private final Path workspaceRoot;
-    private final Path script;
+    private final WindowsBridgeClient bridge;
 
-    public WindowsMediaSessionService(AssistantProperties properties) {
-        workspaceRoot = Path.of(properties.getWorkspaceRoot()).toAbsolutePath().normalize();
-        script = workspaceRoot.resolve("scripts").resolve("windows-media-session.ps1").normalize();
+    public WindowsMediaSessionService(WindowsBridgeClient bridge) {
+        this.bridge = bridge;
     }
 
     public Map<String, Object> snapshot() {
@@ -33,6 +20,19 @@ public class WindowsMediaSessionService {
 
     public Map<String, Object> snapshot(String provider) {
         return invoke("snapshot", normalizeProvider(provider));
+    }
+
+    public byte[] artwork(String version) {
+        if (!version.matches("[0-9]{1,20}-[0-9]{1,20}-[0-9]{1,20}")) return null;
+        var result = bridge.request("media.artwork", Map.of("version", version));
+        Object data = result.get("data");
+        if (!(data instanceof String value) || value.length() > 6 * 1024 * 1024) return null;
+        int comma = value.indexOf(',');
+        if (comma < 0 || !value.substring(0, comma).matches("data:image/(jpeg|png|webp|gif);base64")) return null;
+        try {
+            byte[] bytes = java.util.Base64.getDecoder().decode(value.substring(comma + 1));
+            return bytes.length <= 4 * 1024 * 1024 ? bytes : null;
+        } catch (IllegalArgumentException ignored) { return null; }
     }
 
     public Map<String, Object> control(String action) {
@@ -56,27 +56,8 @@ public class WindowsMediaSessionService {
     }
 
     private Map<String, Object> invoke(String action, String provider) {
-        if (!System.getProperty("os.name", "").toLowerCase().contains("windows")) return unavailable(provider, "Windows media controls are available on Windows only.");
-        if (!script.startsWith(workspaceRoot) || !Files.isRegularFile(script)) return unavailable(provider, "The local media-control script is unavailable.");
-        try {
-            Process process = new ProcessBuilder(
-                            "powershell.exe", "-NoProfile", "-NonInteractive", "-WindowStyle", "Hidden",
-                            "-ExecutionPolicy", "Bypass", "-File", script.toString(), "-Action", action, "-Provider", provider)
-                    .redirectErrorStream(false)
-                    .start();
-            if (!process.waitFor(COMMAND_TIMEOUT.toMillis(), TimeUnit.MILLISECONDS)) {
-                process.destroyForcibly();
-                return unavailable(provider, "Windows media controls timed out.");
-            }
-            String output = new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8).trim();
-            String error = new String(process.getErrorStream().readAllBytes(), StandardCharsets.UTF_8).trim();
-            if (process.exitValue() != 0 || output.isBlank()) {
-                return unavailable(provider, error.isBlank() ? "Windows media controls did not return a result." : error);
-            }
-            return objectMapper.readValue(output, new TypeReference<>() {});
-        } catch (Exception error) {
-            return unavailable(provider, error.getMessage() == null ? error.toString() : error.getMessage());
-        }
+        Map<String, Object> result = bridge.request("media." + action, Map.of("provider", provider));
+        return result.containsKey("title") ? result : unavailable(provider, String.valueOf(result.getOrDefault("detail", "Windows media controls are unavailable.")));
     }
 
     private Map<String, Object> unavailable(String provider, String detail) {

@@ -53,6 +53,7 @@
     </dependencies>
 
     <build>
+        <finalName>live-desktop-backend</finalName>
         <plugins>
             <plugin>
                 <groupId>org.springframework.boot</groupId>
@@ -60,4 +61,14 @@
             </plugin>
         </plugins>
     </build>
+    <profiles>
+        <profile>
+            <id>startup-aot</id>
+            <build><directory>${project.basedir}/target/aot</directory><plugins><plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+                <executions><execution><id>startup-experiment</id><goals><goal>process-aot</goal></goals></execution></executions>
+            </plugin></plugins></build>
+        </profile>
+    </profiles>
 </project>

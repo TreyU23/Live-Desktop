@@ -100,10 +100,9 @@ public class DashboardContextService {
     }
 
     private Map<String, Object> summary() {
-        var state = store.snapshot();
         return Map.of(
-                "conversationCount", state.conversations().size(),
-                "memoryCount", state.memories().size(),
+                "conversationCount", store.conversationSummaries().size(),
+                "memoryCount", store.memories().size(),
                 "pendingApprovalCount", actions.list("pending").size());
     }
 

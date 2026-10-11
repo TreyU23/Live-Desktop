@@ -1,0 +1,11 @@
+{
+  "baseline": true,
+  "independentlyReady": false,
+  "calendarDelayMs": 10000,
+  "visibleRequests": 334,
+  "hiddenRequests": 322,
+  "observationMs": 300000,
+  "clock": "accelerated browser timers for polling; real delayed calendar",
+  "browser": "156.0.4314.15",
+  "errors": []
+}

@@ -1,6 +1,12 @@
 $ErrorActionPreference = "Stop"
 
 $projectRoot = Split-Path -Parent $PSScriptRoot
+$nativeRelease = Join-Path $projectRoot "native\build\Release"
+foreach ($artifact in @('live-desktop-windows-bridge.exe', 'live-desktop-credentials.dll')) {
+    if (-not (Test-Path -LiteralPath (Join-Path $nativeRelease $artifact) -PathType Leaf)) {
+        throw "Native Windows integration is missing $artifact. Run scripts/build-windows-bridge.ps1 before starting the backend."
+    }
+}
 $localJdk = Join-Path $projectRoot ".tools\jdk-21"
 
 if (Test-Path (Join-Path $localJdk "bin\java.exe")) {

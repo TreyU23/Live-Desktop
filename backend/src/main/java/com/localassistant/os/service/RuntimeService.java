@@ -16,12 +16,12 @@ public class RuntimeService {
     private static final int BACKEND_PORT = 4317;
 
     private final Path workspaceRoot;
-    private final Path lifecycleScript;
+    private final Path lifecycleLauncher;
     private final Path lifecycleLog;
 
     public RuntimeService(AssistantProperties properties) {
         workspaceRoot = Path.of(properties.getWorkspaceRoot()).toAbsolutePath().normalize();
-        lifecycleScript = workspaceRoot.resolve("scripts").resolve("project-lifecycle.ps1").normalize();
+        lifecycleLauncher = workspaceRoot.resolve("native/build/Release/live-desktop-launcher.exe").normalize();
         lifecycleLog = workspaceRoot.resolve("data").resolve("runtime-control.log").normalize();
     }
 
@@ -41,29 +41,33 @@ public class RuntimeService {
         if (!System.getProperty("os.name", "").toLowerCase(Locale.ROOT).contains("windows")) {
             throw new IllegalStateException("Project lifecycle controls are available on Windows only.");
         }
-        if (!lifecycleScript.startsWith(workspaceRoot) || !Files.isRegularFile(lifecycleScript)) {
-            throw new IllegalStateException("Project lifecycle script is unavailable.");
+        if (!lifecycleLauncher.startsWith(workspaceRoot) || !Files.isRegularFile(lifecycleLauncher)) {
+            throw new IllegalStateException("Native lifecycle launcher is unavailable. Build production artifacts first.");
         }
 
         Files.createDirectories(lifecycleLog.getParent());
         ProcessBuilder builder = new ProcessBuilder(
-                "powershell.exe",
-                "-NoProfile",
-                "-NonInteractive",
-                "-WindowStyle",
-                "Hidden",
-                "-ExecutionPolicy",
-                "Bypass",
-                "-File",
-                lifecycleScript.toString(),
-                "-Action",
+                lifecycleLauncher.toString(),
                 normalized,
-                "-WorkspaceRoot",
-                workspaceRoot.toString());
+                "--root",
+                workspaceRoot.toString(),
+                "--request");
         builder.directory(workspaceRoot.toFile());
         builder.redirectOutput(ProcessBuilder.Redirect.appendTo(lifecycleLog.toFile()));
         builder.redirectError(ProcessBuilder.Redirect.appendTo(lifecycleLog.toFile()));
-        builder.start();
+        Process process = builder.start();
+        try {
+            if (!process.waitFor(5, java.util.concurrent.TimeUnit.SECONDS)) {
+                process.destroyForcibly();
+                throw new IllegalStateException("Native lifecycle request timed out.");
+            }
+            if (process.exitValue() != 0) {
+                throw new IllegalStateException("Native lifecycle request failed. See data/runtime-control.log.");
+            }
+        } catch (InterruptedException interrupted) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException("Native lifecycle request interrupted.", interrupted);
+        }
 
         return new LifecycleRequest(normalized, "accepted", Instant.now().toString());
     }

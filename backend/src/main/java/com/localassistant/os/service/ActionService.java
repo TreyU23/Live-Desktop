@@ -40,7 +40,7 @@ public class ActionService {
     }
 
     public List<AssistantAction> list(String status) {
-        return store.snapshot().actions().stream()
+        return store.actions().stream()
                 .filter(action -> status == null || status.isBlank() || action.status().equals(status))
                 .toList();
     }
@@ -101,7 +101,7 @@ public class ActionService {
     }
 
     private boolean hasPreviousApproval(String approvalKey) throws IOException {
-        for (AssistantAction action : store.snapshot().actions()) {
+        for (AssistantAction action : store.actions()) {
             if (Set.of("approved", "completed", "failed").contains(action.status())
                     && approvalKey(action.kind(), action.arguments()).equals(approvalKey)) {
                 return true;
@@ -143,16 +143,14 @@ public class ActionService {
             if (!System.getProperty("os.name", "").toLowerCase().contains("windows")) {
                 throw new IllegalStateException("The browser launcher is currently implemented for Windows only.");
             }
-            new ProcessBuilder("rundll32.exe", "url.dll,FileProtocolHandler", uri.toString()).start();
-            return Map.of("opened", uri.toString());
+            return systemControls.open("browser.openUrl", uri.toString());
         }
         if (action.kind().equals("windows_open_uri")) {
             String uri = parseWindowsUri(String.valueOf(action.arguments().get("uri")));
             if (!System.getProperty("os.name", "").toLowerCase().contains("windows")) {
                 throw new IllegalStateException("Windows settings are available on Windows only.");
             }
-            new ProcessBuilder("explorer.exe", uri).start();
-            return Map.of("opened", uri);
+            return systemControls.open("windows.openUri", uri);
         }
         if (action.kind().equals("windows_set_control")) {
             return systemControls.set(

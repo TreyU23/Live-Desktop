@@ -50,6 +50,7 @@ public class OpenAiAgent {
     private final WorkspaceService workspace;
     private final DashboardContextService dashboardContext;
     private final ProfileCredentialStore credentials;
+    private final ProfileClientPool clients;
 
     public OpenAiAgent(
             AssistantProperties properties,
@@ -57,13 +58,15 @@ public class OpenAiAgent {
             MemoryService memories,
             WorkspaceService workspace,
             DashboardContextService dashboardContext,
-            ProfileCredentialStore credentials) {
+            ProfileCredentialStore credentials,
+            ProfileClientPool clients) {
         this.properties = properties;
         this.actions = actions;
         this.memories = memories;
         this.workspace = workspace;
         this.dashboardContext = dashboardContext;
         this.credentials = credentials;
+        this.clients = clients;
     }
 
     public boolean configured() {
@@ -90,7 +93,8 @@ public class OpenAiAgent {
         if (key == null) {
             throw new IllegalStateException("OPENAI_API_KEY is not configured.");
         }
-        OpenAIClient client = OpenAIOkHttpClient.builder().apiKey(key).build();
+        try (var lease = clients.acquire(ProfileContext.currentId(), key)) {
+        OpenAIClient client = lease.client();
 
         List<ResponseInputItem> inputs = new ArrayList<>();
         int start = Math.max(0, conversation.messages().size() - 30);
@@ -171,6 +175,7 @@ public class OpenAiAgent {
             }
         }
         throw new IllegalStateException("The assistant exceeded the tool-call limit for one request.");
+        }
     }
 
     private Object callTool(ResponseFunctionToolCall call) throws IOException {

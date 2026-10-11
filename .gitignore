@@ -1,4 +1,5 @@
 .tools/
+native/build/
 .mvn/wrapper/maven-wrapper.jar
 backend/target/
 frontend/node_modules/
@@ -8,3 +9,5 @@ data/*.json
 data/*.tmp
 *.log
 .DS_Store
+.startup-metrics.jsonl
+dist/

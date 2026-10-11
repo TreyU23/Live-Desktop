@@ -182,7 +182,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, [tabindex]:focu
 .track strong { font-size: 13px; }
 .track span, .track small { color: var(--muted); font-size: 11px; }
 .progress { height: 3px; background: #28282c; border-radius: 3px; margin-top: 15px; overflow: hidden; }
-.progress i { height: 100%; display: block; border-radius: inherit; background: var(--blue); transition: width .3s; }
+.progress i { height: 100%; display: block; border-radius: inherit; background: var(--blue); }
 .track-time { display: flex; justify-content: space-between; margin-top: 5px; color: var(--muted); font-size: 9.5px; }
 .media-controls { display: flex; align-items: center; justify-content: space-between; margin-top: 9px; }
 .media-controls button { border: 0; background: transparent; color: #e7e7ea; padding: 6px; display: inline-flex; cursor: pointer; }
@@ -466,3 +466,12 @@ button:focus-visible, input:focus-visible, select:focus-visible, [tabindex]:focu
 }
 
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; } }
+.refresh-status {
+  padding: 12px 24px;
+  margin: 0;
+  color: var(--text);
+  background: var(--raised);
+  font-size: 13px;
+}
+
+@media (max-width: 1500px) { .local-status { display: none; } }

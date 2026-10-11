@@ -4,10 +4,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.localassistant.os.profile.ProfileContext;
 import com.localassistant.os.profile.ProfilePaths;
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.time.Duration;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
@@ -15,12 +13,14 @@ import org.springframework.stereotype.Component;
 
 @Component
 public class ProfileCredentialStore {
-    private static final Duration COMMAND_TIMEOUT = Duration.ofSeconds(12);
     private final ObjectMapper mapper = new ObjectMapper();
     private final ProfilePaths profilePaths;
+    private final com.localassistant.os.agent.ProfileClientPool clients;
     private final Map<String, Optional<String>> cachedKeys = new HashMap<>();
 
-    public ProfileCredentialStore(ProfilePaths profilePaths) { this.profilePaths = profilePaths; }
+    @org.springframework.beans.factory.annotation.Autowired
+    public ProfileCredentialStore(ProfilePaths profilePaths, com.localassistant.os.agent.ProfileClientPool clients) { this.profilePaths = profilePaths; this.clients = clients; }
+    public ProfileCredentialStore(ProfilePaths profilePaths) { this(profilePaths, null); }
 
     public synchronized void saveOpenAiKey(String apiKey) throws IOException {
         String cleaned = apiKey == null ? "" : apiKey.trim();
@@ -31,6 +31,7 @@ public class ProfileCredentialStore {
         Files.createDirectories(file.getParent());
         mapper.writeValue(file.toFile(), Map.of("protectedApiKey", protect(cleaned)));
         cachedKeys.put(ProfileContext.currentId(), Optional.of(cleaned));
+        if (clients != null) clients.invalidate(ProfileContext.currentId());
     }
 
     public synchronized Optional<String> loadOpenAiKey() {
@@ -48,7 +49,7 @@ public class ProfileCredentialStore {
     }
 
     public synchronized boolean hasOpenAiKey() {
-        return protectedOpenAiKey().isPresent();
+        return loadOpenAiKey().isPresent();
     }
 
     private Optional<String> protectedOpenAiKey() {
@@ -64,34 +65,17 @@ public class ProfileCredentialStore {
     public synchronized void clearOpenAiKey() throws IOException {
         Files.deleteIfExists(profilePaths.file("openai-credentials.json"));
         cachedKeys.remove(ProfileContext.currentId());
+        if (clients != null) clients.invalidate(ProfileContext.currentId());
     }
 
-    public synchronized void clearCurrentCache() { cachedKeys.remove(ProfileContext.currentId()); }
+    public synchronized void clearCurrentCache() { cachedKeys.remove(ProfileContext.currentId()); if (clients != null) clients.invalidate(ProfileContext.currentId()); }
 
     private String protect(String value) throws IOException {
-        return runPowerShell("Add-Type -AssemblyName System.Security;$v=[Console]::In.ReadToEnd();$b=[Text.Encoding]::UTF8.GetBytes($v);$p=[System.Security.Cryptography.ProtectedData]::Protect($b,$null,[System.Security.Cryptography.DataProtectionScope]::CurrentUser);[Console]::Out.Write([Convert]::ToBase64String($p))", value);
+        return WindowsCredentialProtection.protect(profilePaths.workspaceRoot(), value);
     }
 
     private String unprotect(String value) throws IOException {
-        return runPowerShell("Add-Type -AssemblyName System.Security;$v=[Console]::In.ReadToEnd();$b=[Convert]::FromBase64String($v);$p=[System.Security.Cryptography.ProtectedData]::Unprotect($b,$null,[System.Security.Cryptography.DataProtectionScope]::CurrentUser);[Console]::Out.Write([Text.Encoding]::UTF8.GetString($p))", value);
+        return WindowsCredentialProtection.unprotect(profilePaths.workspaceRoot(), value);
     }
 
-    private String runPowerShell(String script, String input) throws IOException {
-        Process process = new ProcessBuilder("powershell.exe", "-NoProfile", "-NonInteractive", "-WindowStyle", "Hidden", "-Command", script).start();
-        process.getOutputStream().write(input.getBytes(StandardCharsets.UTF_8));
-        process.getOutputStream().close();
-        try {
-            if (!process.waitFor(COMMAND_TIMEOUT.toMillis(), java.util.concurrent.TimeUnit.MILLISECONDS)) {
-                process.destroyForcibly();
-                throw new IOException("Windows credential protection timed out.");
-            }
-        } catch (InterruptedException error) {
-            Thread.currentThread().interrupt();
-            throw new IOException("Windows credential protection was interrupted.", error);
-        }
-        String output = new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8).trim();
-        String error = new String(process.getErrorStream().readAllBytes(), StandardCharsets.UTF_8).trim();
-        if (process.exitValue() != 0 || output.isBlank()) throw new IOException(error.isBlank() ? "Windows credential protection failed." : error);
-        return output;
-    }
 }

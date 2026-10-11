@@ -11,7 +11,11 @@ public class AssistantProperties {
     private String reasoningEffort = "medium";
 
     public String getDataDir() {
-        return dataDir;
+        String installation = System.getenv("LIVE_DESKTOP_ROOT");
+        java.nio.file.Path configured = java.nio.file.Path.of(dataDir);
+        return installation != null && !installation.isBlank() && !configured.isAbsolute()
+                ? java.nio.file.Path.of(installation).resolve("backend").resolve(configured).normalize().toString()
+                : dataDir;
     }
 
     public void setDataDir(String dataDir) {
