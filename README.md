@@ -6,6 +6,8 @@ Open [http://localhost:4173](http://localhost:4173). Production binds the fronte
 
 ## Run an installed package
 
+Download `Live-Desktop-windows-x64.zip` from the [latest GitHub release](https://github.com/TreyU23/Live-Desktop/releases/latest). Release assets include a SHA-256 checksum. The complete Windows runtime is also published to the repository's GitHub Packages Maven registry as `com.localassistant:live-desktop-windows-x64:<release-version>:zip`; it contains the same ZIP bytes as the release asset. See [package publishing and downloads](docs/PACKAGES.md) for authenticated registry access.
+
 Extract the entire `Live-Desktop` folder from the Windows x64 ZIP into a writable directory private to your Windows account. Run `start.cmd`, then open the dashboard. If the ZIP does not contain `.tools/jdk-21`, install Java 21 and set `JAVA_HOME`, or run `scripts/bootstrap-java.ps1`.
 
 Normal use requires Windows 10/11 x64 and Java 21. Node, pnpm, Maven, Visual Studio, CMake, and a separate Visual C++ runtime installation are unnecessary. Build tools are only needed for a source checkout. The ZIP contains no saved profiles, credentials, `.env`, logs, or dependency caches.

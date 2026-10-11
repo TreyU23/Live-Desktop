@@ -1,0 +1,60 @@
+name: Publish Windows runtime package
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Published release tag (for example v0.2.0)
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: runtime-package-${{ github.event.release.tag_name || inputs.tag }}
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Set up Java and Maven registry credentials
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          server-id: github
+          server-username: GITHUB_ACTOR
+          server-password: GITHUB_TOKEN
+      - name: Download and publish the release runtime ZIP
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ github.event.release.tag_name || inputs.tag }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ ! "$RELEASE_TAG" =~ ^v([0-9]+\.[0-9]+\.[0-9]+)$ ]]; then
+            echo "Expected a stable release tag such as v0.2.0" >&2
+            exit 1
+          fi
+          version="${BASH_REMATCH[1]}"
+          mkdir -p dist
+          gh release download "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" \
+            --pattern 'Live-Desktop-windows-x64.zip' \
+            --pattern 'Live-Desktop-windows-x64.zip.sha256' --dir dist
+          (cd dist && sha256sum --check Live-Desktop-windows-x64.zip.sha256)
+          mvn --batch-mode org.apache.maven.plugins:maven-deploy-plugin:3.1.4:deploy-file \
+            -DrepositoryId=github \
+            -Durl=https://maven.pkg.github.com/treyu23/live-desktop \
+            -DgroupId=com.localassistant \
+            -DartifactId=live-desktop-windows-x64 \
+            -Dversion="$version" \
+            -Dpackaging=zip \
+            -DgeneratePom=true \
+            -Dfile=dist/Live-Desktop-windows-x64.zip
