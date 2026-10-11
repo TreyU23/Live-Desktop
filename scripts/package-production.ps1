@@ -9,7 +9,7 @@ $packageRoot = Join-Path $stage 'Live-Desktop'
 $archive = Join-Path $distribution 'Live-Desktop-windows-x64.zip'
 try {
     New-Item -ItemType Directory -Path $packageRoot -Force | Out-Null
-    $files = @('start.cmd', '.env.example', 'README.md', 'backend\README.md', 'frontend\README.md', 'native\README.md', 'scripts\bootstrap-java.ps1', 'backend\target\live-desktop-backend.jar')
+    $files = @('start.cmd', '.env.example', 'README.md', 'backend\README.md', 'frontend\README.md', 'native\README.md', 'scripts\bootstrap-java.ps1')
     foreach ($name in @('live-desktop-launcher.exe', 'live-desktop-host.exe', 'live-desktop-windows-bridge.exe', 'live-desktop-credentials.dll')) {
         $files += "native\build\Release\$name"
     }
@@ -20,7 +20,7 @@ try {
         New-Item -ItemType Directory -Path (Split-Path -Parent $target) -Force | Out-Null
         Copy-Item -LiteralPath $source -Destination $target
     }
-    foreach ($relative in @('frontend\dist\client', 'docs')) {
+    foreach ($relative in @('backend\target\runtime', 'frontend\dist\client', 'docs')) {
         $target = Join-Path $packageRoot $relative
         New-Item -ItemType Directory -Path (Split-Path -Parent $target) -Force | Out-Null
         Copy-Item -LiteralPath (Join-Path $projectRoot $relative) -Destination $target -Recurse

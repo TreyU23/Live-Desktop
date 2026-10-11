@@ -1,8 +1,8 @@
 # Native production startup validation
 
-Recorded October 9, 2026 on the development Windows machine.
+Historical validation recorded October 9, 2026 on the development Windows machine. The current extracted deployment/CDS path and October 10 measurements are documented in [PERFORMANCE_RESULTS.md](PERFORMANCE_RESULTS.md); the tables below describe the earlier artifact.
 
-## Implemented startup path
+## Startup path in the October 9 artifact
 
 `start.cmd` invokes `native/build/Release/live-desktop-launcher.exe start`. The launcher creates a background C++ supervisor which starts Java directly with `-jar backend/target/live-desktop-backend.jar` and `live-desktop-host.exe --root WORKSPACE`. The frontend serves `frontend/dist/client` and proxies API/health requests to the backend. Production launch performs no Node, PowerShell, Maven, pnpm, Vite, compilation, dependency install, or download. The native host uses Winsock for loopback HTTP and WinHTTP for API proxying.
 
@@ -53,4 +53,4 @@ The native targets statically link the MSVC runtime. `scripts/package-production
 
 `scripts/test-production-startup.ps1 -PackagePath PATH` extracts only the package artifacts into the test workspace, verifies manifest hashes, and runs lifecycle checks. Normal CLI start/restart/shutdown run with Node/build-tool directories removed from PATH. Missing host and deliberately invalid host binaries verify the diagnostics. Separate test data and owned processes are removed afterwards.
 
-Cleanup forcibly terminates processes and does not drain in-flight requests. Cross-session naming follows Windows' global-object semantics, but separate Windows sessions/users were not exercised live. Hardware mutations, external app launching, sleep/resume, and UI click automation are outside this startup test. AppCDS, Spring AOT, and GraalVM are unimplemented.
+Cleanup forcibly terminates processes and does not drain in-flight requests. Cross-session naming follows Windows' global-object semantics, but separate Windows sessions/users were not exercised live. Hardware mutations, external app launching, sleep/resume, and UI click automation were outside this October 9 startup test. That artifact did not implement CDS, Spring AOT or GraalVM; current CDS delivery and the separate JVM AOT experiment are documented in the [performance report](PERFORMANCE_RESULTS.md).

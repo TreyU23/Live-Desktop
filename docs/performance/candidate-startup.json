@@ -1,0 +1,461 @@
+{
+  "label": "candidate",
+  "source": "ec99bcea449c243d67575e40761f966cd1328d6b",
+  "java": "Picked up JAVA_TOOL_OPTIONS: \r\nopenjdk version \"21.0.12\" 2026-07-21 LTS\r\nOpenJDK Runtime Environment Temurin-21.0.12+8 (build 21.0.12+8-LTS)\r\nOpenJDK 64-Bit Server VM Temurin-21.0.12+8 (build 21.0.12+8-LTS, mixed mode, sharing)\r\n",
+  "cpu": "Intel(R) Core(TM) i5-8265U CPU @ 1.60GHz",
+  "power": "Power Scheme GUID: 381b4222-f694-41f0-9685-ff5bb260df2e  (Balanced)\r\n",
+  "jarSha256": "13E1B24991D7076DFBB94ADC4D09ACD60C4A9BDABA48D9AEEE6A3B408CB4F898",
+  "artifactHashes": [
+    {
+      "path": "native/build/Release/live-desktop-credentials.dll",
+      "sha256": "54F2E7FEB8050F9CC4A96E66E159BF9A732EDF35C82FAA4C1A208906B5CDD359"
+    },
+    {
+      "path": "native/build/Release/live-desktop-credentials.exp",
+      "sha256": "7FD001920F1B80C4AFB296E5E108828EB4122877DEAEBE69DB7D32AC711297CD"
+    },
+    {
+      "path": "native/build/Release/live-desktop-credentials.lib",
+      "sha256": "4C91589591D03C4DAF0F2FBFC80F5C2E2CD6B1B904177B1199AA2FB4C5C2FC3F"
+    },
+    {
+      "path": "native/build/Release/live-desktop-host.exe",
+      "sha256": "3825D3469F246A3A31BFABC5A8F1B16C6E4E0EA4F6FBCA959C5AF0DF744E429E"
+    },
+    {
+      "path": "native/build/Release/live-desktop-launcher.exe",
+      "sha256": "E3509AD785ACB69AE6018BE4BBEC10951B93B8D694F4A13DB436AFEADB378131"
+    },
+    {
+      "path": "native/build/Release/live-desktop-windows-bridge.exe",
+      "sha256": "1D75B82F5874D1B6C63585DDB3ACC381894FCDCCA36BEA9C39A314F61C36BBFB"
+    },
+    {
+      "path": "backend/target/runtime/application.jsa",
+      "sha256": "9F50EE9B3C2FE2B0F80645339EFC9EAC8173A02EF6EC6216B9DA595943F551BC"
+    },
+    {
+      "path": "backend/target/runtime/cds-identity.json",
+      "sha256": "D77B236026EB67ABA1B9F92C519C16BED94EC91DA81766DDF00FAD184032961E"
+    },
+    {
+      "path": "backend/target/runtime/cds-java-release.txt",
+      "sha256": "0838EC7ABAB7D1B89D425E36735DBB696889E05968C1DBAE18EAE631972F443E"
+    },
+    {
+      "path": "backend/target/runtime/live-desktop-backend.jar",
+      "sha256": "61635EEBAC8AE123DB18CB66F0AD9D52E5916C7EE053298141F92306C59CE430"
+    },
+    {
+      "path": "backend/target/runtime/lib/annotations-13.0.jar",
+      "sha256": "ACE2A10DC8E2D5FD34925ECAC03E4988B2C0F851650C94B8CEF49BA1BD111478"
+    },
+    {
+      "path": "backend/target/runtime/lib/classmate-1.7.3.jar",
+      "sha256": "75FBDA45456F123FB6E2028A6189442D8D0730B357ADCE4C0A6D7E789F70669B"
+    },
+    {
+      "path": "backend/target/runtime/lib/commons-codec-1.21.0.jar",
+      "sha256": "4DA851CB6ABFB98BFE9EB77C5E5FC47F5414FA28B94E21B7FD9A646705DC167F"
+    },
+    {
+      "path": "backend/target/runtime/lib/commons-lang3-3.20.0.jar",
+      "sha256": "69E5C9FA35DA7A51A5FD2099DFE56A2D8D32CF233E2F6D770E796146440263F4"
+    },
+    {
+      "path": "backend/target/runtime/lib/commons-logging-1.3.6.jar",
+      "sha256": "F8EAD8943401081DEA0AA824B5B1BA40A0E4ED297A572A0F02258150A0B62357"
+    },
+    {
+      "path": "backend/target/runtime/lib/error_prone_annotations-2.41.0.jar",
+      "sha256": "A56E782B5B50811AC204073A355A21D915A2107FCE13EC711331AD036F660FCC"
+    },
+    {
+      "path": "backend/target/runtime/lib/gson-2.13.2.jar",
+      "sha256": "DD0CE1B55A3ED2080CB70F9C655850CDA86C206862310009DCB5E5C95265A5E0"
+    },
+    {
+      "path": "backend/target/runtime/lib/hibernate-validator-9.1.0.Final.jar",
+      "sha256": "4DEA20C780D12E8AD6E1FE7D695460AF74F8668DF9EB58910991919194412188"
+    },
+    {
+      "path": "backend/target/runtime/lib/ical4j-4.3.0.jar",
+      "sha256": "05A5401B404A4983B7DD712174F2D619AFF003200A7ECF78CDDACA0AD99FC93E"
+    },
+    {
+      "path": "backend/target/runtime/lib/jackson-annotations-2.21.jar",
+      "sha256": "53CA085F4A150F703F49E1AABD935BD03B43E1EA3D55D135438292AF22CEF56B"
+    },
+    {
+      "path": "backend/target/runtime/lib/jackson-core-2.21.4.jar",
+      "sha256": "4B40A06396F239F8DE2DA57419ADDE6E94E5EDC18A2171D471EA05EEED4E5C2D"
+    },
+    {
+      "path": "backend/target/runtime/lib/jackson-core-3.1.4.jar",
+      "sha256": "3BDA1CD6EFF0A8D47BDFCAEAE7C2BD5311D6C8ED494EF5F3E51029BB44AA9BDF"
+    },
+    {
+      "path": "backend/target/runtime/lib/jackson-databind-2.21.4.jar",
+      "sha256": "3888E9E69AB66FBACAACC9AEA0E9FFBF15368288E4ACA468B024DBA11C09FBF9"
+    },
+    {
+      "path": "backend/target/runtime/lib/jackson-databind-3.1.4.jar",
+      "sha256": "14034BFDF392B6EBEC1B4BB6C1DE29D604F0AA97251259A19D5F19AF8719BB20"
+    },
+    {
+      "path": "backend/target/runtime/lib/jackson-datatype-jdk8-2.21.4.jar",
+      "sha256": "2DDE4A8F1AAD3306C040F56FF40DA81C6D58DCEF3434C00849C9BCE09F56A074"
+    },
+    {
+      "path": "backend/target/runtime/lib/jackson-datatype-jsr310-2.21.4.jar",
+      "sha256": "D1AC4B98B70304E56448423589FDE5E775B100889643AD1EAD62CC7811633684"
+    },
+    {
+      "path": "backend/target/runtime/lib/jackson-module-kotlin-2.21.4.jar",
+      "sha256": "F9FE2AD3927DBFF6C604B122977302FD83F9C3D52D48381DB0F40560DEC516CA"
+    },
+    {
+      "path": "backend/target/runtime/lib/jakarta.annotation-api-3.0.0.jar",
+      "sha256": "B01F55552284CFB149411E64EABCA75E942D26D2E1786B32914250E4330AFAA2"
+    },
+    {
+      "path": "backend/target/runtime/lib/jakarta.validation-api-3.1.1.jar",
+      "sha256": "63CE00156388C365F3AC1BE71FCFAF114682FC0C452020B5DF6E7EC236E142AB"
+    },
+    {
+      "path": "backend/target/runtime/lib/jboss-logging-3.6.3.Final.jar",
+      "sha256": "7C12EE575508F81E22B1DB9334B969D0EC54EF0FD1DCBA24EEAB1A44235FC366"
+    },
+    {
+      "path": "backend/target/runtime/lib/jsonschema-generator-4.38.0.jar",
+      "sha256": "ADE4AEB301DB4028AC6BCBA016C31405677E37AAE6EEBAF13C99DE3FDB3531B4"
+    },
+    {
+      "path": "backend/target/runtime/lib/jsonschema-module-jackson-4.38.0.jar",
+      "sha256": "36FBD3F1C27379C3BA8420AC2CB0B42411F7BC3B3DF8BDD11D8D7E024A1C28CA"
+    },
+    {
+      "path": "backend/target/runtime/lib/jsonschema-module-swagger-2-4.38.0.jar",
+      "sha256": "B76C0DF657BCF88CCA46D7AD540938552E10127A7C28D2136F62B631666997C1"
+    },
+    {
+      "path": "backend/target/runtime/lib/jspecify-1.0.0.jar",
+      "sha256": "1FAD6E6BE7557781E4D33729D49AE1CDC8FDDA6FE477BB0CC68CE351EAFDFBAB"
+    },
+    {
+      "path": "backend/target/runtime/lib/jul-to-slf4j-2.0.18.jar",
+      "sha256": "CBB7D1AAAA9E871EB1A06594ABD911BF97027152976EDF1EDC315BE75239204E"
+    },
+    {
+      "path": "backend/target/runtime/lib/kotlin-reflect-2.3.21.jar",
+      "sha256": "33E37D9DFA86C7A29AB34E975B5F4A1287B458878611051F3485652220C1A2CB"
+    },
+    {
+      "path": "backend/target/runtime/lib/kotlin-stdlib-2.3.21.jar",
+      "sha256": "6F64EAC736DB9434DD6925B4A518B9D1D17177652320C37916CF9BA3CE7D7D7A"
+    },
+    {
+      "path": "backend/target/runtime/lib/kotlin-stdlib-common-1.9.10.jar",
+      "sha256": "CDE3341BA18A2BA262B0B7CF6C55B20C90E8D434E42C9A13E6A3F770DB965A88"
+    },
+    {
+      "path": "backend/target/runtime/lib/kotlin-stdlib-jdk7-2.3.21.jar",
+      "sha256": "E2243ABAC2BED6E0B47BE18B2B7FE1C1B4CF6A431480353DCD49D1ED35F31199"
+    },
+    {
+      "path": "backend/target/runtime/lib/kotlin-stdlib-jdk8-2.3.21.jar",
+      "sha256": "63091929246BEBA86B5FB2B020A6F5D06E01693A960B58A59959C8713667991C"
+    },
+    {
+      "path": "backend/target/runtime/lib/log4j-api-2.25.4.jar",
+      "sha256": "C4B642A7F047275215DE117E0E3847EB2C7711D84A0AA7433E7B3C096DAF341D"
+    },
+    {
+      "path": "backend/target/runtime/lib/log4j-to-slf4j-2.25.4.jar",
+      "sha256": "D7B78FC0AAAA5E8ADA388B29D718B0AB187E512965BED0B259BB4AB299F13DB2"
+    },
+    {
+      "path": "backend/target/runtime/lib/logback-classic-1.5.34.jar",
+      "sha256": "B65E05076A5C1AADB659B4FE4BC5FEE31CB26CD70390292EB03E4A7A24CFF10F"
+    },
+    {
+      "path": "backend/target/runtime/lib/logback-core-1.5.34.jar",
+      "sha256": "42EDA264C0C650C2BEC59E66151A88B708A8663DC1B49D788202D53E78B8CAAE"
+    },
+    {
+      "path": "backend/target/runtime/lib/micrometer-commons-1.17.0.jar",
+      "sha256": "03919DC71E2417EC4B5C254C4BA924963C972E124190F73CDCB68ED51C6EEDE6"
+    },
+    {
+      "path": "backend/target/runtime/lib/micrometer-observation-1.17.0.jar",
+      "sha256": "2FC95A327578D3B2A81C3FF40E646A4A21E46B0153CCBBF91690142BF80D9661"
+    },
+    {
+      "path": "backend/target/runtime/lib/okhttp-4.12.0.jar",
+      "sha256": "B1050081B14BB7A3A7E55A4D3EF01B5DCFABC453B4573A4FC019767191D5F4E0"
+    },
+    {
+      "path": "backend/target/runtime/lib/okio-3.6.0.jar",
+      "sha256": "8E63292E5C53BB93C4A6B0C213E79F15990FED250C1340F1C343880E1C9C39B5"
+    },
+    {
+      "path": "backend/target/runtime/lib/okio-jvm-3.6.0.jar",
+      "sha256": "67543F0736FC422AE927ED0E504B98BC5E269FDA0D3500579337CB713DA28412"
+    },
+    {
+      "path": "backend/target/runtime/lib/openai-java-4.49.0.jar",
+      "sha256": "ED9271D311BD8E8F1F41E88B955216524273499E1ABB8C9AD8AE24644F9F9DD1"
+    },
+    {
+      "path": "backend/target/runtime/lib/openai-java-client-okhttp-4.49.0.jar",
+      "sha256": "568ECB7EE9FB6CA8329971010E10A9D8D0008530D97BBD8D18C9857E33CF8CD6"
+    },
+    {
+      "path": "backend/target/runtime/lib/openai-java-core-4.49.0.jar",
+      "sha256": "E8947A51253D371010DF36B75F3A9AC6ACD9FB67E3157B7C4888579CE030B8AA"
+    },
+    {
+      "path": "backend/target/runtime/lib/slf4j-api-2.0.18.jar",
+      "sha256": "44508FD1576500688C790B190ACDD16FEC4F8C79A3E0B900AFD70503CF055F55"
+    },
+    {
+      "path": "backend/target/runtime/lib/snakeyaml-2.6.jar",
+      "sha256": "C8F7A98E7394ADDA02F6317249710E4D1B4C7A25AA8C7EACE0C2EEA52EB8BF85"
+    },
+    {
+      "path": "backend/target/runtime/lib/spring-aop-7.0.8.jar",
+      "sha256": "1178F039E087884174E2AFFC46E484F4A8BD7F2A4E011D33DD9137709F740F80"
+    },
+    {
+      "path": "backend/target/runtime/lib/spring-beans-7.0.8.jar",
+      "sha256": "6EC2E361A8872A71D8B1FF66F1BCB8CFA29FCC437931998919DA7CECFB59B45B"
+    },
+    {
+      "path": "backend/target/runtime/lib/spring-boot-4.1.0.jar",
+      "sha256": "B23951A3A7F867E38DB4729B8594E1B72374516F386B1DD9CF4D5317D6D3F91F"
+    },
+    {
+      "path": "backend/target/runtime/lib/spring-boot-autoconfigure-4.1.0.jar",
+      "sha256": "0FCAA3050BA835CA6B3879F81CD48DC590A6262F53BBF10D2A95C70BF7C048AC"
+    },
+    {
+      "path": "backend/target/runtime/lib/spring-boot-http-converter-4.1.0.jar",
+      "sha256": "F82C8913EA17A60630A5D26FA006CF79F28C7D920DBBEF8760F5BC7053706FEA"
+    },
+    {
+      "path": "backend/target/runtime/lib/spring-boot-jackson-4.1.0.jar",
+      "sha256": "10B6E63A40B257168854093F413EAAB8B8A9AFB7E989FCC7F6732B42C3F173D1"
+    },
+    {
+      "path": "backend/target/runtime/lib/spring-boot-jarmode-tools-4.1.0.jar",
+      "sha256": "20B66FC7CFFE830B51CE2CC36DF77A0DD695CF197828902503E04492087C84B6"
+    },
+    {
+      "path": "backend/target/runtime/lib/spring-boot-servlet-4.1.0.jar",
+      "sha256": "5F694A7C6C357A87032BC92DB0E7E0E03B64010F77892E5992C86B10F568A5AE"
+    },
+    {
+      "path": "backend/target/runtime/lib/spring-boot-tomcat-4.1.0.jar",
+      "sha256": "011E662EB6F9F4A80C5DACF914CFCA8A25A33FCD753736EC453DCF701337DD24"
+    },
+    {
+      "path": "backend/target/runtime/lib/spring-boot-validation-4.1.0.jar",
+      "sha256": "38E3409DC8050E14AFCFE14B7BB09F10D1077C7FBD33150BA2698D53DD79B4CC"
+    },
+    {
+      "path": "backend/target/runtime/lib/spring-boot-web-server-4.1.0.jar",
+      "sha256": "A8541CCBD29F5A8DB7E6092FA83463AA4D1C002FAC07B8B5BABE118AD6C4A3D3"
+    },
+    {
+      "path": "backend/target/runtime/lib/spring-boot-webmvc-4.1.0.jar",
+      "sha256": "AB21735A550CBFEFAA4AD6FFBB1A891592580EF05AD729CD2025BC0245862B55"
+    },
+    {
+      "path": "backend/target/runtime/lib/spring-context-7.0.8.jar",
+      "sha256": "1EB7D552414EBAC00E30AB3E809138D810785F6D2C4271DB77CDF0181F308F19"
+    },
+    {
+      "path": "backend/target/runtime/lib/spring-core-7.0.8.jar",
+      "sha256": "726BA2A5130833644BDF267A55FF26E1F52E8DCC9AA1FFA06904CA9C14619F25"
+    },
+    {
+      "path": "backend/target/runtime/lib/spring-expression-7.0.8.jar",
+      "sha256": "3C97C38AB59C77EE886E08CCF8096F6BB58A1245F68DFED7A40E93F41C435F9A"
+    },
+    {
+      "path": "backend/target/runtime/lib/spring-web-7.0.8.jar",
+      "sha256": "4D4ED7ECB0453D25D735EA27D025EA36B003C3D29CB7D006BEDD6D5188A2F5C0"
+    },
+    {
+      "path": "backend/target/runtime/lib/spring-webmvc-7.0.8.jar",
+      "sha256": "48F7E1E2D0D46E98ED3FA30D5A64CB1F7ED2AA339A82EDCD87289ED8FF216F04"
+    },
+    {
+      "path": "backend/target/runtime/lib/swagger-annotations-2.2.31.jar",
+      "sha256": "8CB2155211480E5FBD24388A6DC81BAEEA6DD50F8FCC6504CF4F39E4E3ACF96C"
+    },
+    {
+      "path": "backend/target/runtime/lib/threeten-extra-1.8.0.jar",
+      "sha256": "51E4D21EDC4E9447F7760C050E0BAEE75D7D973F387BA605A17ABDC4D24FD6D8"
+    },
+    {
+      "path": "backend/target/runtime/lib/tomcat-embed-core-11.0.22.jar",
+      "sha256": "78CD7CD7C104B6B87142C1B0BD902E1CE005B0245C3CEFA8A06759148947200B"
+    },
+    {
+      "path": "backend/target/runtime/lib/tomcat-embed-el-11.0.22.jar",
+      "sha256": "1B34C33B858C141DF36C501B4D809E68036C406BCA3671A86FACAE297917C7DE"
+    },
+    {
+      "path": "backend/target/runtime/lib/tomcat-embed-websocket-11.0.22.jar",
+      "sha256": "210E0C7AB194A76CC7283DF0BE365276091B042369DAE125FB477828BA67E922"
+    },
+    {
+      "path": "frontend/dist/client/index.html",
+      "sha256": "538AC892D5AEF44C3D91257D6B9A0D6CA1F27279B378158FBD3FE718632F41A9"
+    },
+    {
+      "path": "frontend/dist/client/assets/album-cover.png",
+      "sha256": "790A964E5CD5ED841EBB9A48AE7BBDCB02F87E579925B2DA1BA962F3B99506B9"
+    },
+    {
+      "path": "frontend/dist/client/assets/app-apple-music.svg",
+      "sha256": "66D6A3000FCAAF33AA2AA96A9520F44A43FB27A43820EA8F6E10B75212E4C7B4"
+    },
+    {
+      "path": "frontend/dist/client/assets/app-figma.svg",
+      "sha256": "B9171110637BB953781A04044D9957478AE84F6A7AC597A25C0BFDFB3292A45E"
+    },
+    {
+      "path": "frontend/dist/client/assets/app-spotify.svg",
+      "sha256": "11F37BAA78D54AF305370F76C134005D0B9409C466A32E0734E12C96A251D095"
+    },
+    {
+      "path": "frontend/dist/client/assets/app-vscode.svg",
+      "sha256": "503D580C442A7071AAE180D9B4766E312E4600BF0E9D842B30F56D0E614ECEB8"
+    },
+    {
+      "path": "frontend/dist/client/assets/index-CQTZNBHM.js",
+      "sha256": "2E5CF0DD309EB3CD2103F100DC2102311C0102CB33B6D219537E7612A7E2D76F"
+    },
+    {
+      "path": "frontend/dist/client/assets/index-DoVpFVGI.css",
+      "sha256": "E087F4F96C674140615B6259C5581C6F272DB1CDFF1938E99B2AB2240FC4F778"
+    },
+    {
+      "path": "frontend/dist/client/assets/phone-device-iphone.png",
+      "sha256": "0738916586DEF2669022CB32ED452718A5A49E1737E4E332A53A105186A769C8"
+    },
+    {
+      "path": "frontend/dist/client/assets/phone-device.png",
+      "sha256": "1A399F2A61242DB14A016EB47556A74932ED1C53260A62764EE626CFD53E864B"
+    },
+    {
+      "path": "frontend/dist/client/assets/user-avatar.png",
+      "sha256": "0B9A854152C90BDCD9D9B96518BF92DC60562C32E42B40F104817F710BE6C582"
+    }
+  ],
+  "launches": [
+    {
+      "label": "candidate",
+      "iteration": 1,
+      "metrics": {
+        "event": "launch-ready",
+        "action": "start",
+        "reused": false,
+        "launch_to_ready_ms": 4062
+      }
+    },
+    {
+      "label": "candidate",
+      "iteration": 2,
+      "metrics": {
+        "event": "launch-ready",
+        "action": "start",
+        "reused": false,
+        "launch_to_ready_ms": 2484
+      }
+    },
+    {
+      "label": "candidate",
+      "iteration": 3,
+      "metrics": {
+        "event": "launch-ready",
+        "action": "start",
+        "reused": false,
+        "launch_to_ready_ms": 3125
+      }
+    },
+    {
+      "label": "candidate",
+      "iteration": 4,
+      "metrics": {
+        "event": "launch-ready",
+        "action": "start",
+        "reused": false,
+        "launch_to_ready_ms": 2437
+      }
+    },
+    {
+      "label": "candidate",
+      "iteration": 5,
+      "metrics": {
+        "event": "launch-ready",
+        "action": "start",
+        "reused": false,
+        "launch_to_ready_ms": 2407
+      }
+    },
+    {
+      "label": "candidate",
+      "iteration": 6,
+      "metrics": {
+        "event": "launch-ready",
+        "action": "start",
+        "reused": false,
+        "launch_to_ready_ms": 2375
+      }
+    },
+    {
+      "label": "candidate",
+      "iteration": 7,
+      "metrics": {
+        "event": "launch-ready",
+        "action": "start",
+        "reused": false,
+        "launch_to_ready_ms": 2391
+      }
+    },
+    {
+      "label": "candidate",
+      "iteration": 8,
+      "metrics": {
+        "event": "launch-ready",
+        "action": "start",
+        "reused": false,
+        "launch_to_ready_ms": 2547
+      }
+    },
+    {
+      "label": "candidate",
+      "iteration": 9,
+      "metrics": {
+        "event": "launch-ready",
+        "action": "start",
+        "reused": false,
+        "launch_to_ready_ms": 2375
+      }
+    },
+    {
+      "label": "candidate",
+      "iteration": 10,
+      "metrics": {
+        "event": "launch-ready",
+        "action": "start",
+        "reused": false,
+        "launch_to_ready_ms": 2359
+      }
+    }
+  ],
+  "conditions": "Fresh processes, warm filesystem cache, isolated synthetic profiles, no credentials; host power state not controlled."
+}

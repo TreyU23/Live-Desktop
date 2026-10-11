@@ -114,21 +114,12 @@ public class AssistantController {
 
     @GetMapping("/api/conversations")
     public Object conversations() {
-        return store.snapshot().conversations().stream()
-                .map(conversation -> Map.of(
-                        "id", conversation.id(),
-                        "title", conversation.title(),
-                        "createdAt", conversation.createdAt(),
-                        "updatedAt", conversation.updatedAt(),
-                        "messageCount", conversation.messages().size()))
-                .toList();
+        return store.conversationSummaries();
     }
 
     @GetMapping("/api/conversations/{id}")
     public ResponseEntity<?> conversation(@PathVariable String id) {
-        return store.snapshot().conversations().stream()
-                .filter(item -> item.id().equals(id))
-                .findFirst()
+        return store.conversation(id)
                 .<ResponseEntity<?>>map(ResponseEntity::ok)
                 .orElseGet(() -> ResponseEntity.status(HttpStatus.NOT_FOUND)
                         .body(Map.of("error", "Conversation not found.")));
@@ -143,9 +134,7 @@ public class AssistantController {
         try {
             Conversation conversation = store.getOrCreateConversation(request.conversationId());
             store.addMessage(conversation.id(), "user", request.message().trim());
-            Conversation current = store.snapshot().conversations().stream()
-                    .filter(item -> item.id().equals(conversation.id()))
-                    .findFirst()
+            Conversation current = store.conversation(conversation.id())
                     .orElseThrow();
             ConversationMessage message = store.addMessage(
                     conversation.id(), "assistant", agent.reply(current));
@@ -208,8 +197,8 @@ public class AssistantController {
     }
 
     @GetMapping("/api/integrations/phone-link")
-    public Object phoneLink() {
-        return system.phoneLink();
+    public Object phoneLink(@RequestParam(required = false) Long refresh) {
+        return system.phoneLink(refresh != null);
     }
 
     @PostMapping("/api/system/controls/{id}")
@@ -289,6 +278,36 @@ public class AssistantController {
     @GetMapping("/api/integrations/media-session")
     public Object mediaSession(@RequestParam(required = false, defaultValue = "music") String provider) {
         return mediaSession.snapshot(provider);
+    }
+
+    @GetMapping("/api/integrations/media-session/artwork/{version}")
+    public ResponseEntity<byte[]> mediaArtwork(@PathVariable String version) {
+        byte[] bytes = mediaSession.artwork(version);
+        if (bytes == null) return ResponseEntity.notFound().build();
+        // The native bridge only accepts raster image types. Never serve arbitrary
+        // paths or active content. Versions are scoped to this bridge lifetime.
+        String type = artworkContentType(bytes);
+        if (type == null) return ResponseEntity.notFound().build();
+        return ResponseEntity.ok().header("Content-Type", type)
+                .header("Cache-Control", "private, max-age=30").header("X-Content-Type-Options", "nosniff").body(bytes);
+    }
+
+    static String artworkContentType(byte[] bytes) {
+        if (hasSignature(bytes, 0, 0x89, 'P', 'N', 'G', 13, 10, 26, 10)) return "image/png";
+        if (hasSignature(bytes, 0, 0xff, 0xd8, 0xff)) return "image/jpeg";
+        if (hasSignature(bytes, 0, 'G', 'I', 'F', '8', '7', 'a')
+                || hasSignature(bytes, 0, 'G', 'I', 'F', '8', '9', 'a')) return "image/gif";
+        if (hasSignature(bytes, 0, 'R', 'I', 'F', 'F')
+                && hasSignature(bytes, 8, 'W', 'E', 'B', 'P')) return "image/webp";
+        return null;
+    }
+
+    private static boolean hasSignature(byte[] bytes, int offset, int... signature) {
+        if (bytes.length < offset + signature.length) return false;
+        for (int index = 0; index < signature.length; index++) {
+            if (Byte.toUnsignedInt(bytes[offset + index]) != signature[index]) return false;
+        }
+        return true;
     }
 
     @PostMapping("/api/integrations/media-session/{action}")

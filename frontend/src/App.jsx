@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
-import * as FeatherIcons from "react-icons/fi";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { FiActivity, FiAlertCircle, FiBattery, FiBatteryCharging, FiBellOff, FiBluetooth, FiBookmark, FiCalendar, FiCamera, FiCheck, FiCheckCircle, FiChevronLeft, FiChevronRight, FiCircle, FiClipboard, FiCopy, FiCpu, FiExternalLink, FiGlobe, FiGrid, FiHardDrive, FiHome, FiInfo, FiLayers, FiLink2, FiLoader, FiMail, FiMessageCircle, FiMessageSquare, FiMic, FiMonitor, FiMoon, FiMusic, FiPause, FiPieChart, FiPlay, FiPlus, FiPower, FiRefreshCw, FiRotateCw, FiSearch, FiSend, FiServer, FiSettings, FiShield, FiShuffle, FiSkipBack, FiSkipForward, FiSmartphone, FiSquare, FiSun, FiUpload, FiUser, FiUsers, FiVolumeX, FiWifi, FiX, FiZap } from "react-icons/fi";
+const FeatherIcons = { FiActivity, FiAlertCircle, FiBattery, FiBatteryCharging, FiBellOff, FiBluetooth, FiBookmark, FiCalendar, FiCamera, FiCheck, FiCheckCircle, FiChevronLeft, FiChevronRight, FiCircle, FiClipboard, FiCopy, FiCpu, FiExternalLink, FiGlobe, FiGrid, FiHardDrive, FiHome, FiInfo, FiLayers, FiLink2, FiLoader, FiMail, FiMessageCircle, FiMessageSquare, FiMic, FiMonitor, FiMoon, FiMusic, FiPause, FiPieChart, FiPlay, FiPlus, FiPower, FiRefreshCw, FiRotateCw, FiSearch, FiSend, FiServer, FiSettings, FiShield, FiShuffle, FiSkipBack, FiSkipForward, FiSmartphone, FiSquare, FiSun, FiUpload, FiUser, FiUsers, FiVolumeX, FiWifi, FiX, FiZap };
 import { getPhoneDeviceVisual } from "./phoneDevice.js";
 import {
   EMPTY_MUSIC_CONNECTION,
@@ -9,6 +10,8 @@ import {
 } from "./musicProviders.js";
 import { ACCENT_PRESETS, accentForegroundColor, accentSoftColor, effectiveAccentColor, normalizeHexColor, readAccentColor } from "./accentColors.js";
 import { applyCompletedControlAction, upsertAction } from "./systemControls.js";
+import { createResourceScheduler } from "./resourceScheduler.js";
+import { recordTiming } from "./performanceDiagnostics.js";
 
 const ICON_COMPONENTS = {
   Activity: "FiActivity", AppWindow: "FiSquare", BatteryCharging: "FiBatteryCharging",
@@ -45,27 +48,27 @@ const FALLBACK_SYSTEM = {
   host: {
     name: "LOCAL-DESKTOP",
     user: "Local user",
-    os: "Windows 11 Pro",
-    osVersion: "24H2",
+    os: "Windows",
+    osVersion: "Unavailable",
     architecture: "x64",
     javaVersion: 21,
   },
   resources: {
-    cpuPercent: 12,
-    memoryUsedBytes: 15.3 * 1024 ** 3,
-    memoryTotalBytes: 32 * 1024 ** 3,
-    storageUsedBytes: 405 * 1024 ** 3,
-    storageTotalBytes: 1000 * 1024 ** 3,
-    network: { name: "Ethernet", address: "Connected", connected: true },
-    battery: { available: true, percent: 78, detail: "Charging" },
+    cpuPercent: 0,
+    memoryUsedBytes: 0,
+    memoryTotalBytes: 0,
+    storageUsedBytes: 0,
+    storageTotalBytes: 0,
+    network: { name: "Unavailable", address: "Waiting for system data", connected: false },
+    battery: { available: false, percent: null, detail: "Waiting for system data" },
   },
   controls: CONTROL_ORDER.map((id) => ({
     id,
     label: CONTROL_META[id].label,
-    enabled: ["wifi", "bluetooth", "night-light", "microphone"].includes(id),
-    available: true,
+    enabled: false,
+    available: false,
     direct: ["wifi", "bluetooth"].includes(id),
-    detail: ["wifi", "bluetooth"].includes(id) ? "On" : "Opens Windows Settings after one-time approval",
+    detail: "Waiting for system data",
   })),
   device: {
     manufacturer: "Unavailable",
@@ -74,7 +77,7 @@ const FALLBACK_SYSTEM = {
     processorCores: 0,
     processorLogicalProcessors: 0,
     maxClockMhz: 0,
-    installedMemoryBytes: 32 * 1024 ** 3,
+    installedMemoryBytes: 0,
     graphics: [],
     systemType: "x64-based PC",
     productId: "Unavailable",
@@ -90,13 +93,6 @@ const FALLBACK_SYSTEM = {
   },
 };
 
-const FALLBACK_APPS = [
-  { id: "code", name: "Visual Studio Code", detail: "Working file: app.tsx", icon: "code", running: true, age: "10m ago" },
-  { id: "figma", name: "Figma", detail: "Design review", icon: "figma", running: true, age: "25m ago" },
-  { id: "msedge", name: "Microsoft Edge", detail: "Live Desktop – research", icon: "edge", running: true, age: "1h ago" },
-  { id: "excel", name: "Microsoft Excel", detail: "Budget_2026.xlsx", icon: "excel", running: true, age: "2h ago" },
-  { id: "powerpnt", name: "PowerPoint", detail: "Q3 Planning Deck.pptx", icon: "powerpoint", running: true, age: "3h ago" },
-];
 
 const EMPTY_ICLOUD_CALENDAR = {
   connected: false,
@@ -188,13 +184,15 @@ const APP_ICON_ASSETS = {
 };
 
 async function api(path, options = {}) {
+  const { profileId = activeProfileId(), headers, ...requestOptions } = options;
   const response = await fetch(`${API_BASE}${path}`, {
+    ...requestOptions,
+    cache: "no-store",
     headers: {
-      "X-Profile-Id": activeProfileId(),
+      "X-Profile-Id": profileId,
       ...(options.body ? { "Content-Type": "application/json" } : {}),
-      ...options.headers,
+      ...headers,
     },
-    ...options,
   });
   const contentType = response.headers.get("content-type") || "";
   const payload = contentType.includes("application/json") ? await response.json() : null;
@@ -401,7 +399,7 @@ function SystemHealth({ system, connected, configured, onOpenSystem }) {
         ))}
       </div>
       <div className="device-list">
-        <InfoLine icon="PanelsTopLeft" label="Windows" value={`${system.host.os} ${system.host.osVersion}`} />
+        <InfoLine icon="PanelsTopLeft" label="Windows" value={[system.host.os, system.host.osVersion].filter(Boolean).join(" ")} />
         <InfoLine icon="Monitor" label="Device" value={system.host.name} />
         <InfoLine icon="Layers3" label="Backend" value={connected ? "Local API connected" : "Unavailable"} healthy={connected} />
         <InfoLine icon="Bot" label="OpenAI" value={configured ? "Connected" : "API key needed"} healthy={configured} />
@@ -427,7 +425,7 @@ function InfoLine({ icon, label, value, healthy }) {
 function RecentApps({ apps }) {
   const [showAll, setShowAll] = useState(false);
   const [selectedId, setSelectedId] = useState(null);
-  const displayApps = apps.length ? apps.map((app, index) => ({ ...app, age: index ? `${index * 12 + 1}m ago` : "Now" })) : FALLBACK_APPS;
+  const displayApps = apps.map(app => ({ ...app, age: app.running ? "Running" : "Installed" }));
   const visibleApps = showAll ? displayApps : displayApps.slice(0, 4);
   return (
     <section className="activity-column" aria-labelledby="activity-title">
@@ -436,6 +434,7 @@ function RecentApps({ apps }) {
         <button type="button" className="text-action" onClick={() => setShowAll((value) => !value)}>{showAll ? "Compact" : "View all"}</button>
       </div>
       <div className="app-list">
+        {!visibleApps.length ? <p className="app-inline-detail">No supported running apps detected.</p> : null}
         {visibleApps.map((app) => (
           <div className={`app-row-wrap ${selectedId === app.id ? "app-row-wrap--selected" : ""}`} key={app.id}>
             <button className="app-row" type="button" aria-expanded={selectedId === app.id} onClick={() => setSelectedId((value) => value === app.id ? null : app.id)}>
@@ -658,7 +657,7 @@ function MemoriesView({ memories, onCreate, onDelete }) {
   const submit = (event) => {
     event.preventDefault();
     if (!content.trim()) return;
-    onCreate(content.trim(), category).then(() => setContent(""));
+    onCreate(content.trim(), category).then((saved) => { if (saved !== false) setContent(""); });
   };
   return (
     <ViewShell eyebrow="Local memory" title="Memories" detail="Everything remembered is stored locally and stays inspectable and removable.">
@@ -1059,6 +1058,8 @@ export function App() {
   const [profiles, setProfiles] = useState(readProfiles);
   const [profileId] = useState(activeProfileId);
   const [activeView, setActiveView] = useState("home");
+  const [musicMounted, setMusicMounted] = useState(false);
+  useEffect(() => { if (activeView === "music") setMusicMounted(true); }, [activeView]);
   const [system, setSystem] = useState(FALLBACK_SYSTEM);
   const [apps, setApps] = useState([]);
   const [phone, setPhone] = useState({ installed: false, running: false, connected: false, detail: "Checking Phone Link" });
@@ -1084,6 +1085,15 @@ export function App() {
   const musicConnection = musicIntegration.connections[musicProviderId];
   const [musicPlayer, setMusicPlayer] = useState(() => emptyMusicPlayerFor(musicProviderId));
   const [openAiSettings, setOpenAiSettings] = useState({ openAiConfigured: false, profileApiKey: false });
+  const [resourceStatus, setResourceStatus] = useState({});
+  const resourceStates = useRef({});
+  const scheduler = useRef(null);
+  const committedResources = useRef(new Map());
+  const calendarSelection = useRef(0);
+  const calendarDate = useRef(localIsoDate(localDateAtOffset()));
+  const musicProviderRef = useRef(musicProviderId);
+  const conversationSelection = useRef(0);
+  musicProviderRef.current = musicProviderId;
   const activeProfile = profiles.find((profile) => profile.id === profileId) || profiles[0];
 
   useEffect(() => {
@@ -1115,6 +1125,7 @@ export function App() {
   };
 
   const switchProfile = (nextId) => {
+    scheduler.current?.stop();
     window.localStorage.setItem(ACTIVE_PROFILE_KEY, nextId);
     window.location.reload();
   };
@@ -1122,7 +1133,7 @@ export function App() {
   const deleteProfile = async (id) => {
     if (id === "default" || profiles.length === 1) return;
     try {
-      await api("/api/profile/data", { method: "DELETE" });
+      await api("/api/profile/data", { method: "DELETE", profileId: id });
       const next = profiles.filter((profile) => profile.id !== id);
       updateProfiles(next);
       switchProfile(next[0].id);
@@ -1135,36 +1146,10 @@ export function App() {
     notify.timeout = window.setTimeout(() => setToast(null), 4200);
   }, []);
 
-  const loadDashboard = useCallback(async () => {
-    const results = await Promise.allSettled([
-      api("/health"),
-      api("/api/system"),
-      api("/api/system/apps"),
-      api("/api/integrations/phone-link"),
-      api("/api/actions"),
-      api("/api/memories"),
-      api("/api/conversations"),
-      api("/api/runtime"),
-      api(`/api/integrations/icloud-calendar?date=${localIsoDate(localDateAtOffset())}`),
-      api("/api/profile/settings"),
-    ]);
-    if (results[0].status === "fulfilled") setHealth({ connected: true, configured: Boolean(results[0].value.openAiConfigured) });
-    else setHealth({ connected: false, configured: false });
-    if (results[1].status === "fulfilled") setSystem(results[1].value);
-    if (results[2].status === "fulfilled") setApps(results[2].value);
-    if (results[3].status === "fulfilled") setPhone(results[3].value);
-    if (results[4].status === "fulfilled") setActions(results[4].value);
-    if (results[5].status === "fulfilled") setMemories(results[5].value);
-    if (results[6].status === "fulfilled") setConversations(results[6].value);
-    if (results[7].status === "fulfilled") setRuntime(results[7].value);
-    if (results[8].status === "fulfilled") setCalendar(results[8].value);
-    if (results[9].status === "fulfilled") setOpenAiSettings(results[9].value);
-  }, []);
-
   const refreshMusicPlayer = useCallback(async (announce = false) => {
     try {
-      const latest = await api(`/api/integrations/media-session?provider=${musicProviderId}`);
-      setMusicPlayer((current) => ({ ...current, ...latest }));
+      const latest = await scheduler.current?.refresh("media");
+      if (!latest) return null;
       if (announce) notify(latest.available ? "Windows media session refreshed." : latest.detail, latest.available ? "success" : "neutral");
       return latest;
     } catch (error) {
@@ -1176,8 +1161,7 @@ export function App() {
   const refreshPhone = useCallback(async (announce = false) => {
     setPhoneRefreshing(true);
     try {
-      const latest = await api(`/api/integrations/phone-link?refresh=${Date.now()}`);
-      setPhone(latest);
+      await scheduler.current?.refresh("phone", announce ? `/api/integrations/phone-link?refresh=${Date.now()}` : undefined);
       if (announce) notify("Phone Link information refreshed.", "success");
     } catch (error) {
       if (announce) notify(error.message, "error");
@@ -1187,34 +1171,85 @@ export function App() {
   }, [notify]);
 
   const refreshCalendar = useCallback(async (date, announce = false) => {
+    const selection = ++calendarSelection.current;
+    if (calendarDate.current !== date) await scheduler.current?.invalidate("calendar");
+    if (selection !== calendarSelection.current) return;
+    calendarDate.current = date;
     setCalendarRefreshing(true);
     try {
-      const latest = await api(`/api/integrations/icloud-calendar?date=${date}${announce ? `&refresh=${Date.now()}` : ""}`);
-      setCalendar(latest);
+      await scheduler.current?.refresh("calendar", `/api/integrations/icloud-calendar?date=${date}${announce ? `&refresh=${Date.now()}` : ""}`);
       if (announce) notify("iCloud Calendar refreshed.", "success");
     } catch (error) {
       if (announce) notify(error.message, "error");
     } finally {
-      setCalendarRefreshing(false);
+      if (selection === calendarSelection.current) setCalendarRefreshing(false);
     }
   }, [notify]);
 
   useEffect(() => {
-    loadDashboard();
-    refreshMusicPlayer(false);
-    const timer = window.setInterval(loadDashboard, 15000);
-    const phoneTimer = window.setInterval(() => refreshPhone(false), 5000);
-    const mediaTimer = window.setInterval(() => refreshMusicPlayer(false), 5000);
-    return () => {
-      window.clearInterval(timer);
-      window.clearInterval(phoneTimer);
-      window.clearInterval(mediaTimer);
+    resourceStates.current = {};
+    committedResources.current.clear();
+    setResourceStatus({});
+    const resources = createResourceScheduler({
+      read: async (path, signal) => {
+        const resource = path.split("?")[0];
+        const started = performance.now();
+        recordTiming(resource, "request-start");
+        try { return await api(path, { profileId, signal }); }
+        finally { recordTiming(resource, "request-end", performance.now() - started); }
+      },
+      status: (key, value) => {
+        const previous = resourceStates.current[key];
+        resourceStates.current[key] = value;
+        // Healthy polling already commits through its resource's data setter.
+        // Publish only error changes consumed by the banner, avoiding status-only renders.
+        if ((previous?.error || null) !== (value.error || null)) {
+          setResourceStatus(current => ({ ...current, [key]: value }));
+        }
+      },
+    });
+    scheduler.current = resources;
+    const definitions = {
+      health: { path: "/health", interval: 30000, apply: value => setHealth({ connected: true, configured: Boolean(value.openAiConfigured) }), error: () => setHealth({ connected: false, configured: false }) },
+      system: { path: "/api/system", interval: 15000, apply: setSystem },
+      apps: { path: "/api/system/apps", interval: 60000, apply: setApps },
+      phone: { path: "/api/integrations/phone-link", interval: 10000, apply: setPhone, error: message => setPhone(current => ({ ...current, detail: message })) },
+      actions: { path: "/api/actions", apply: setActions },
+      memories: { path: "/api/memories", apply: setMemories },
+      conversations: { path: "/api/conversations", apply: setConversations },
+      runtime: { path: "/api/runtime", interval: 30000, apply: setRuntime },
+      calendar: { path: () => `/api/integrations/icloud-calendar?date=${calendarDate.current}`, interval: 240000, apply: setCalendar, error: message => setCalendar(current => ({ ...current, status: "error", detail: message })) },
+      settings: { path: "/api/profile/settings", apply: setOpenAiSettings },
+      conversation: { path: "/api/conversations", interval: 0, apply: setSelectedConversation },
+      media: { path: () => `/api/integrations/media-session?provider=${musicProviderRef.current}`, interval: 5000, apply: value => setMusicPlayer(current => ({ ...current, ...value })) },
     };
-  }, [loadDashboard, refreshPhone, refreshMusicPlayer]);
+    for (const [key, definition] of Object.entries(definitions)) resources.register(key, definition);
+    const onVisibility = () => resources.visibilityChanged();
+    document.addEventListener("visibilitychange", onVisibility);
+    resources.visibilityChanged();
+    return () => {
+      document.removeEventListener("visibilitychange", onVisibility);
+      resources.stop();
+    };
+  }, [profileId]);
+
+  useEffect(() => {
+    for (const [key, value] of Object.entries(resourceStates.current)) {
+      if (!value.loading && !value.error && committedResources.current.get(key) !== value) {
+        committedResources.current.set(key, value);
+        recordTiming(key, "widget-commit", Math.max(0, performance.now() - value.readyAt));
+      }
+    }
+  });
+
+  useEffect(() => {
+    const resources = scheduler.current;
+    if (resources) resources.invalidate("media").then(() => resources.refresh("media")).catch(() => {});
+  }, [musicProviderId]);
 
   const controls = useMemo(() => {
     const byId = new Map(system.controls.map((control) => [control.id, control]));
-    return CONTROL_ORDER.map((id) => ({ ...CONTROL_META[id], ...byId.get(id), id }));
+    return CONTROL_ORDER.map((id) => ({ ...CONTROL_META[id], available: false, enabled: false, detail: "System information unavailable", ...byId.get(id), id }));
   }, [system]);
 
   const pendingCount = actions.filter((action) => action.status === "pending").length;
@@ -1222,11 +1257,14 @@ export function App() {
   const queueControl = async (id) => {
     setPendingControl(id);
     try {
+      await scheduler.current?.invalidate("system");
+      await scheduler.current?.invalidate("actions");
       const control = controls.find((item) => item.id === id);
       const action = await api(`/api/system/controls/${id}`, {
         method: "POST",
         body: JSON.stringify({ enabled: !control?.enabled }),
       });
+      await Promise.all(["system", "actions"].map(key => scheduler.current?.invalidate(key)));
       setActions((current) => upsertAction(current, action));
       setSystem((current) => applyCompletedControlAction(current, action));
       notify(
@@ -1249,7 +1287,9 @@ export function App() {
   const openPhone = async () => {
     setPendingControl("phone");
     try {
+      await scheduler.current?.invalidate("actions");
       const action = await api("/api/integrations/phone-link/open", { method: "POST" });
+      await scheduler.current?.invalidate("actions");
       setActions((current) => upsertAction(current, action));
       notify(
         action.status === "completed"
@@ -1322,7 +1362,10 @@ export function App() {
 
   const updateAction = async (id, verb) => {
     try {
+      await scheduler.current?.invalidate("actions");
+      await scheduler.current?.invalidate("system");
       const updated = await api(`/api/actions/${id}/${verb}`, { method: "POST" });
+      await Promise.all(["actions", "system"].map(key => scheduler.current?.invalidate(key)));
       setActions((current) => upsertAction(current, updated));
       setSystem((current) => applyCompletedControlAction(current, updated));
       notify(verb === "approve" ? (updated.status === "completed" ? "Action completed." : "Action could not complete.") : "Action rejected.", updated.status === "failed" ? "error" : "success");
@@ -1333,31 +1376,42 @@ export function App() {
 
   const createMemory = async (content, category) => {
     try {
+      await scheduler.current?.invalidate("memories");
       await api("/api/memories", { method: "POST", body: JSON.stringify({ content, category }) });
+      await scheduler.current?.invalidate("memories");
       notify("Memory saved locally.", "success");
-      await loadDashboard();
+      await scheduler.current?.refresh("memories").catch(error => {
+        notify(`Memory saved, but the list could not refresh: ${error.message}`, "error");
+      });
+      return true;
     } catch (error) {
       notify(error.message, "error");
+      return false;
     }
   };
 
   const deleteMemory = async (id) => {
     try {
+      await scheduler.current?.invalidate("memories");
       await api(`/api/memories/${id}`, { method: "DELETE" });
+      await scheduler.current?.invalidate("memories");
       notify("Memory forgotten.", "success");
-      await loadDashboard();
+      await scheduler.current?.refresh("memories");
     } catch (error) {
       notify(error.message, "error");
     }
   };
 
   const selectConversation = async (summary) => {
+    const selection = ++conversationSelection.current;
+    await scheduler.current?.invalidate("conversation");
+    if (selection !== conversationSelection.current) return;
     if (!summary) {
       setSelectedConversation(null);
       return;
     }
     try {
-      setSelectedConversation(await api(`/api/conversations/${summary.id}`));
+      await scheduler.current?.refresh("conversation", `/api/conversations/${summary.id}`);
     } catch (error) {
       notify(error.message, "error");
     }
@@ -1366,9 +1420,11 @@ export function App() {
   const sendMessage = async (message, conversationId = selectedConversation?.id) => {
     setAssistantBusy(true);
     try {
+      await Promise.all(["conversations", "actions", "memories", "conversation"].map(key => scheduler.current?.invalidate(key)));
       const result = await api("/api/chat", { method: "POST", body: JSON.stringify({ message, conversationId }) });
+      await Promise.all(["conversations", "actions", "memories", "conversation"].map(key => scheduler.current?.invalidate(key)));
       setActiveView("conversations");
-      await loadDashboard();
+      await Promise.allSettled(["conversations", "actions", "memories"].map(key => scheduler.current?.refresh(key)));
       await selectConversation({ id: result.conversationId });
     } catch (error) {
       notify(error.message, "error");
@@ -1378,17 +1434,22 @@ export function App() {
   };
 
   const connectICloudCalendar = async (email, appSpecificPassword) => {
+    await scheduler.current?.invalidate("calendar");
     const connectedCalendar = await api("/api/integrations/icloud-calendar/connect", {
       method: "POST",
       body: JSON.stringify({ email, appSpecificPassword }),
     });
+    await scheduler.current?.invalidate("calendar");
     setCalendar(connectedCalendar);
     notify("iCloud Calendar connected and synced.", "success");
   };
 
   const disconnectICloudCalendar = async () => {
     try {
-      setCalendar(await api("/api/integrations/icloud-calendar", { method: "DELETE" }));
+      await scheduler.current?.invalidate("calendar");
+      const disconnectedCalendar = await api("/api/integrations/icloud-calendar", { method: "DELETE" });
+      await scheduler.current?.invalidate("calendar");
+      setCalendar(disconnectedCalendar);
       notify("iCloud Calendar disconnected. Stored credentials were removed.", "success");
     } catch (error) {
       notify(error.message, "error");
@@ -1402,7 +1463,11 @@ export function App() {
         notify(`Start a track in the ${musicProvider.shortName} player once, then these controls will follow it through Windows.`, "neutral");
         return;
       }
+      await scheduler.current?.invalidate("media");
       const updated = await api(`/api/integrations/media-session/${action}?provider=${musicProviderId}`, { method: "POST" });
+      if (musicProviderRef.current !== musicProviderId) return;
+      await scheduler.current?.invalidate("media");
+      if (musicProviderRef.current !== musicProviderId) return;
       setMusicPlayer((current) => ({ ...current, ...updated, muted: action === "mute" ? !current.muted : current.muted }));
       if (updated.actionSucceeded === false) notify("That media session did not accept the command.", "error");
     } catch (error) {
@@ -1434,14 +1499,20 @@ export function App() {
   };
 
   const saveOpenAiKey = async (apiKey) => {
+    await scheduler.current?.invalidate("settings");
+    await scheduler.current?.invalidate("health");
     const saved = await api("/api/profile/openai-key", { method: "POST", body: JSON.stringify({ apiKey }) });
+    await Promise.all(["settings", "health"].map(key => scheduler.current?.invalidate(key)));
     setOpenAiSettings(saved);
     setHealth((current) => ({ ...current, configured: true }));
     notify("OpenAI API key saved for this profile.", "success");
   };
 
   const deleteOpenAiKey = async () => {
+    await scheduler.current?.invalidate("settings");
+    await scheduler.current?.invalidate("health");
     const saved = await api("/api/profile/openai-key", { method: "DELETE" });
+    await Promise.all(["settings", "health"].map(key => scheduler.current?.invalidate(key)));
     setOpenAiSettings(saved);
     setHealth((current) => ({ ...current, configured: saved.openAiConfigured }));
     notify("This profile’s OpenAI API key was removed.", "success");
@@ -1449,13 +1520,14 @@ export function App() {
 
   return (
     <div className="desktop-shell">
+      {Object.entries(resourceStatus).some(([, value]) => value.error) ? <p className="refresh-status" role="status">Some information could not refresh: {Object.entries(resourceStatus).filter(([, value]) => value.error).map(([key]) => key).join(", ")}. Last available information is shown. Refresh or check the connection.</p> : null}
       <header className="topbar">
         <button className="brand" type="button" onClick={() => setActiveView("home")}><AppLogo /><span><strong>Live Desktop</strong><small>Your local Windows assistant</small></span></button>
         <nav aria-label="Primary navigation">
           {NAV_ITEMS.map((item) => <button type="button" key={item.id} className={activeView === item.id ? "active" : ""} onClick={() => setActiveView(item.id)}><Icon name={item.icon} size={19} />{item.label}{item.id === "approvals" && pendingCount ? <b>{pendingCount}</b> : null}</button>)}
         </nav>
         <div className="topbar-actions">
-          <span className="local-status"><i className={health.connected && runtime.frontendOnline ? "" : "offline"} /><strong>{health.connected ? "Local mode" : "Preview mode"}</strong><small>{health.connected ? "All data stays on this PC" : "Backend is offline"}</small></span>
+          <span className="local-status"><i className={health.connected && runtime.frontendOnline ? "" : "offline"} /><strong>{health.connected ? "Local mode" : "Preview mode"}</strong><small>{health.connected ? "Profiles stored on this PC" : "Backend is offline"}</small></span>
           <div className="lifecycle-actions" aria-label="Project lifecycle controls">
             <button type="button" aria-label="Restart frontend and backend" title="Restart frontend and backend" onClick={() => runLifecycle("restart")} disabled={lifecycleState !== "idle"}>
               <Icon name="RotateCw" size={18} className={lifecycleState === "restarting" ? "spin" : ""} />
@@ -1484,7 +1556,7 @@ export function App() {
           </button>
           <div className="dashboard-grid">
             <section className="today-panel">
-              <header><h1>Today on your PC</h1><p>Sunday, August 2, 2026</p></header>
+              <header><h1>Today on your PC</h1><p>{new Date().toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric", year: "numeric" })}</p></header>
               <div className="today-columns">
                 <SystemHealth system={system} connected={health.connected} configured={health.configured} onOpenSystem={() => setActiveView("system")} />
                 <RecentApps apps={apps} />
@@ -1510,7 +1582,7 @@ export function App() {
       {activeView === "memories" ? <MemoriesView memories={memories} onCreate={createMemory} onDelete={deleteMemory} /> : null}
       {activeView === "conversations" ? <ConversationsView conversations={conversations} selected={selectedConversation} onSelect={selectConversation} onSend={sendMessage} busy={assistantBusy} /> : null}
       {activeView === "music" ? <MusicView musicProvider={musicProvider} musicConnection={musicConnection} musicPlayer={musicPlayer} onMusicAction={controlMusic} onOpenSettings={() => setActiveView("settings")} /> : null}
-      {musicConnection.embedUrl ? <div className={`music-web-player music-web-player--${musicProviderId} ${activeView === "music" ? "" : "music-web-player--parked"}`} aria-hidden={activeView !== "music"}><iframe key={`${musicProviderId}:${musicConnection.embedUrl}`} title={`${musicProvider.name} web player`} src={musicConnection.embedUrl} allow={musicProviderId === "apple" ? "autoplay *; encrypted-media *; fullscreen *; clipboard-write" : "autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"} loading="eager" /></div> : null}
+      {musicMounted && musicConnection.embedUrl ? <div className={`music-web-player music-web-player--${musicProviderId} ${activeView === "music" ? "" : "music-web-player--parked"}`} aria-hidden={activeView !== "music"}><iframe key={`${musicProviderId}:${musicConnection.embedUrl}`} title={`${musicProvider.name} web player`} src={musicConnection.embedUrl} allow={musicProviderId === "apple" ? "autoplay *; encrypted-media *; fullscreen *; clipboard-write" : "autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"} loading="eager" /></div> : null}
       {activeView === "settings" ? <SettingsView darkMode={darkMode} onDarkModeChange={setDarkMode} accentColor={accentColor} onAccentColorChange={setAccentColor} onCustomAccentColorChange={setCustomAccentColor} calendar={calendar} onConnectCalendar={connectICloudCalendar} onDisconnectCalendar={disconnectICloudCalendar} musicProviderId={musicProviderId} musicConnection={musicConnection} musicPlayer={musicPlayer} onMusicProviderChange={switchMusicProvider} onSaveMusic={saveMusicConnection} onDisconnectMusic={disconnectMusic} onRefreshMusic={() => refreshMusicPlayer(true)} onOpenMusic={() => setActiveView("music")} openAiSettings={openAiSettings} onSaveOpenAiKey={saveOpenAiKey} onDeleteOpenAiKey={deleteOpenAiKey} /> : null}
 
       {shutdownOpen ? <ShutdownDialog onCancel={() => setShutdownOpen(false)} onConfirm={() => runLifecycle("shutdown")} /> : null}

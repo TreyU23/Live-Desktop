@@ -8,6 +8,9 @@ try {
     & "$PSScriptRoot\build-windows-bridge.ps1"
     & '.\mvnw.cmd' -pl backend package
     if ($LASTEXITCODE -ne 0) { throw 'Backend package failed.' }
+    & "$PSScriptRoot\prepare-backend-runtime.ps1" -Cds
+    & npm --prefix frontend test
+    if ($LASTEXITCODE -ne 0) { throw 'Frontend tests failed.' }
     & npm --prefix frontend run build
     if ($LASTEXITCODE -ne 0) { throw 'Frontend build failed.' }
 } finally { Pop-Location }

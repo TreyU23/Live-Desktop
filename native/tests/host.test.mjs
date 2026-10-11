@@ -14,6 +14,8 @@ test('native host: assets, proxy, confinement, and upstream failures', { timeout
   await mkdir(client, { recursive: true });
   await writeFile(path.join(client, 'index.html'), '<html>Live Desktop</html>');
   await writeFile(path.join(client, 'app.js'), 'export default 1;');
+  await mkdir(path.join(client, 'assets'));
+  await writeFile(path.join(client, 'assets/index-AbCd1234.js'), 'export default 1;');
   await writeFile(path.join(root, 'secret.txt'), 'outside');
   // A junction works without Windows Developer Mode and tests canonical path confinement.
   await symlink(root, path.join(client, 'escape'), 'junction');
@@ -50,6 +52,17 @@ test('native host: assets, proxy, confinement, and upstream failures', { timeout
     await t.test('rejects encoded traversal, Windows paths, invalid encodings, and junction escape', async () => {
       for (const url of ['/%2e%2e/secret.txt', '/%5c..%5csecret.txt', '/%invalid', '/app.js:secret', '/foo./app.js', '/foo%00']) assert.equal((await request(url)).status, 400, url);
       assert.equal((await request('/escape/secret.txt')).status, 403);
+    });
+    await t.test('revalidates stable files and caches only hashed build assets', async () => {
+      const asset = await request('/app.js');
+      assert.equal(asset.headers['cache-control'], 'no-cache');
+      const cached = await request('/app.js', { 'if-none-match': asset.headers.etag });
+      assert.equal(cached.status, 304); assert.equal(cached.body, '');
+      assert.equal((await request('/app.js', { 'if-none-match': '"other", ' + asset.headers.etag })).status, 304);
+      assert.equal((await request('/assets/index-AbCd1234.js')).headers['cache-control'], 'public, max-age=31536000, immutable');
+      assert.equal((await request('/')).headers['cache-control'], 'no-cache');
+      await writeFile(path.join(client, 'app.js'), 'export default 22;');
+      assert.equal((await request('/app.js', { 'if-none-match': asset.headers.etag })).status, 200);
     });
     await t.test('enforces Host and Origin before proxying', async () => {
       assert.equal((await request('/', { host: 'attacker.example:4173' })).status, 403);

@@ -40,7 +40,7 @@ public class ActionService {
     }
 
     public List<AssistantAction> list(String status) {
-        return store.snapshot().actions().stream()
+        return store.actions().stream()
                 .filter(action -> status == null || status.isBlank() || action.status().equals(status))
                 .toList();
     }
@@ -101,7 +101,7 @@ public class ActionService {
     }
 
     private boolean hasPreviousApproval(String approvalKey) throws IOException {
-        for (AssistantAction action : store.snapshot().actions()) {
+        for (AssistantAction action : store.actions()) {
             if (Set.of("approved", "completed", "failed").contains(action.status())
                     && approvalKey(action.kind(), action.arguments()).equals(approvalKey)) {
                 return true;

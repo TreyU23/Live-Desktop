@@ -5,6 +5,8 @@
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <regex>
+#include <sstream>
 #include <string>
 #include <map>
 #include <set>
@@ -250,7 +252,25 @@ void serve(SOCKET socket, const Request& req, const fs::path& root) {
     if (!GetFileSizeEx(file.value, &fileSize)) { response(socket, 500, "Unable to inspect frontend asset"); return; }
     static const std::map<std::string, std::string> types{{".html", "text/html; charset=utf-8"}, {".js", "text/javascript; charset=utf-8"}, {".css", "text/css; charset=utf-8"}, {".json", "application/json"}, {".svg", "image/svg+xml"}, {".png", "image/png"}, {".jpg", "image/jpeg"}, {".jpeg", "image/jpeg"}, {".webp", "image/webp"}, {".ico", "image/x-icon"}, {".woff2", "font/woff2"}};
     auto ext = lower(target.extension().string()), type = types.contains(ext) ? types.at(ext) : "application/octet-stream";
-    sendAll(socket, "HTTP/1.1 200 OK\r\nConnection: close\r\nContent-Type: " + type + "\r\nContent-Length: " + std::to_string(fileSize.QuadPart) + "\r\nCache-Control: no-cache\r\nX-Content-Type-Options: nosniff\r\n\r\n");
+    FILETIME modified{};
+    if (!GetFileTime(file.value, nullptr, nullptr, &modified)) throw HttpError{500, "Unable to inspect frontend timestamp"};
+    ULARGE_INTEGER ticks{}; ticks.LowPart = modified.dwLowDateTime; ticks.HighPart = modified.dwHighDateTime;
+    auto etag = "W/\"" + std::to_string(ticks.QuadPart) + "-" + std::to_string(fileSize.QuadPart) + "\"";
+    static const std::regex hashedAsset(R"(-[A-Za-z0-9_-]{8,}\.(js|css|woff2)$)");
+    bool immutable = target.parent_path().filename() == L"assets" && std::regex_search(target.filename().string(), hashedAsset);
+    auto cacheHeaders = "Cache-Control: " + std::string(immutable ? "public, max-age=31536000, immutable" : "no-cache") + "\r\nETag: " + etag + "\r\n";
+    auto condition = req.headers.find("if-none-match");
+    if (condition != req.headers.end()) {
+        std::string token; std::istringstream conditions(condition->second);
+        while (std::getline(conditions, token, ',')) {
+            token = trim(token);
+            if (token.starts_with("W/")) token.erase(0, 2);
+            if (token == "*" || token == etag.substr(2)) {
+                sendAll(socket, "HTTP/1.1 304 Not Modified\r\nConnection: close\r\n" + cacheHeaders + "\r\n"); return;
+            }
+        }
+    }
+    sendAll(socket, "HTTP/1.1 200 OK\r\nConnection: close\r\nContent-Type: " + type + "\r\nContent-Length: " + std::to_string(fileSize.QuadPart) + "\r\n" + cacheHeaders + "X-Content-Type-Options: nosniff\r\n\r\n");
     if (req.method == "HEAD") return;
     char buffer[65536]; DWORD read = 0;
     while (ReadFile(file.value, buffer, sizeof(buffer), &read, nullptr) && read) sendAll(socket, buffer, read);

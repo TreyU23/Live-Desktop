@@ -16,6 +16,8 @@
 #include <string>
 #include <thread>
 #include <vector>
+#include <atomic>
+#include <deque>
 
 using namespace winrt;
 using namespace Windows::Data::Json;
@@ -178,7 +180,34 @@ JsonObject app_snapshot() {
     return result;
 }
 
+JsonObject cached_app_snapshot(bool refresh) {
+    static JsonObject cached{nullptr};
+    static std::chrono::steady_clock::time_point captured;
+    auto now = std::chrono::steady_clock::now();
+    if (!cached || refresh || now - captured >= 2s) { cached = app_snapshot(); captured = now; }
+    return cached;
+}
+
 GlobalSystemMediaTransportControlsSessionManager media_manager{nullptr};
+GlobalSystemMediaTransportControlsSession observed_session{nullptr};
+GlobalSystemMediaTransportControlsSessionMediaProperties cached_properties{nullptr};
+event_token properties_token{};
+std::atomic<bool> properties_dirty{true};
+std::chrono::steady_clock::time_point properties_checked;
+std::wstring artwork_version;
+struct CachedArtwork { std::wstring version, content_type; Windows::Storage::Streams::IBuffer bytes; };
+std::deque<CachedArtwork> artwork_cache;
+unsigned long long artwork_sequence = 0;
+
+JsonObject artwork_request(JsonObject const& arguments) {
+    auto version = std::wstring(arguments.GetNamedString(L"version"));
+    for (auto const& entry : artwork_cache) if (entry.version == version) {
+        auto encoded = Windows::Security::Cryptography::CryptographicBuffer::EncodeToBase64String(entry.bytes);
+        JsonObject result; result.Insert(L"data", text(L"data:" + entry.content_type + L";base64," + std::wstring(encoded))); return result;
+    }
+    JsonObject result; result.Insert(L"available", flag(false)); return result;
+}
+
 JsonObject media_request(hstring const& operation, JsonObject const& arguments) {
     std::wstring provider(arguments.GetNamedString(L"provider"));
     if (provider != L"apple" && provider != L"spotify" && provider != L"music") throw hresult_invalid_argument(L"Unknown music provider.");
@@ -211,7 +240,17 @@ JsonObject media_request(hstring const& operation, JsonObject const& arguments) 
     result.Insert(L"duration", number(0));
     result.Insert(L"shuffled", flag(false));
     result.Insert(L"detail", text(L"Start playback once, then Live Desktop can control it through Windows."));
-    if (!session) return result;
+    if (!session) {
+        if (observed_session) observed_session.MediaPropertiesChanged(properties_token);
+        observed_session = nullptr; cached_properties = nullptr; artwork_version.clear();
+        return result;
+    }
+    if (observed_session != session) {
+        if (observed_session) observed_session.MediaPropertiesChanged(properties_token);
+        observed_session = session; cached_properties = nullptr; properties_dirty = true;
+        artwork_version.clear();
+        properties_token = session.MediaPropertiesChanged([](auto const&, auto const&) { properties_dirty = true; });
+    }
     bool succeeded = true;
     if (operation == L"media.play") succeeded = await_native(session.TryPlayAsync());
     else if (operation == L"media.pause") succeeded = await_native(session.TryPauseAsync());
@@ -228,7 +267,15 @@ JsonObject media_request(hstring const& operation, JsonObject const& arguments) 
         succeeded = SendInput(2, keys, sizeof(INPUT)) == 2;
     }
     if (operation != L"media.snapshot") std::this_thread::sleep_for(120ms);
-    auto properties = await_native(session.TryGetMediaPropertiesAsync());
+    bool changed = properties_dirty.exchange(false) || !cached_properties || operation == L"media.next" || operation == L"media.previous";
+    if (changed || std::chrono::steady_clock::now() - properties_checked >= 30s) {
+        auto latest = await_native(session.TryGetMediaPropertiesAsync());
+        changed = changed || !cached_properties || latest.Title() != cached_properties.Title()
+            || latest.Artist() != cached_properties.Artist() || latest.AlbumTitle() != cached_properties.AlbumTitle();
+        cached_properties = latest;
+        properties_checked = std::chrono::steady_clock::now();
+    }
+    auto properties = cached_properties;
     auto playback = session.GetPlaybackInfo();
     auto timeline = session.GetTimelineProperties();
     result.Insert(L"source", JsonValue::CreateStringValue(session.SourceAppUserModelId()));
@@ -244,7 +291,9 @@ JsonObject media_request(hstring const& operation, JsonObject const& arguments) 
     result.Insert(L"shuffled", flag(shuffle && shuffle.Value()));
     result.Insert(L"actionSucceeded", flag(succeeded));
     result.Insert(L"detail", text(succeeded ? L"Controlled locally through Windows media controls." : L"Windows media session rejected the action."));
+    if (changed) artwork_version.clear();
     try {
+      if (changed) {
         if (properties.Thumbnail()) {
             auto stream = await_native(properties.Thumbnail().OpenReadAsync());
             if (stream.Size() > 0 && stream.Size() <= 4 * 1024 * 1024) {
@@ -252,13 +301,16 @@ JsonObject media_request(hstring const& operation, JsonObject const& arguments) 
                 if (content_type == L"image/jpeg" || content_type == L"image/png" || content_type == L"image/webp" || content_type == L"image/gif") {
                     Windows::Storage::Streams::Buffer buffer(static_cast<uint32_t>(stream.Size()));
                     auto loaded = await_native(stream.ReadAsync(buffer, buffer.Capacity(), Windows::Storage::Streams::InputStreamOptions::None));
-                    auto encoded = Windows::Security::Cryptography::CryptographicBuffer::EncodeToBase64String(loaded);
-                    result.Insert(L"artwork", text(L"data:" + content_type + L";base64," + std::wstring(encoded)));
+                    artwork_version = std::to_wstring(GetCurrentProcessId()) + L"-" + std::to_wstring(GetTickCount64()) + L"-" + std::to_wstring(++artwork_sequence);
+                    artwork_cache.push_back({artwork_version, content_type, loaded});
+                    while (artwork_cache.size() > 4) artwork_cache.pop_front();
                 }
             }
             stream.Close();
         }
+      }
     } catch (...) { /* Artwork failure does not fail media control. */ }
+    if (!artwork_version.empty()) result.Insert(L"artwork", text(L"/api/integrations/media-session/artwork/" + artwork_version));
     return result;
 }
 JsonObject open_uri(hstring const& operation, JsonObject const& arguments) {
@@ -281,13 +333,14 @@ JsonObject open_uri(hstring const& operation, JsonObject const& arguments) {
 
 bool supports_native_operation(hstring const& operation) {
     static std::set<std::wstring> const operations{L"power.snapshot", L"system.staticSnapshot", L"process.knownApps", L"phoneLink.snapshot",
-        L"media.snapshot", L"media.play", L"media.pause", L"media.next", L"media.previous", L"media.shuffle", L"media.mute", L"windows.openUri", L"browser.openUrl"};
+        L"media.snapshot", L"media.artwork", L"media.play", L"media.pause", L"media.next", L"media.previous", L"media.shuffle", L"media.mute", L"windows.openUri", L"browser.openUrl"};
     return operations.contains(std::wstring(operation));
 }
 JsonObject native_dispatch(hstring const& operation, JsonObject const& arguments) {
     if (operation == L"power.snapshot") return power_snapshot();
     if (operation == L"system.staticSnapshot") return static_snapshot();
-    if (operation == L"process.knownApps" || operation == L"phoneLink.snapshot") return app_snapshot();
+    if (operation == L"process.knownApps" || operation == L"phoneLink.snapshot") return cached_app_snapshot(arguments.GetNamedBoolean(L"refresh", false));
+    if (operation == L"media.artwork") return artwork_request(arguments);
     if (operation == L"windows.openUri" || operation == L"browser.openUrl") return open_uri(operation, arguments);
     if (std::wstring(operation).starts_with(L"media.")) {
         try { return media_request(operation, arguments); }

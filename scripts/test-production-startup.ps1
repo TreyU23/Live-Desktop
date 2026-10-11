@@ -33,6 +33,15 @@ function Wait-Stopped($ids) {
     } while ([DateTime]::UtcNow -lt $deadline)
     throw 'Owned service processes survived cleanup.'
 }
+function Wait-SupervisorStopped {
+    $deadline = [DateTime]::UtcNow.AddSeconds(12)
+    do {
+        & $launcher status --root $testRoot | Out-Null
+        if ($LASTEXITCODE -eq 2) { return }
+        Start-Sleep -Milliseconds 100
+    } while ([DateTime]::UtcNow -lt $deadline)
+    throw 'Supervisor survived service failure.'
+}
 try {
     if (-not $PackagePath) {
         foreach ($folder in @('native\build\Release', 'backend\target', 'frontend\dist')) {
@@ -41,7 +50,7 @@ try {
         foreach ($name in @('live-desktop-launcher.exe', 'live-desktop-host.exe', 'live-desktop-windows-bridge.exe', 'live-desktop-credentials.dll')) {
             Copy-Item -LiteralPath (Join-Path $projectRoot "native\build\Release\$name") -Destination (Join-Path $testRoot "native\build\Release\$name")
         }
-        Copy-Item -LiteralPath (Join-Path $projectRoot 'backend\target\live-desktop-backend.jar') -Destination (Join-Path $testRoot 'backend\target')
+        Copy-Item -LiteralPath (Join-Path $projectRoot 'backend\target\runtime') -Destination (Join-Path $testRoot 'backend\target') -Recurse
         Copy-Item -LiteralPath (Join-Path $projectRoot 'frontend\dist\client') -Destination (Join-Path $testRoot 'frontend\dist') -Recurse
     }
     if ($PackagePath) {
@@ -60,6 +69,8 @@ try {
     $env:JAVA_HOME = if ($PackagePath -and $manifest.includesJavaRuntime) { '' } else { (Resolve-Path -LiteralPath (Join-Path $projectRoot '.tools\jdk-21')).Path }
     $env:DATA_DIR = Join-Path $testRoot 'data'
     Invoke-Launcher start
+    & $nodePath (Join-Path $projectRoot 'frontend/tests/runtime-smoke.mjs')
+    Assert-True ($LASTEXITCODE -eq 0) 'Built dashboard browser smoke failed.'
     $first = Read-Children
     Assert-True ((Get-Process -Id $first[1]).ProcessName -eq 'live-desktop-host') 'Production frontend is not native.'
     $measurements = @(Get-Content -LiteralPath (Join-Path $testRoot '.startup-metrics.jsonl') | ForEach-Object { $_ | ConvertFrom-Json })
@@ -117,8 +128,7 @@ try {
     # Terminate only the frontend this test launched; the supervisor must clean up its backend.
     Stop-Process -Id $third[1] -Force
     Wait-Stopped $third
-    & $launcher status --root $testRoot
-    Assert-True ($LASTEXITCODE -eq 2) 'Supervisor survived service failure.'
+    Wait-SupervisorStopped
 
     Invoke-Launcher start
     $fourth = Read-Children
@@ -137,7 +147,18 @@ try {
     $failureOutput = (& $launcher start --root $testRoot 2>&1 | Out-String)
     Assert-True ($LASTEXITCODE -ne 0 -and $failureOutput.Contains('Native frontend host exited with code')) 'Native child failure diagnostic failed.'
     Move-Item -LiteralPath ($hostExe + '.missing') -Destination $hostExe -Force
-    $jar = Join-Path $testRoot 'backend\target\live-desktop-backend.jar'
+    # CDS is optional: missing and corrupt archives must fall back safely.
+    $cds = Join-Path $testRoot 'backend\target\runtime\application.jsa'
+    if (Test-Path -LiteralPath $cds) {
+        Move-Item -LiteralPath $cds -Destination ($cds + '.saved')
+        Invoke-Launcher start
+        Invoke-Launcher shutdown
+        Set-Content -LiteralPath $cds -Value 'synthetic-invalid-CDS-archive'
+        Invoke-Launcher start
+        Invoke-Launcher shutdown
+        Move-Item -LiteralPath ($cds + '.saved') -Destination $cds -Force
+    }
+    $jar = Join-Path $testRoot 'backend\target\runtime\live-desktop-backend.jar'
     Move-Item -LiteralPath $jar -Destination ($jar + '.missing')
     & $launcher start --root $testRoot
     Assert-True ($LASTEXITCODE -ne 0) 'Missing packaged backend was accepted.'

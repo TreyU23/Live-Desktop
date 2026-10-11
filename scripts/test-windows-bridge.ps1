@@ -26,6 +26,8 @@ try {
     $startup.Stop()
     $connectAndHealthMs = $startup.Elapsed.TotalMilliseconds
     $startup.Start()
+    $capabilities = Invoke-BridgeRead 'bridge.capabilities'
+    if (-not $capabilities.ok -or $capabilities.result.operations -notcontains 'media.artwork') { throw 'Artwork operation missing from capability inventory.' }
     if ((Invoke-BridgeRead "unregistered.operation").ok) { throw "Unknown operation was accepted." }
     if ((Invoke-BridgeRead "bridge.health" 2).ok) { throw "Unsupported protocol was accepted." }
     foreach ($operation in @('power.snapshot','system.staticSnapshot','process.knownApps','phoneLink.snapshot')) {

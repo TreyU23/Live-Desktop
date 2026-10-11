@@ -1,412 +1,123 @@
 # Live Desktop
 
-Live Desktop is a local-first Windows dashboard and assistant. A React/Vite frontend provides system controls, system information, conversations, memories, approvals, iCloud Calendar, a custom Apple Music or Spotify player, Phone Link status, and one-click project lifecycle controls. A Java 21/Spring Boot backend owns local state, OpenAI requests, Windows inspection, integrations, and approved actions.
+Live Desktop is a local Windows dashboard with system information, approved device controls, conversations, memories, iCloud Calendar, Phone Link status, and an Apple Music/Spotify player. React presents the interface; Java 21/Spring Boot owns profiles, durable state, integrations, OpenAI requests, and approval policy. C++ owns the production supervisor, frontend host, Windows bridge, and credential protection DLL.
 
-This is a desktop-style assistant application, not an operating-system kernel. The backend binds to `127.0.0.1:4317`; the frontend runs at `http://localhost:4173` and proxies `/api` and `/health` to the backend. Production uses a C++ supervisor, a prebuilt Java JAR, and a lightweight C++ host for the built frontend.
+Open [http://localhost:4173](http://localhost:4173). Production binds the frontend to `127.0.0.1:4173` and the backend to `127.0.0.1:4317`; `/api` and `/health` pass through the native host. Saved profiles live on this PC. Requests to OpenAI, iCloud, and music providers use their external services.
 
-## Current capabilities
+## Run an installed package
 
-- Local profile picker with profile names, uploaded avatars, isolated app data, credentials, integration links, and appearance preferences.
-- True-black dashboard with a per-profile persistent dark/light appearance preference.
-- A dedicated **System Info** tab with live CPU, memory, storage, network, battery, backend, and OpenAI status plus Windows-reported processor, graphics, device, and OS specifications.
-- One-time approval-backed direct Wi-Fi and Bluetooth toggles using the supported Windows radio API, plus explicit Windows Settings shortcuts for Focus, Night light, microphone privacy, and Battery saver. After a capability is approved for the active profile, later matching button presses run immediately.
-- OpenAI-powered conversations using the official Java SDK.
-- Token-conscious assistant context: each prompt receives only relevant live dashboard sections, with an on-demand tool for additional bounded context.
-- Inspectable local memories and conversation history.
-- Restart and shutdown controls for both frontend and backend.
-- iCloud Calendar day view using CalDAV, including recurring events.
-- Provider-switchable Apple Music and Spotify player with artwork, metadata, progress, play/pause, previous/next, shuffle, and system mute. It uses each service's web embed plus Windows' built-in media-session controls, with no developer credentials.
-- Microsoft Phone Link installation, process, linked-device, battery, notification-signal, and sync metadata detection, with iPhone or Android artwork selected from the detected device metadata.
+Extract the entire `Live-Desktop` folder from the Windows x64 ZIP into a writable directory private to your Windows account. Run `start.cmd`, then open the dashboard. If the ZIP does not contain `.tools/jdk-21`, install Java 21 and set `JAVA_HOME`, or run `scripts/bootstrap-java.ps1`.
 
-## Project layout
+Normal use requires Windows 10/11 x64 and Java 21. Node, pnpm, Maven, Visual Studio, CMake, and a separate Visual C++ runtime installation are unnecessary. Build tools are only needed for a source checkout. The ZIP contains no saved profiles, credentials, `.env`, logs, or dependency caches.
 
-```text
-backend/    Java 21 + Spring Boot API and local integrations
-frontend/   React 19 + Vite 6 dashboard
-native/     C++ launcher/HTTP host, C++/WinRT Windows bridge, JNI DPAPI protection
-data/       Local state, encrypted integration records, and lifecycle log
-scripts/    Java bootstrap, production build, and development scripts
-artifacts/  Local design and QA artifacts
-```
-
-## Requirements
-
-Required:
-
-- Windows 10 or Windows 11. PowerShell is used for setup/build and development; production startup uses C++.
-- Java 21. The included bootstrap script can install a project-local Temurin JDK.
-- Node.js 20 or later and pnpm for building/developing the frontend. Neither is required for normal use or for an extracted runtime package.
-- Network access while installing dependencies and while using OpenAI, iCloud Calendar, Apple Music, or Spotify.
-
-To build from source, install Visual Studio 2022 Build Tools with Desktop development with C++, a Windows SDK containing C++/WinRT headers, and CMake tools. Java 21 JNI headers are required for the credential DLL. The build script discovers bundled CMake automatically. Build and run the read-only smoke test after installing Java, before launch:
+Use the top-bar restart button, or the power button and its confirmation, to manage an owned production instance. From the installation directory:
 
 ```powershell
+.\native\build\Release\live-desktop-launcher.exe status
+.\native\build\Release\live-desktop-launcher.exe restart
+.\native\build\Release\live-desktop-launcher.exe shutdown
+```
+
+Stop the application before replacing or rebuilding runtime files. Back up `data/` before upgrades; DPAPI credentials are tied to the Windows user that protected them.
+
+## Build from source
+
+Install Java 21, Node.js 20 or later, pnpm, and Visual Studio 2022 Build Tools with Desktop development with C++, a Windows SDK with C++/WinRT, and CMake. The Maven wrapper is included. Run these commands from the repository root in PowerShell:
+
+```powershell
+.\scripts\bootstrap-java.ps1
+pnpm --dir frontend install --frozen-lockfile
 .\scripts\build-production.ps1
 .\scripts\test-windows-bridge.ps1
 .\start.cmd
 ```
 
-Radios, media sessions, battery status, system specifications, known-app detection, Phone Link package/process detection, and allowlisted app/URL launching use one backend-owned C++ bridge. Credentials use an in-process JNI DPAPI DLL; secrets never travel through the pipe. There is no PowerShell integration provider, provider setting, or fallback. The private pipe accepts only the owning backend PID. A later request can reconnect after failure, but failed changes are never replayed. Refresh state before retrying an ambiguous mutation. See [native build and protocol instructions](native/README.md). Java retains profiles, approvals, persistence, calendar/network work, and Phone Link metadata parsing. Production start/restart/shutdown use the C++ launcher, including the dashboard controls.
+If PowerShell blocks local scripts, `Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass` affects only that terminal. The Java bootstrap verifies a Temurin download and installs `.tools/jdk-21`.
 
-See [current migration scope and validation](docs/WINDOWS_NATIVE_MIGRATION.md). Native read-only tests and credential compatibility are verified; actual radio toggles, media actions, sleep/resume, and cross-user pipe access still require live validation. The launcher, native frontend host, bridge, credential DLL, packaged backend, and built frontend must exist before launch; nothing is compiled or downloaded on startup. Stop Live Desktop before rebuilding native artifacts. Run `scripts/build-production.ps1` after source changes to refresh all production artifacts.
+The production build compiles/tests C++, packages/tests Java, extracts the backend deployment, trains CDS with isolated non-secret data, and tests/builds the frontend. It does not run the browser, native-host, or lifecycle suites; run those separately below.
 
-Optional accounts depend on the features you use:
+Production uses one layout: `backend/target/runtime/live-desktop-backend.jar` plus its `lib/` directory. The supervisor launches Java directly from the extracted deployment directory and starts `live-desktop-host.exe`. A compatible build-time CDS archive accelerates class loading. No extraction, compilation, training, or download happens during launch. Java selection is `.tools/jdk-21`, then `JAVA_HOME`, then PATH. An absent archive or changed JDK identity uses the extracted JVM runtime with a diagnostic; rebuilding generates a matching archive.
 
-- An OpenAI API project key with API billing/credits for the assistant.
-- An Apple Account with two-factor authentication for iCloud Calendar.
-- An Apple Music account if you want to play subscriber content; no Apple Developer Program membership or developer key is required.
-- A Spotify account if you want to use Spotify content beyond what its web embed makes available without sign-in; no Spotify developer application is required.
-- Microsoft Phone Link installed and paired with a phone for live phone metadata.
-
-## First-time setup
-
-Run all commands from the repository root in PowerShell.
-
-### 1. Allow the project scripts for this terminal
-
-If PowerShell blocks local scripts, use a process-only execution-policy override:
+For a runtime ZIP:
 
 ```powershell
-Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
-```
-
-This setting ends when that PowerShell window closes.
-
-### 2. Install Java 21
-
-```powershell
-.\scripts\bootstrap-java.ps1
-```
-
-The script downloads a verified Eclipse Temurin 21 archive, checks its SHA-256 checksum, and installs it under `.tools\jdk-21`. It does not require a global Java installation. The Maven wrapper is included, so Maven does not need to be installed separately.
-
-### 3. Install frontend dependencies
-
-If `frontend\node_modules` is not already present, install pnpm and the locked dependencies:
-
-```powershell
-npm install --global pnpm
-pnpm --dir frontend install --frozen-lockfile
-```
-
-Codex desktop users can normally skip the global pnpm installation because `scripts\run-frontend.ps1` locates the bundled Node/pnpm runtime.
-
-### 4. Configure the OpenAI API key
-
-Recommended: open **Settings → OpenAI API key** after launch and save a separate key for each local profile. The backend protects profile keys with Windows DPAPI and never returns them to the browser.
-
-For the original `default` profile only, an environment key remains available as a setup fallback:
-
-Copy the configuration template and edit the local `.env` file:
-
-```powershell
-Copy-Item .env.example .env
-notepad .env
-```
-
-Set at least:
-
-```properties
-OPENAI_API_KEY=your_openai_project_api_key
-```
-
-The complete supported configuration is:
-
-```properties
-HOST=127.0.0.1
-PORT=4317
-OPENAI_API_KEY=
-OPENAI_MODEL=gpt-5.6-sol
-OPENAI_REASONING_EFFORT=medium
-DATA_DIR=../data
-WORKSPACE_ROOT=..
-```
-
-`.env` is ignored by Git. Never commit, paste into source code, or share an API key. Additional profiles do not inherit the environment key; save their own key in Settings.
-
-Alternatively, store the key as a Windows user environment variable without putting it directly in PowerShell history:
-
-```powershell
-$liveDesktopKey = Read-Host "Paste your OpenAI API key"
-[Environment]::SetEnvironmentVariable("OPENAI_API_KEY", $liveDesktopKey, "User")
-$env:OPENAI_API_KEY = $liveDesktopKey
-Remove-Variable liveDesktopKey
-```
-
-The final two lines make the key available to the current terminal immediately. New terminals inherit the saved user variable automatically. A process/user environment variable takes precedence over the same property in `.env`.
-
-## Start Live Desktop
-
-### Recommended: one command
-
-From the repository root, run:
-
-```powershell
-.\start.cmd
-```
-
-This starts the prebuilt backend and frontend in the background and returns success after the native host identity, backend `/health`, proxied `/health`, and dashboard `/` pass readiness checks (up to 60 seconds). Repeated starts reuse the existing supervisor. Open [http://localhost:4173](http://localhost:4173).
-
-Build before the first launch and after source changes:
-
-```powershell
-.\scripts\build-production.ps1
-```
-
-The build runs native compilation/CTest, Maven package/tests, and the frontend build. Startup directly runs `java -jar backend/target/live-desktop-backend.jar` and `live-desktop-host.exe` for built assets and the API proxy; it invokes no Node, Maven, pnpm, Vite, or PowerShell. Java selection is `.tools/jdk-21`, then `JAVA_HOME`, then PATH. The backend works from `backend/`, preserving `../.env` and `../data` defaults; `WORKSPACE_ROOT` and loopback host/port are set by the supervisor. Production frontend binds only to `127.0.0.1:4173`.
-
-The supervisor owns its backend, frontend, and their descendants in a Windows Job Object. Shutdown, restart, supervisor termination, or an unexpected service exit clean up that job only. A current-user-only workspace lock prevents duplicate supervisors, including across Windows sessions. An occupied port causes an error; the launcher never kills a process based on its name, port, or saved PID. Stop older development terminals explicitly before switching to production. Logs append to `.launcher.log`, `.backend-preview.out.log`, `.backend-preview.err.log`, `.frontend-preview.out.log`, and `.frontend-preview.err.log`.
-
-Readiness reports elapsed launch-to-ready time and appends `.startup-metrics.jsonl`. `services-ready` records native host, Java backend, API proxy, and all-services times from supervisor cycle start; `launch-ready` records elapsed time from launcher entry, action, and whether an existing instance was reused. Restart includes shutdown time in the command measurement. These are HTTP availability measurements; external integrations and browser rendering can finish later. Missing artifacts fail immediately with the exact path. Child exits name the service and exit code; timeout errors identify incomplete readiness stages and point to component logs. Supervisor failure details also appear in the calling terminal.
-
-### Install a runtime package
-
-To create a Windows x64 ZIP from a source checkout:
-
-```powershell
-.\scripts\package-production.ps1
-# After a successful build, optionally include the project-local Java 21 installation:
 .\scripts\package-production.ps1 -SkipBuild -IncludeJavaRuntime
-```
-
-Output: `dist/Live-Desktop-windows-x64.zip`. Extract the entire `Live-Desktop` folder to a writable, private directory, then run its `start.cmd`. The package contains all four native binaries, the backend JAR, built client assets, setup documentation, `.env.example`, and a SHA-256 inventory in `manifest.json`. Saved data, credentials, `.env`, logs, Node dependencies, and build caches are excluded. Native binaries link the MSVC runtime statically. The runtime package needs Windows 10/11 x64 and Java 21; it needs no Node, pnpm, Maven, CMake, or Visual Studio installation. Without `-IncludeJavaRuntime`, install Java 21/set `JAVA_HOME` or use the included `scripts/bootstrap-java.ps1`. Source rebuild instructions apply to a full source checkout, not the runtime ZIP. Stop the application before replacing its files.
-
-Verify with free ports 4173/4317:
-
-```powershell
-.\scripts\test-native-host.ps1
 .\scripts\test-production-startup.ps1 -PackagePath .\dist\Live-Desktop-windows-x64.zip
 ```
 
-The first test uses Node only as a build-time test driver and mock backend. It verifies native serving, proxy bodies/streaming, Host/Origin restrictions, path confinement, and backend failure. The second verifies packaged hashes and runs lifecycle/readiness checks in an isolated workspace with separate data.
+`dist/Live-Desktop-windows-x64.zip` contains the four native binaries, complete extracted Java deployment, client assets, documentation, `.env.example`, and a SHA-256 `manifest.json`. Omit `-IncludeJavaRuntime` when recipients already have Java 21. Source build commands require a full checkout.
 
-### Visible development terminals
+## Development
 
-Open two PowerShell terminals at the repository root.
-
-Terminal 1:
+In separate terminals at the repository root:
 
 ```powershell
 .\scripts\run-backend.ps1
-```
-
-Terminal 2:
-
-```powershell
 .\scripts\run-frontend.ps1
 ```
 
-Open [http://localhost:4173](http://localhost:4173). The backend health endpoint is [http://127.0.0.1:4317/health](http://127.0.0.1:4317/health).
+The development frontend uses loopback Vite on port 4173 and proxies the backend on 4317. Stop those terminals explicitly before starting production; the supervisor manages only processes it owns. Dashboard lifecycle commands require an owning production supervisor.
 
-### Direct lifecycle command
+See the [backend README](backend/README.md), [frontend README](frontend/README.md), and [native README](native/README.md) for their development and implementation contracts.
 
-`start.cmd` calls the native launcher's `start` command. To explicitly restart an owned instance:
+## Profiles and accounts
 
-```powershell
-.\native\build\Release\live-desktop-launcher.exe restart
-```
+The profile picker creates, renames, switches, and deletes local profiles. Appearance, avatar, music links, and profile selection use profile-scoped browser storage. Backend conversations, memories, approvals, and credentials use `data/profiles/<id>/`; the original `default` profile retains files directly under `data/`. Browser profiles are local organization, not separate Windows accounts or an authentication boundary.
 
-Use this command for either an initial background start or a restart. Once the dashboard is online, the circular-arrow button in its top bar runs the same restart workflow.
+Save each profile's OpenAI project key in **Settings → OpenAI API key**. Windows current-user DPAPI protects it at rest; key settings endpoints return availability rather than the key. Corrupt or undecryptable saved keys report unavailable; the default profile may still use its configured environment fallback. Additional profiles do not inherit an environment key. OpenAI API billing/credits are separate from ChatGPT subscriptions. Assistant requests include recent conversation turns and only relevant dashboard context. Memory and workspace reads run immediately; writes, durable memories, browser launches, and device controls require the matching profile's first-use approval. Review the action before approving it. Matching approved capabilities may execute immediately afterward.
 
-### Shut down both services
+Workspace file operations check the configured root and existing canonical ancestors, rejecting symbolic links and Windows junctions that resolve outside it. Text reads are limited to 100 KB and file listings to 500 entries. Read/list tools exclude the configured data directory, the workspace's conventional `data/` subtree and root `.env`/`.env.*` files, including canonical aliases; `.env.example` remains readable as a setup template. Approved writes retain their approval and path checks. Protect the installation from untrusted concurrent filesystem changes; path checks do not lock the directory tree against replacement.
 
-Use the power button in the dashboard and confirm, or run:
+For iCloud Calendar, generate an Apple **app-specific password** at [Apple Account](https://account.apple.com/) with two-factor authentication enabled. Enter the account email and that password in **Settings → iCloud Calendar**. A regular Apple Account password is unsuitable. Credentials stay DPAPI-protected locally; CalDAV traffic is restricted to Apple-owned HTTPS endpoints. Discovery and date results are cached separately, and the widget supports date selection and manual refresh. Reconnect with a new app-specific password if Apple revokes it.
 
-```powershell
-.\native\build\Release\live-desktop-launcher.exe shutdown
-```
+For music, choose Apple Music or Spotify in Settings and paste a supported content link. Open Music once to load its web embed. Once mounted, the embed stays mounted while navigating to other views so playback continues. Provider switching replaces the selected embed and preserves each provider's link. Windows media sessions supply real metadata and controls; start a track once in a player that publishes a Windows session. Developer credentials, MusicKit keys, Spotify OAuth applications, and additional paid APIs are unnecessary. Provider accounts/subscriptions and browser playback restrictions still apply.
 
-Lifecycle logs are written to `data\runtime-control.log`. Background process output is written to `.backend-preview.out.log`, `.backend-preview.err.log`, `.frontend-preview.out.log`, and `.frontend-preview.err.log` in the repository root.
+Install and pair Microsoft Phone Link for phone status. The backend reads local package/process information and available device/companion metadata; it does not promise access to messages or notification contents. Unknown platform or battery information remains unavailable. The widget labels opening Phone Link as an external action.
 
-## Integration setup
+Wi-Fi and Bluetooth support verified direct controls where Windows permits them. Focus, Night light, microphone privacy, and Battery saver open the corresponding Windows Settings page after approval; opening Settings does not confirm a toggle changed. See the [control capability inventory](docs/WINDOWS_CONTROL_CAPABILITIES.md) and [system information inventory](docs/SYSTEM_INFORMATION.md).
 
-### Windows control capabilities
+## Configuration
 
-Night light, Battery saver, Focus, and microphone privacy retain their Settings-shortcut behavior, executed by the C++ bridge after profile-scoped approval. They do not report a verified on/off change. The [supported API audit and exact native route](docs/WINDOWS_CONTROL_CAPABILITIES.md) explain why gamma changes, power-plan changes, and microphone mute are not substituted for these settings. Focus-session write APIs require additional Microsoft-issued limited-access permission. Java remains the approval authority; it does not launch these settings through PowerShell or Explorer.
+Settings is the normal path for credentials. Optionally copy `.env.example` to `.env` in the root for the default profile's OpenAI fallback and backend configuration. Keep this file private and outside Git.
 
-### iCloud Calendar
-
-Do not enter your normal Apple Account password. Live Desktop uses an Apple app-specific password for CalDAV.
-
-1. Make sure two-factor authentication is enabled for the Apple Account.
-2. Sign in at [account.apple.com](https://account.apple.com/).
-3. Open **Sign-In and Security → App-Specific Passwords**.
-4. Generate a password named something recognizable, such as `Live Desktop`.
-5. In Live Desktop, open **Settings → iCloud Calendar**.
-6. Enter the Apple Account email and generated app-specific password, then select **Connect iCloud Calendar**.
-
-The backend verifies the account before keeping it. The password is protected with Windows DPAPI for the current Windows user and stored only in `data\icloud-calendar-credentials.json`; it is never returned to the frontend. Calendar results are cached briefly, refresh automatically, and can be refreshed manually from the widget.
-
-Changing or resetting the main Apple Account password revokes existing app-specific passwords. Generate a replacement and reconnect if calendar sync stops afterward. See Apple’s [app-specific password instructions](https://support.apple.com/en-us/102654).
-
-### Apple Music or Spotify custom player
-
-The music integration uses Apple Music or Spotify's standard embedded player together with the media-session interface built into Windows 10/11. It does not require an Apple Developer Program membership, MusicKit credentials, a Spotify developer application, OAuth client credentials, or an additional paid API.
-
-1. Open **Settings → Music service**.
-2. Select **Apple Music** or **Spotify**. This selection replaces the service used by both the dashboard widget and full Music view.
-3. Paste a shared link. Apple Music accepts a playlist, album, or song; Spotify accepts a playlist, album, track, artist, show, or episode. Apple Music also includes a starter playlist.
-4. Open the full player and sign in within the selected service's player if the content requires it.
-5. Start a track once in the embedded player or the selected service's Windows app.
-6. Live Desktop detects the active Windows media session and begins showing its real title, artist, album, artwork when available, playback state, and timeline.
-
-The original dashboard controls then send play, pause, previous, next, and shuffle requests to the active Windows session. The volume button toggles Windows' system mute. The embedded player stays mounted offscreen when you switch Live Desktop tabs so playback can continue.
-
-No Apple or Spotify password is stored by this integration. Each provider's shared link and the selected provider are stored only in browser local storage. Both links are retained when you toggle providers, so switching back restores the prior player. Windows 10 version 1809 or later is required for the system media-session API.
-
-### Microsoft Phone Link
-
-1. Install or update **Phone Link** from the Microsoft Store.
-2. Open Phone Link and pair the phone completely.
-3. Keep Phone Link running in the background if you want current connection and sync information.
-4. Use the refresh button on the Live Desktop phone widget if its status is stale.
-
-The backend reads local Phone Link package metadata and running-process information. It reports the paired device name/model, battery when available, last-seen/sync timestamps, and whether the local companion metadata indicates notifications. Live Desktop does not display private notification contents. The first use of **Open app** creates an approval to launch Phone Link externally with the `ms-phone:` URI; after that approval, the button launches Phone Link immediately for the active profile.
-
-## Local data and security
-
-The System Info tab uses read-only, non-admin Windows native APIs, fixed registry queries, environment, network-interface, file-system, and Java runtime data. The complete field-by-field inventory, local source, refresh behavior, and assistant-context boundary are documented in [System information access](docs/SYSTEM_INFORMATION.md).
-
-| Data | Location | Protection |
+| Variable | Default | Meaning |
 | --- | --- | --- |
-| Default profile conversations, memories, actions, and reusable approvals | `data\assistant-state.json` | Local JSON, user-readable |
-| Additional profile backend data | `data\profiles\<profile-id>\` | Separate local files per profile |
-| iCloud account and OpenAI key records | Default under `data\`; additional profiles under `data\profiles\<profile-id>\` | Secrets encrypted with Windows DPAPI |
-| Profile names, avatars, theme, accent color, selected music provider, and Apple Music/Spotify links | Browser local storage | Namespaced by local profile; uploaded avatars remain in this browser |
-| Lifecycle history | `data\runtime-control.log` | Local text log |
+| `HOST` | `127.0.0.1` | Backend bind; production supervisor fixes loopback |
+| `PORT` | `4317` | Backend port; production supervisor fixes 4317 |
+| `OPENAI_API_KEY` | empty | Default profile fallback only |
+| `OPENAI_MODEL` | `gpt-5.6-sol` | Configured API model identifier |
+| `OPENAI_REASONING_EFFORT` | `medium` | SDK reasoning option |
+| `DATA_DIR` | `../data` | Relative paths resolve against `backend/` in production |
+| `WORKSPACE_ROOT` | `..` | Assistant workspace; supervisor fixes installation root |
+| `LIVE_DESKTOP_ROOT` | supervisor-set | Internal installation root used for backend-relative data resolution with the extracted Java working directory; not user configuration |
+| `LIVE_DESKTOP_DIAGNOSTICS` | unset | Set `1` in the launching environment for bounded timing logs |
 
-DPAPI-protected values can only be decrypted by the same Windows user profile. After first use, the running backend keeps decrypted credentials in profile-isolated memory so routine dashboard polls and assistant requests do not repeatedly decrypt credentials; replacing or removing a credential, deleting its profile, or restarting the backend clears the applicable cache. Disconnect an integration in Settings to delete its saved credential record. Creating, renaming, switching, and uploading an avatar are available from the profile icon in the top bar. Deleting an additional profile removes its app-owned backend folder and browser profile metadata; the original default profile cannot be deleted.
+Environment values take precedence over `.env`. The supervisor imports the root `.env` explicitly and resolves relative `DATA_DIR` values against `backend/`, preserving existing data locations. Frontend development/build also supports `VITE_API_BASE`; the normal local build uses same-origin proxy routes.
 
-The selected music provider and both provider links are profile-specific. Authentication inside each embedded player remains controlled by that provider and the browser's third-party cookie storage, so the app never copies or stores a provider password or session token. The browser may reuse an embedded-player sign-in between local profiles.
+## Performance and validation
 
-The model cannot execute arbitrary shell commands. Wi-Fi and Bluetooth changes are strictly allowlisted and use Windows' radio API; Live Desktop verifies the returned radio state before reporting success and applies that result to the dashboard immediately. Windows integrations share one private C++ bridge; it never falls back to PowerShell or replays a failed change. The first request for each control requires approval, and later presses of that control run immediately in the same local profile (the approval covers both on and off). Stable Windows device data and battery state are warmed during backend startup. Radio snapshots are cached for up to 30 seconds and battery information for up to five minutes; dashboard-initiated radio changes update the cache immediately, while changes made elsewhere in Windows can take up to 30 seconds to appear. Windows can still deny a change because of user permission, hardware controls, or system policy. Focus, Night light, microphone privacy, and Battery saver do not have equivalent supported consumer toggle APIs for this unpackaged desktop application, so those controls open the matching Windows Settings page after their one-time approval. Live Desktop deliberately does not use undocumented registry edits or UI automation for them. Phone Link launch uses the same one-time approval path. Restart and confirmed shutdown are explicit local lifecycle operations.
+Dashboard resources commit independently. Completion-based polling deduplicates each read, pauses while hidden, and refreshes once on return. Last-known data survives refresh errors with a visible status. Media artwork uses bounded caches and opaque image references; unchanged artwork does not travel in every playback response. See the [performance action plan](docs/PERFORMANCE_ACTION_PLAN.md), [assessment](docs/PERFORMANCE_MIGRATION_ASSESSMENT.md), and [results and remaining validation](docs/PERFORMANCE_RESULTS.md).
 
-Reusable approvals are profile-scoped and inferred from that profile's approved action history. Matching is intentionally limited to the same capability: a Windows control ID, an exact Windows URI, an exact web URL, a normalized workspace file path, or a memory category. A different target still creates a new pending approval. Both completed actions and actions that failed after approval count as approved, so a transient execution failure does not force another approval. Removing a non-default profile also removes its reusable approvals; deleting the default profile's `assistant-state.json` while Live Desktop is stopped resets its approvals together with its conversations, memories, and action history.
-
-### Assistant access to dashboard information
-
-The assistant can access live dashboard information, but the application does not attach the entire dashboard to every request. A local relevance router examines the latest prompt and includes only matching sections:
-
-- PC/resource/control questions: compact system and control state.
-- Running-application questions: the bounded detected-app list.
-- Phone questions: Phone Link connection and device metadata, without notification contents.
-- Calendar questions: at most eight events for the relevant day; `tomorrow` and `yesterday` are resolved locally.
-- Music questions: metadata and timeline only; artwork image data is deliberately excluded.
-- Runtime or approval questions: compact service state or at most five pending actions.
-- Explicit dashboard-overview questions: a bounded summary of all sections.
-
-If the automatic context is insufficient, the model has a `get_dashboard_context` tool limited to four explicitly requested topics per call. Credentials, API keys, Apple app-specific passwords, local credential files, artwork blobs, unrelated memories, and unrelated dashboard sections are never included. Prompts unrelated to the dashboard receive no dashboard payload at all.
-
-Production binds both services to `127.0.0.1`; the frontend rejects unexpected Host and Origin headers. The Vite development frontend starts with `--host 0.0.0.0`, so Windows Firewall may make port `4173` reachable from the local network. Do not expose either service to the internet; there is no multi-user authentication or remote-deployment hardening. Native job ownership uses forced process termination for cleanup; it does not provide graceful request draining.
-
-## Build and test
-
-Build native first, then run the backend suite and package from the repository root:
+With production stopped and ports 4173/4317 free:
 
 ```powershell
-$env:JAVA_HOME = (Resolve-Path '.tools\jdk-21').Path
-.\scripts\build-windows-bridge.ps1
-.\mvnw.cmd test
-.\mvnw.cmd -pl backend package
+.\scripts\test-native-host.ps1
+.\scripts\test-windows-bridge.ps1
+.\scripts\test-production-startup.ps1
+npm --prefix frontend test
+npm --prefix frontend run test:sites
 ```
 
-The packaged backend is written to `backend\target\assistant-backend-0.1.0-SNAPSHOT.jar`.
+For browser scheduling/rendering checks, run a frontend development server on loopback port 4174, then `npm --prefix frontend run test:browser`. Tests mock integrations and use an installed Microsoft Edge. Backend performance sampling and startup comparisons are documented in the backend README. Optional diagnostics at `?diagnostics=1` expose at most 1,000 non-content request/commit timing samples through `window.liveDesktopTimings()`.
 
-Run the frontend production build and Sites packaging checks:
+Builds and synthetic tests do not establish live hardware changes, authenticated calendar behavior, continuous real audio, sleep/resume, or independent-user pipe isolation. Keep those checks distinct from HTTP readiness and simulated tests. Publishing or shipping to `main` requires the project security review and a separate release decision.
 
-```powershell
-pnpm --dir frontend run build
-pnpm --dir frontend run test:sites
-```
+## Troubleshooting and ownership
 
-The frontend build writes the browser assets to `frontend\dist\client`, the Sites worker to `frontend\dist\server\index.js`, and the hosting manifest to `frontend\dist\.openai\hosting.json`. The current hosted artifact is frontend-only; live Windows and account integrations still require the local backend.
+The supervisor uses a current-user workspace mutex and Windows Job Object. Repeated starts reuse the owned instance. Shutdown, restart, supervisor exit, or unexpected service exit cleans up only its children and descendants. An occupied port fails startup and leaves unrelated listeners alive; stop the known development process explicitly.
 
-## API reference
+Startup readiness checks native `/_live/ready`, direct backend `/health`, proxied `/health`, and dashboard `/` for up to 60 seconds. `start.cmd` returns after the launcher's readiness checks complete; external integrations and browser widgets can finish later. HTTP availability does not mean every integration is ready.
 
-| Method | Route | Purpose |
-| --- | --- | --- |
-| `GET` | `/health` | Backend and OpenAI configuration status |
-| `GET` | `/api/system` | Live resource/control snapshot plus cached Windows device and OS specifications |
-| `GET` | `/api/system/apps` | Detected running applications |
-| `POST` | `/api/system/controls/{id}` | Request a direct Wi-Fi/Bluetooth change with `{ "enabled": true|false }`, or open the matching Windows setting; returns `pending` on first use and executes immediately after prior approval |
-| `GET` | `/api/runtime` | Frontend/backend lifecycle status |
-| `POST` | `/api/runtime/{action}` | Restart or stop both services; `action` is `restart` or `shutdown` |
-| `POST` | `/api/chat` | Send `{ "message": "...", "conversationId": "optional" }` |
-| `GET` | `/api/conversations` | List conversations |
-| `GET` | `/api/conversations/{id}` | Read one conversation |
-| `GET` | `/api/actions?status=pending` | List approval actions |
-| `POST` | `/api/actions/{id}/approve` | Approve and execute an action, remembering its matching capability for the active profile |
-| `POST` | `/api/actions/{id}/reject` | Reject an action |
-| `GET` | `/api/memories` | List memories |
-| `POST` | `/api/memories` | Create a memory |
-| `DELETE` | `/api/memories/{id}` | Delete a memory |
-| `GET` | `/api/profile/settings` | Read current-profile credential status |
-| `POST` | `/api/profile/openai-key` | Protect and save `{ "apiKey": "..." }` for the current profile |
-| `DELETE` | `/api/profile/openai-key` | Remove the current profile's saved OpenAI key |
-| `DELETE` | `/api/profile/data` | Delete all app-owned backend data for a non-default profile |
-| `GET` | `/api/integrations/phone-link` | Read current Phone Link metadata |
-| `POST` | `/api/integrations/phone-link/open` | Request a Phone Link launch; first use is pending approval and later uses launch immediately |
-| `GET` | `/api/integrations/icloud-calendar?date=YYYY-MM-DD` | Read the selected day |
-| `POST` | `/api/integrations/icloud-calendar/connect` | Verify and save iCloud credentials |
-| `DELETE` | `/api/integrations/icloud-calendar` | Disconnect iCloud and remove credentials |
-| `GET` | `/api/integrations/media-session?provider=apple|spotify` | Read the provider-preferred active Windows media session |
-| `POST` | `/api/integrations/media-session/{action}?provider=apple|spotify` | Send play, pause, previous, next, shuffle, or mute locally |
+Logs in the root: `.launcher.log`, `.backend-preview.out.log`, `.backend-preview.err.log`, `.frontend-preview.out.log`, and `.frontend-preview.err.log`. `.startup-metrics.jsonl` records cumulative supervisor stages and command launch-to-ready timings, including whether a start reused an instance. Do not add cumulative stages or compare reused starts with fresh processes. Lifecycle requests also log under `data/runtime-control.log`.
 
-The frontend sends `X-Profile-Id` on API requests. Calls without the header use the original `default` profile for backward compatibility.
-
-## Troubleshooting
-
-### “OPENAI_API_KEY is not configured”
-
-Check the health response:
-
-```powershell
-Invoke-RestMethod http://127.0.0.1:4317/health
-```
-
-`openAiConfigured` must be `true`. Check `.env`, or open a new terminal after setting the Windows user variable, then restart both services. If both exist, remember that the environment variable wins.
-
-### OpenAI reports a usage limit even though the usage page shows zero
-
-ChatGPT subscriptions and OpenAI API billing are separate. Confirm that the API key belongs to the intended API project/organization, that billing or prepaid credits are active for that project, and that the project’s budget/usage limits allow requests. Restart the backend after replacing the key. See the [OpenAI API billing overview](https://platform.openai.com/settings/organization/billing/overview) and [usage dashboard](https://platform.openai.com/usage).
-
-### Port 4173 or 4317 is already in use
-
-For an instance owned by the native supervisor, use:
-
-```powershell
-.\native\build\Release\live-desktop-launcher.exe restart
-```
-
-If another program or an older development terminal owns either port, stop it explicitly. The launcher leaves it untouched. To inspect the listeners:
-
-```powershell
-Get-NetTCPConnection -State Listen | Where-Object LocalPort -In 4173,4317
-```
-
-### iCloud Calendar will not connect
-
-- Use the Apple Account email and an app-specific password, not the normal password.
-- Confirm two-factor authentication is enabled.
-- Generate a new app-specific password if the main Apple password was changed or reset.
-- Check internet access to `caldav.icloud.com`.
-
-### Music controls say to start a track
-
-- Start one track manually in the selected embedded player or its Windows app so Windows creates a media session.
-- Select **Refresh status** in Settings after playback starts.
-- Confirm Windows is version 10 build 17763 or later.
-- Some browsers may not publish embedded audio as a Windows media session. If that occurs, use the Apple Music or Spotify Windows app; the same Live Desktop controls prefer the selected provider's app session.
-- Keep the dashboard page open. Switching Live Desktop tabs preserves the embedded player, but closing the browser page ends that web-player session.
-
-### Phone Link information is stale
-
-Open Phone Link, confirm the phone is paired and reachable, then use the widget’s refresh button. Some fields are unavailable until Phone Link writes fresh local metadata; Live Desktop intentionally does not fabricate missing device information.
-
-## Implementation notes
-
-- Backend: Java 21, Spring Boot 4.1, OpenAI Java SDK, ical4j.
-- Frontend: React 19, Vite 6, React Icons.
-- Music: persistent provider-selected Apple Music or Spotify web embed plus Windows Global System Media Transport Controls.
-- Calendar: iCloud CalDAV with local recurrence expansion.
-- Credential protection: Windows DPAPI, current-user scope.
+Missing artifacts identify the failing path: rebuild from source or re-extract the full package. A native DLL/executable locked during build usually means the owned application is still running. CDS/JDK mismatch diagnostics call for rebuilding the deployment; the extracted JVM path remains available. Bridge failures do not replay mutations: refresh state before retrying a change whose result is unknown. Read [startup verification details](docs/STARTUP_VALIDATION.md) and [native migration limitations](docs/WINDOWS_NATIVE_MIGRATION.md) for historical evidence.

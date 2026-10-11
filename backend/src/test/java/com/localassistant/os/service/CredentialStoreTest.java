@@ -58,6 +58,16 @@ class CredentialStoreTest {
                 .isInstanceOf(java.io.IOException.class);
     }
 
+    @Test void corruptProfileCredentialsAreUnavailableAndReplacementInvalidatesCachedAbsence() throws Exception {
+        Files.writeString(tempDir.resolve("openai-credentials.json"), "{\"protectedApiKey\":\"invalid-base64\"}");
+        ProfileCredentialStore store = new ProfileCredentialStore(new ProfilePaths(properties()));
+        assertThat(store.hasOpenAiKey()).isFalse();
+        assertThat(store.loadOpenAiKey()).isEmpty();
+        store.saveOpenAiKey("sk-test-replacement-key-1234567890");
+        assertThat(store.hasOpenAiKey()).isTrue();
+        assertThat(store.loadOpenAiKey()).contains("sk-test-replacement-key-1234567890");
+    }
+
     @Test void readsLegacyDotNetProtectedDataWithoutRewritingUserFiles() throws Exception {
         // Synthetic legacy fixture only. Production code never invokes PowerShell.
         Process process = new ProcessBuilder("powershell.exe", "-NoProfile", "-NonInteractive", "-Command",

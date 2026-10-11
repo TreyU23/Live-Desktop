@@ -15,9 +15,12 @@ import org.springframework.stereotype.Component;
 public class ProfileCredentialStore {
     private final ObjectMapper mapper = new ObjectMapper();
     private final ProfilePaths profilePaths;
+    private final com.localassistant.os.agent.ProfileClientPool clients;
     private final Map<String, Optional<String>> cachedKeys = new HashMap<>();
 
-    public ProfileCredentialStore(ProfilePaths profilePaths) { this.profilePaths = profilePaths; }
+    @org.springframework.beans.factory.annotation.Autowired
+    public ProfileCredentialStore(ProfilePaths profilePaths, com.localassistant.os.agent.ProfileClientPool clients) { this.profilePaths = profilePaths; this.clients = clients; }
+    public ProfileCredentialStore(ProfilePaths profilePaths) { this(profilePaths, null); }
 
     public synchronized void saveOpenAiKey(String apiKey) throws IOException {
         String cleaned = apiKey == null ? "" : apiKey.trim();
@@ -28,6 +31,7 @@ public class ProfileCredentialStore {
         Files.createDirectories(file.getParent());
         mapper.writeValue(file.toFile(), Map.of("protectedApiKey", protect(cleaned)));
         cachedKeys.put(ProfileContext.currentId(), Optional.of(cleaned));
+        if (clients != null) clients.invalidate(ProfileContext.currentId());
     }
 
     public synchronized Optional<String> loadOpenAiKey() {
@@ -45,7 +49,7 @@ public class ProfileCredentialStore {
     }
 
     public synchronized boolean hasOpenAiKey() {
-        return protectedOpenAiKey().isPresent();
+        return loadOpenAiKey().isPresent();
     }
 
     private Optional<String> protectedOpenAiKey() {
@@ -61,9 +65,10 @@ public class ProfileCredentialStore {
     public synchronized void clearOpenAiKey() throws IOException {
         Files.deleteIfExists(profilePaths.file("openai-credentials.json"));
         cachedKeys.remove(ProfileContext.currentId());
+        if (clients != null) clients.invalidate(ProfileContext.currentId());
     }
 
-    public synchronized void clearCurrentCache() { cachedKeys.remove(ProfileContext.currentId()); }
+    public synchronized void clearCurrentCache() { cachedKeys.remove(ProfileContext.currentId()); if (clients != null) clients.invalidate(ProfileContext.currentId()); }
 
     private String protect(String value) throws IOException {
         return WindowsCredentialProtection.protect(profilePaths.workspaceRoot(), value);

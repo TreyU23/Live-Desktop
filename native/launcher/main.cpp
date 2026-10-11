@@ -111,7 +111,7 @@ fs::path runtime(const fs::path& root) {
     throw std::runtime_error("Java 21 is required. Run scripts/bootstrap-java.ps1 or set JAVA_HOME to a Java 21 installation.");
 }
 void preflight(const fs::path& root) {
-    for (const auto& path : {L"backend/target/live-desktop-backend.jar", L"frontend/dist/client/index.html",
+    for (const auto& path : {L"backend/target/runtime/live-desktop-backend.jar", L"frontend/dist/client/index.html",
          L"native/build/Release/live-desktop-host.exe", L"native/build/Release/live-desktop-windows-bridge.exe",
          L"native/build/Release/live-desktop-credentials.dll"}) fileRequired(root / path);
     runtime(root);
@@ -147,6 +147,21 @@ void portAvailable(unsigned short port) {
             for (DWORD i = 0; i < table->dwNumEntries; ++i) occupied |= table->table[i].dwState == MIB_TCP_STATE_LISTEN && ntohs(static_cast<u_short>(table->table[i].dwLocalPort)) == port;
         }
         if (occupied) throw std::runtime_error("Port " + std::to_string(port) + " is occupied. Stop its owner explicitly; no existing process was killed.");
+    }
+}
+void waitForReleasedPorts() {
+    ULONGLONG deadline = GetTickCount64() + 5000;
+    unsigned clearSamples = 0;
+    for (;;) {
+        try {
+            portAvailable(4317); portAvailable(4173);
+            if (++clearSamples == 3) return;
+        } catch (...) {
+            clearSamples = 0;
+            if (GetTickCount64() >= deadline) throw;
+        }
+        if (GetTickCount64() >= deadline) throw std::runtime_error("Owned listener teardown did not stabilize within five seconds.");
+        Sleep(100);
     }
 }
 Handle child(const fs::path& app, const std::vector<std::wstring>& args, const fs::path& cwd, HANDLE job, const fs::path& out, const fs::path& err) {
@@ -197,18 +212,33 @@ int supervise(const fs::path& root, Objects& objects) {
     MutexLock owner(objects.instance.value, 0);
     std::cout << "Supervisor PID " << GetCurrentProcessId() << std::endl;
     ResetEvent(objects.ready.value); ResetEvent(objects.stop.value); ResetEvent(objects.restart.value);
+    bool firstLaunch = true;
     for (;;) {
         ULONGLONG started = GetTickCount64();
         preflight(root);
         auto java = runtime(root);
-        portAvailable(4317); portAvailable(4173);
+        if (firstLaunch) { portAvailable(4317); portAvailable(4173); firstLaunch = false; }
+        else waitForReleasedPorts();
         Handle job(CreateJobObjectW(nullptr, nullptr)); require(job.value != nullptr, "Cannot create service job");
         JOBOBJECT_EXTENDED_LIMIT_INFORMATION limits{}; limits.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;
         require(SetInformationJobObject(job.value, JobObjectExtendedLimitInformation, &limits, sizeof(limits)), "Cannot configure owned process cleanup");
         // Backend working directory preserves ../.env and ../data semantics.
         SetEnvironmentVariableW(L"WORKSPACE_ROOT", root.c_str());
+        SetEnvironmentVariableW(L"LIVE_DESKTOP_ROOT", root.c_str());
         SetEnvironmentVariableW(L"HOST", L"127.0.0.1"); SetEnvironmentVariableW(L"PORT", L"4317");
-        auto backend = child(java, {L"-jar", (root / L"backend/target/live-desktop-backend.jar").wstring()}, root / L"backend", job.value, root / L".backend-preview.out.log", root / L".backend-preview.err.log");
+        std::vector<std::wstring> javaArgs;
+        auto deployment = root / L"backend/target/runtime";
+        auto readIdentity = [](const fs::path& path) {
+            std::ifstream input(path, std::ios::binary);
+            return std::string(std::istreambuf_iterator<char>(input), std::istreambuf_iterator<char>());
+        };
+        auto trainedJava = readIdentity(deployment / L"cds-java-release.txt");
+        if (fs::is_regular_file(deployment / L"application.jsa") && !trainedJava.empty()
+                && trainedJava == readIdentity(java.parent_path().parent_path() / L"release")) {
+            javaArgs = {L"-Xshare:auto", L"-XX:SharedArchiveFile=application.jsa"};
+        } else std::cout << "CDS unavailable or JDK identity changed; using extracted JVM runtime. Rebuild to train a matching archive." << std::endl;
+        javaArgs.insert(javaArgs.end(), {L"-jar", L"live-desktop-backend.jar", L"--spring.config.import=optional:file:" + root.generic_wstring() + L"/.env[.properties]"});
+        auto backend = child(java, javaArgs, deployment, job.value, root / L".backend-preview.out.log", root / L".backend-preview.err.log");
         auto frontend = child(root / L"native/build/Release/live-desktop-host.exe", {L"--root", root.wstring()}, root, job.value, root / L".frontend-preview.out.log", root / L".frontend-preview.err.log");
         std::cout << "Backend PID " << GetProcessId(backend.value) << ", frontend PID " << GetProcessId(frontend.value) << std::endl;
         HANDLE waits[] = {objects.stop.value, objects.restart.value, backend.value, frontend.value};
@@ -262,11 +292,7 @@ int supervise(const fs::path& root, Objects& objects) {
         } while (GetTickCount64() < cleanupDeadline);
         require(accounting.ActiveProcesses == 0, "Owned processes did not stop in time");
         // Windows can report a terminated process's listener briefly after job accounting reaches zero.
-        ULONGLONG portsDeadline = GetTickCount64() + 5000;
-        for (;;) {
-            try { portAvailable(4317); portAvailable(4173); break; }
-            catch (...) { if (GetTickCount64() >= portsDeadline) throw; Sleep(100); }
-        }
+        waitForReleasedPorts();
         if (signal == WAIT_OBJECT_0) return 0;
         if (signal == WAIT_OBJECT_0 + 1) continue;
         throw std::runtime_error((failure.empty() ? "A service exited; remaining owned processes were stopped" : failure) + ". Check .backend-preview.err.log, .backend-preview.out.log and .frontend-preview.err.log.");

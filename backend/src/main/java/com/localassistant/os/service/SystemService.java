@@ -52,6 +52,7 @@ public class SystemService {
     private final WindowsBridgeClient bridge;
     private final ObjectMapper objectMapper = new ObjectMapper();
     private final Object batteryLock = new Object();
+    private final PhoneMetadataCache phoneMetadata = new PhoneMetadataCache();
     private volatile WindowsDetails cachedWindowsDetails;
     private volatile CachedBattery cachedBattery;
 
@@ -225,15 +226,20 @@ public class SystemService {
     }
 
     public PhoneLinkInfo phoneLink() {
+        return phoneLink(false);
+    }
+
+    public PhoneLinkInfo phoneLink(boolean refresh) {
         boolean windows = isWindows();
         Path packagePath = Path.of(environment("LOCALAPPDATA", "."), "Packages", "Microsoft.YourPhone_8wekyb3d8bbwe");
-        Map<String, Object> phoneState = windows ? bridge.request("phoneLink.snapshot", Map.of()) : Map.of();
+        Map<String, Object> phoneState = windows ? bridge.request("phoneLink.snapshot", Map.of("refresh", refresh)) : Map.of();
         boolean installed = Boolean.TRUE.equals(phoneState.get("phoneLinkInstalled"));
         boolean running = Boolean.TRUE.equals(phoneState.get("phoneLinkRunning"));
 
         Path metadataPath = packagePath.resolve("LocalCache").resolve("DeviceMetadataStorage.json");
         Path companionPath = packagePath.resolve("LocalState").resolve("StartMenu").resolve("StartMenuCompanion.json");
-        Optional<PhoneDevice> device = installed ? readPhoneDevice(metadataPath) : Optional.empty();
+        Optional<PhoneDevice> device = installed ? readPhoneDevice(metadataPath, refresh) : Optional.empty();
+        JsonNode companion = installed ? phoneMetadata.read(companionPath, refresh) : objectMapper.createObjectNode();
         Instant companionUpdatedAt = modifiedAt(companionPath).orElse(null);
         Instant metadataUpdatedAt = modifiedAt(metadataPath).orElse(null);
         Instant lastSeenAt = device.map(PhoneDevice::lastSeenAt).orElse(null);
@@ -241,8 +247,9 @@ public class SystemService {
         boolean connected = running
                 && companionUpdatedAt != null
                 && companionUpdatedAt.isAfter(Instant.now().minusSeconds(10 * 60));
-        Integer batteryPercent = installed ? readBatteryPercent(companionPath).orElse(null) : null;
-        boolean notificationsAvailable = installed && containsNotificationSignal(companionPath);
+        Integer batteryPercent = readBatteryPercent(companion).orElse(null);
+        String companionText = companion.toString().toLowerCase(Locale.ROOT);
+        boolean notificationsAvailable = companionText.contains("new messages are available") || companionText.contains("notification");
         String detail = !installed
                 ? "Phone Link is not installed"
                 : connected
@@ -266,12 +273,12 @@ public class SystemService {
                 "ms-phone:");
     }
 
-    private Optional<PhoneDevice> readPhoneDevice(Path metadataPath) {
+    private Optional<PhoneDevice> readPhoneDevice(Path metadataPath, boolean refresh) {
         if (!Files.isRegularFile(metadataPath)) {
             return Optional.empty();
         }
         try {
-            JsonNode root = objectMapper.readTree(metadataPath.toFile());
+            JsonNode root = phoneMetadata.read(metadataPath, refresh);
             JsonNode deviceGroups = root.path("DeviceMetadatas");
             PhoneDevice newest = null;
             Iterator<Map.Entry<String, JsonNode>> groups = deviceGroups.fields();
@@ -308,12 +315,8 @@ public class SystemService {
         }
     }
 
-    private Optional<Integer> readBatteryPercent(Path companionPath) {
-        if (!Files.isRegularFile(companionPath)) {
-            return Optional.empty();
-        }
+    private Optional<Integer> readBatteryPercent(JsonNode root) {
         try {
-            JsonNode root = objectMapper.readTree(companionPath.toFile());
             ArrayDeque<JsonNode> queue = new ArrayDeque<>();
             queue.add(root);
             while (!queue.isEmpty()) {
@@ -332,18 +335,6 @@ public class SystemService {
             // Phone Link may replace the companion file while it is being read.
         }
         return Optional.empty();
-    }
-
-    private boolean containsNotificationSignal(Path companionPath) {
-        if (!Files.isRegularFile(companionPath)) {
-            return false;
-        }
-        try {
-            String content = Files.readString(companionPath).toLowerCase(Locale.ROOT);
-            return content.contains("new messages are available") || content.contains("notification");
-        } catch (Exception ignored) {
-            return false;
-        }
     }
 
     private Optional<Instant> modifiedAt(Path path) {

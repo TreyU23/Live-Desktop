@@ -15,6 +15,7 @@ import java.util.UUID;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.locks.ReentrantLock;
 import jakarta.annotation.PreDestroy;
 import org.springframework.stereotype.Service;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -31,6 +32,10 @@ public class WindowsBridgeClient implements AutoCloseable {
     private Process process;
     private final Object connectionLock = new Object();
     private volatile FileChannel pipe;
+    private final ReentrantLock dispatchLock = new ReentrantLock(true);
+    private volatile boolean closed;
+    private final boolean diagnostics = "1".equals(System.getenv("LIVE_DESKTOP_DIAGNOSTICS"));
+    private final java.util.concurrent.atomic.AtomicInteger samples = new java.util.concurrent.atomic.AtomicInteger();
 
     @Autowired
     public WindowsBridgeClient(AssistantProperties properties) {
@@ -40,11 +45,19 @@ public class WindowsBridgeClient implements AutoCloseable {
 
     WindowsBridgeClient(Path executable) { this.executable = executable; }
 
-    public synchronized Map<String, Object> request(String operation, Map<String, Object> arguments) {
+    public Map<String, Object> request(String operation, Map<String, Object> arguments) {
         if (!System.getProperty("os.name", "").toLowerCase(java.util.Locale.ROOT).contains("windows")) {
             return Map.of("available", false, "detail", "Windows integration is available on Windows only.");
         }
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(15);
+        long enqueued = System.nanoTime();
+        long dispatched = enqueued;
+        boolean acquired = false;
         try {
+            acquired = dispatchLock.tryLock(15, TimeUnit.SECONDS);
+            if (!acquired || System.nanoTime() >= deadline) return Map.of("available", false, "code", "QUEUE_TIMEOUT", "detail", "Windows request expired before dispatch. Refresh state and try again.");
+            if (closed) return Map.of("available", false, "detail", "Windows bridge is shutting down.");
+            dispatched = System.nanoTime();
             var task = io.submit(() -> {
                 connect();
                 FileChannel channel = pipe;
@@ -71,7 +84,9 @@ public class WindowsBridgeClient implements AutoCloseable {
                 throw new IOException("Native radio bridge response exceeded the size limit.");
             });
             try {
-                return task.get(15, TimeUnit.SECONDS);
+                long remaining = deadline - System.nanoTime();
+                if (remaining <= 0) throw new java.util.concurrent.TimeoutException();
+                return task.get(remaining, TimeUnit.NANOSECONDS);
             } catch (Exception error) {
                 reset();
                 task.cancel(true);
@@ -80,8 +95,14 @@ public class WindowsBridgeClient implements AutoCloseable {
                         "Windows bridge failed or timed out. The request was not retried; refresh state before trying again.");
             }
         } catch (Exception error) {
-            reset();
+            if (acquired) reset();
+            if (error instanceof InterruptedException) Thread.currentThread().interrupt();
             return Map.of("available", false, "detail", "Windows bridge is unavailable.");
+        } finally {
+            if (diagnostics && samples.getAndIncrement() < 1000) System.out.printf(java.util.Locale.ROOT,
+                    "PERF bridge=%s queue_ms=%.3f total_ms=%.3f%n", operation,
+                    ((acquired ? dispatched : System.nanoTime()) - enqueued) / 1_000_000.0, (System.nanoTime() - enqueued) / 1_000_000.0);
+            if (acquired) dispatchLock.unlock();
         }
     }
 
@@ -100,6 +121,7 @@ public class WindowsBridgeClient implements AutoCloseable {
 
     private void connect() throws Exception {
         synchronized (connectionLock) {
+        if (closed) throw new IOException("Windows bridge is shutting down.");
         if (process != null && process.isAlive() && pipe != null && pipe.isOpen()) return;
         reset();
         if (!Files.isRegularFile(executable)) throw new IOException("Build the native radio bridge before selecting native mode.");
@@ -134,6 +156,7 @@ public class WindowsBridgeClient implements AutoCloseable {
 
     @PreDestroy
     @Override public synchronized void close() {
+        closed = true;
         reset();
         io.shutdownNow();
     }

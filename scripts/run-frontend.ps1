@@ -21,7 +21,7 @@ if (-not (Test-Path $runtimePnpm)) {
 
 Push-Location $frontendRoot
 try {
-    & $runtimePnpm run dev --host 0.0.0.0 --port 4173 --strictPort
+    & $runtimePnpm run dev --host 127.0.0.1 --port 4173 --strictPort
 } finally {
     Pop-Location
 }

@@ -67,7 +67,7 @@ JsonObject dispatch(JsonObject const& request) {
         result.Insert(L"status", str("ok"));
         JsonArray capabilities;
         for (auto const& item : {"bridge.health", "bridge.capabilities", "radio.snapshot", "radio.set"}) capabilities.Append(str(item));
-        for (auto const& item : {"power.snapshot", "system.staticSnapshot", "process.knownApps", "phoneLink.snapshot", "media.snapshot", "media.play", "media.pause", "media.next", "media.previous", "media.shuffle", "media.mute", "windows.openUri", "browser.openUrl"}) capabilities.Append(str(item));
+        for (auto const& item : {"power.snapshot", "system.staticSnapshot", "process.knownApps", "phoneLink.snapshot", "media.snapshot", "media.artwork", "media.play", "media.pause", "media.next", "media.previous", "media.shuffle", "media.mute", "windows.openUri", "browser.openUrl"}) capabilities.Append(str(item));
         result.Insert(L"operations", capabilities);
         return result;
     }

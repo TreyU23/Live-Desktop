@@ -22,6 +22,19 @@ public class WindowsMediaSessionService {
         return invoke("snapshot", normalizeProvider(provider));
     }
 
+    public byte[] artwork(String version) {
+        if (!version.matches("[0-9]{1,20}-[0-9]{1,20}-[0-9]{1,20}")) return null;
+        var result = bridge.request("media.artwork", Map.of("version", version));
+        Object data = result.get("data");
+        if (!(data instanceof String value) || value.length() > 6 * 1024 * 1024) return null;
+        int comma = value.indexOf(',');
+        if (comma < 0 || !value.substring(0, comma).matches("data:image/(jpeg|png|webp|gif);base64")) return null;
+        try {
+            byte[] bytes = java.util.Base64.getDecoder().decode(value.substring(comma + 1));
+            return bytes.length <= 4 * 1024 * 1024 ? bytes : null;
+        } catch (IllegalArgumentException ignored) { return null; }
+    }
+
     public Map<String, Object> control(String action) {
         return control(action, "music");
     }

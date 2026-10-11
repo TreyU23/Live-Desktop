@@ -19,6 +19,8 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.function.UnaryOperator;
 import org.springframework.stereotype.Component;
@@ -63,6 +65,31 @@ public class StateStore {
         return gson.fromJson(gson.toJson(state()), AppState.class);
     }
 
+    public synchronized List<Memory> memories() { return List.copyOf(state().memories()); }
+
+    public synchronized List<AssistantAction> actions() {
+        return state().actions().stream().map(this::copyAction).toList();
+    }
+
+    private AssistantAction copyAction(AssistantAction action) {
+        return gson.fromJson(gson.toJson(action), AssistantAction.class);
+    }
+
+    private Conversation copyConversation(Conversation conversation) {
+        return new Conversation(conversation.id(), conversation.title(), List.copyOf(conversation.messages()),
+                conversation.createdAt(), conversation.updatedAt());
+    }
+
+    public synchronized Optional<Conversation> conversation(String id) {
+        return state().conversations().stream().filter(item -> item.id().equals(id)).findFirst().map(this::copyConversation);
+    }
+
+    public synchronized List<Map<String, Object>> conversationSummaries() {
+        return state().conversations().stream().map(item -> Map.<String, Object>of(
+                "id", item.id(), "title", item.title(), "createdAt", item.createdAt(),
+                "updatedAt", item.updatedAt(), "messageCount", item.messages().size())).toList();
+    }
+
     public synchronized void clearCurrentCache() {
         states.remove(ProfileContext.currentId());
     }
@@ -72,6 +99,7 @@ public class StateStore {
             return state().conversations().stream()
                     .filter(conversation -> conversation.id().equals(requestedId))
                     .findFirst()
+                    .map(this::copyConversation)
                     .orElseGet(() -> createConversation(requestedId));
         }
         return createConversation(UUID.randomUUID().toString());
@@ -83,9 +111,8 @@ public class StateStore {
         AppState state = state();
         var conversations = new ArrayList<>(state.conversations());
         conversations.add(conversation);
-        states.put(ProfileContext.currentId(), new AppState(1, conversations, state.memories(), state.actions()));
-        persistUnchecked();
-        return conversation;
+        commitUnchecked(new AppState(1, conversations, state.memories(), state.actions()));
+        return copyConversation(conversation);
     }
 
     public synchronized ConversationMessage addMessage(String conversationId, String role, String content)
@@ -112,8 +139,7 @@ public class StateStore {
         if (!found) {
             throw new IllegalArgumentException("Conversation not found.");
         }
-        states.put(ProfileContext.currentId(), new AppState(1, conversations, state.memories(), state.actions()));
-        persist();
+        commit(new AppState(1, conversations, state.memories(), state.actions()));
         return message;
     }
 
@@ -123,8 +149,7 @@ public class StateStore {
         AppState state = state();
         var memories = new ArrayList<>(state.memories());
         memories.add(memory);
-        states.put(ProfileContext.currentId(), new AppState(1, state.conversations(), memories, state.actions()));
-        persist();
+        commit(new AppState(1, state.conversations(), memories, state.actions()));
         return memory;
     }
 
@@ -133,8 +158,7 @@ public class StateStore {
         var memories = new ArrayList<>(state.memories());
         boolean deleted = memories.removeIf(memory -> memory.id().equals(id));
         if (deleted) {
-            states.put(ProfileContext.currentId(), new AppState(1, state.conversations(), memories, state.actions()));
-            persist();
+            commit(new AppState(1, state.conversations(), memories, state.actions()));
         }
         return deleted;
     }
@@ -147,10 +171,9 @@ public class StateStore {
                 null, null, now, now);
         AppState state = state();
         var actions = new ArrayList<>(state.actions());
-        actions.add(action);
-        states.put(ProfileContext.currentId(), new AppState(1, state.conversations(), state.memories(), actions));
-        persist();
-        return action;
+        actions.add(copyAction(action));
+        commit(new AppState(1, state.conversations(), state.memories(), actions));
+        return copyAction(action);
     }
 
     public synchronized AssistantAction updateAction(String id, UnaryOperator<AssistantAction> update)
@@ -160,10 +183,11 @@ public class StateStore {
         AppState state = state();
         for (AssistantAction action : state.actions()) {
             if (action.id().equals(id)) {
-                updated = update.apply(action);
+                updated = update.apply(copyAction(action));
                 updated = new AssistantAction(
                         updated.id(), updated.kind(), updated.status(), updated.arguments(), updated.reason(),
                         updated.result(), updated.error(), updated.createdAt(), Instant.now().toString());
+                updated = copyAction(updated);
                 actions.add(updated);
             } else {
                 actions.add(action);
@@ -172,21 +196,18 @@ public class StateStore {
         if (updated == null) {
             throw new IllegalArgumentException("Action not found.");
         }
-        states.put(ProfileContext.currentId(), new AppState(1, state.conversations(), state.memories(), actions));
-        persist();
-        return updated;
+        commit(new AppState(1, state.conversations(), state.memories(), actions));
+        return copyAction(updated);
     }
 
-    private void persistUnchecked() {
-        try {
-            persist(state());
-        } catch (IOException error) {
-            throw new IllegalStateException("Could not persist assistant state.", error);
-        }
+    private void commitUnchecked(AppState value) {
+        try { commit(value); }
+        catch (IOException error) { throw new IllegalStateException("Could not persist assistant state.", error); }
     }
 
-    private void persist() throws IOException {
-        persist(state());
+    private void commit(AppState value) throws IOException {
+        persist(value);
+        states.put(ProfileContext.currentId(), value);
     }
 
     private void persist(AppState state) throws IOException {
