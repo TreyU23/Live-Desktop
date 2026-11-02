@@ -1,5 +1,6 @@
 .tools/
 native/build/
+/build/
 .mvn/wrapper/maven-wrapper.jar
 backend/target/
 frontend/node_modules/

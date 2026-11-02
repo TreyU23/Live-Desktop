@@ -1,8 +1,0 @@
-C:/Users/treyu/Personal Code/operatingSystemChatGPT/build/CMakeFiles/live-desktop-windows-bridge.dir
-C:/Users/treyu/Personal Code/operatingSystemChatGPT/build/CMakeFiles/live-desktop-credentials.dir
-C:/Users/treyu/Personal Code/operatingSystemChatGPT/build/CMakeFiles/live-desktop-launcher.dir
-C:/Users/treyu/Personal Code/operatingSystemChatGPT/build/CMakeFiles/live-desktop-host.dir
-C:/Users/treyu/Personal Code/operatingSystemChatGPT/build/CMakeFiles/RUN_TESTS.dir
-C:/Users/treyu/Personal Code/operatingSystemChatGPT/build/CMakeFiles/INSTALL.dir
-C:/Users/treyu/Personal Code/operatingSystemChatGPT/build/CMakeFiles/ALL_BUILD.dir
-C:/Users/treyu/Personal Code/operatingSystemChatGPT/build/CMakeFiles/ZERO_CHECK.dir

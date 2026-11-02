@@ -10,7 +10,7 @@ When implementing from a selected generated mock, treat that image as the source
 
 - V2 refinement authorized November 2, 2026: preserve Flight Deck composition, use Segoe UI Variable, 10px controls, 14px containing surfaces, consistent outline icons, 240-degree open-bottom gauges with actual percentage fills, and a modest graphite workstation illustration. Keep true-black canvas; artwork is generic rather than detected hardware.
 
-- Use the Flight Deck redesign in `../DESIGN.md` and `../docs/redesign/IMPLEMENTATION_PLAN.md`: PC overview first, instruments centered, controls left, connected services right, and reserved bottom navigation. The user authorized implementing the existing plan on November 1, 2026.
+- Use the Flight Deck redesign in `../DESIGN.md`: PC overview first, instruments centered, controls left, connected services right, and reserved bottom navigation. The user authorized implementing the existing plan on November 1, 2026.
 - Below 768 px, instruments precede controls and services; navigation exposes Overview, System Info, Conversations and More. More contains Music, Approvals, Memories and Settings. Preserve all seven view IDs.
 - Keep one resource scheduler in App, mutation invalidation, profile request headers, and the persistent provider iframe. Views own presentation and drafts, never independent polling loops.
 - Missing readings are unavailable, not zero. Approval details explain reusable scope, including both on and off for radios. Do not add voice input, calendar editing, or unsupported playback features.

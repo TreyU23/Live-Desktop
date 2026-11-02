@@ -9,7 +9,7 @@ $packageRoot = Join-Path $stage 'Live-Desktop'
 $archive = Join-Path $distribution 'Live-Desktop-windows-x64.zip'
 try {
     New-Item -ItemType Directory -Path $packageRoot -Force | Out-Null
-    $files = @('start.cmd', '.env.example', 'README.md', 'backend\README.md', 'frontend\README.md', 'native\README.md', 'scripts\bootstrap-java.ps1')
+    $files = @('start.cmd', '.env.example', 'README.md', 'PRODUCT.md', 'DESIGN.md', 'backend\README.md', 'frontend\README.md', 'native\README.md', 'scripts\bootstrap-java.ps1')
     foreach ($name in @('live-desktop-launcher.exe', 'live-desktop-host.exe', 'live-desktop-windows-bridge.exe', 'live-desktop-credentials.dll')) {
         $files += "native\build\Release\$name"
     }
