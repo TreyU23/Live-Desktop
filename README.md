@@ -1,5 +1,7 @@
 # Live Desktop
 
+Version **1.0.0** introduces the Flight Deck dashboard redesign across all seven views. Download the Windows runtime from the [1.0.0 release](https://github.com/TreyU23/Live-Desktop/releases/tag/v1.0.0); Java 21 is bundled. See [release notes](docs/RELEASE_1.0.0.md) for changes and upgrade guidance.
+
 Live Desktop is a local Windows dashboard with system information, approved device controls, conversations, memories, iCloud Calendar, Phone Link status, and an Apple Music/Spotify player. React presents the interface; Java 21/Spring Boot owns profiles, durable state, integrations, OpenAI requests, and approval policy. C++ owns the production supervisor, frontend host, Windows bridge, and credential protection DLL.
 
 Open [http://localhost:4173](http://localhost:4173). Production binds the frontend to `127.0.0.1:4173` and the backend to `127.0.0.1:4317`; `/api` and `/health` pass through the native host. Saved profiles live on this PC. Requests to OpenAI, iCloud, and music providers use their external services.

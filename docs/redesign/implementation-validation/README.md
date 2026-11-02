@@ -31,13 +31,18 @@ Browser checks use synthetic accounts, system data, events and actions. No fixtu
 
 The 640x360 CSS viewport check approximates 200% zoom at 1280x720. Actual browser UI zoom, a screen-reader pass, authenticated playback, account responses, and hardware changes are separate checks; synthetic results do not establish those.
 
-## Remaining release gates
+## Release validation for 1.0.0
 
-- Git branch/commit/draft PR creation is blocked by the session's read-only `.git` boundary. Work remains in the existing checkout; no remote changes were made.
-- Formal Codex Security diff scan could not start because its required scan MCP is unavailable. This is not a clean formal scan result.
-- Production build stages, packaged-runtime checks and lifecycle checks passed individually. The monolithic build command did not complete inside the restricted process; the equivalent stages were run separately, including cached offline backend tests/package and native runtime extraction/CDS. FD-16 remains open for authenticated account/device checks.
-- OpenAI requests, authenticated iCloud/Apple Music/Spotify, Phone Link notification availability, and physical radio changes require a suitable test account/device and are unverified in this pass.
-- Distribution publication remains FD-18 and requires separate release authorization.
+The implementation-time Git and security-tool blockers below are superseded by this release pass, authorized on November 1, 2026. The redesign is committed at `da3814e` on remote `main`; release metadata uses version `1.0.0`.
+
+- The full production build completed: 51 backend tests, zero failures/errors and one intentionally skipped performance test; 28 frontend tests passed; native compilation/bridge protocol and CDS preparation succeeded.
+- Four Sites checks, ten native-host tests, and Windows bridge read/integration checks passed. No physical radio mutation was requested.
+- All 42 view/viewport combinations and the interaction, mutation-race and scheduling suites passed. Hidden-tab requests were zero; delayed Calendar did not block core reads; provider iframe continuity and profile headers were retained.
+- The newly built Java-inclusive distribution passed all manifest hashes, the real dashboard/backend browser smoke with zero page errors, and the complete lifecycle suite. Archive inspection found no saved data, real `.env`, logs, node_modules or build caches.
+- Codex Security diff scan `ddfaa789-afae-4e36-a105-0d405bdc7918` completed and sealed the immutable `5d7539f..da3814e` redesign review with zero findings. All 31 source/config inventory paths were reviewed, with supporting changed test/concept scripts and backend/native call chains. This is a diff review, not a full repository or dependency audit. Subsequent release changes only align version metadata and documentation.
+- Authenticated OpenAI/iCloud/music, hardware mutation, Phone Link notification availability, actual browser UI zoom, screen readers, sleep/resume and independent Windows-user checks remain unverified acceptance areas.
+
+See [1.0.0 release notes](../../RELEASE_1.0.0.md) for installation, upgrade guidance and the stable release link. The original implementation evidence above remains historical; the earlier distribution hash below identifies that earlier artifact, not the 1.0.0 release ZIP. The release asset checksum identifies the published 1.0.0 bytes.
 
 ## Rollback
 

@@ -5,7 +5,7 @@ The GitHub release is the normal installation path. Download `Live-Desktop-windo
 The same ZIP is published in GitHub Packages using Maven coordinates:
 
 ```text
-com.localassistant:live-desktop-windows-x64:0.2.0:zip
+com.localassistant:live-desktop-windows-x64:1.0.0:zip
 https://maven.pkg.github.com/treyu23/live-desktop
 ```
 
@@ -14,10 +14,10 @@ This is a distribution archive containing native executables, the Java deploymen
 GitHub requires authentication even when downloading public Maven packages. Use a GitHub personal access token (classic) with `read:packages` in your private Maven `settings.xml`, as described in [GitHub's Maven registry documentation](https://docs.github.com/en/packages/working-with-a-github-packages-registry/working-with-the-apache-maven-registry). Match the settings server ID to `github`. Do not commit the token or settings file. With that server configured:
 
 ```powershell
-mvn dependency:copy "-Dartifact=com.localassistant:live-desktop-windows-x64:0.2.0:zip" "-DremoteRepositories=github::default::https://maven.pkg.github.com/treyu23/live-desktop" "-DoutputDirectory=downloads"
+mvn dependency:copy "-Dartifact=com.localassistant:live-desktop-windows-x64:1.0.0:zip" "-DremoteRepositories=github::default::https://maven.pkg.github.com/treyu23/live-desktop" "-DoutputDirectory=downloads"
 ```
 
-Replace `0.2.0` with the desired release version. Downloads through the ordinary GitHub release page do not require Maven registry credentials.
+Replace `1.0.0` with the desired release version. Downloads through the ordinary GitHub release page do not require Maven registry credentials.
 
 ## Publication
 
