@@ -19,7 +19,7 @@ const ICON_COMPONENTS = {
   Wifi: "FiWifi", X: "FiX",
 };
 
-export function Icon({ name, size = 20, strokeWidth = 1.8, className = "" }) {
+export function Icon({ name, size = 20, strokeWidth = 1.75, className = "" }) {
   const Component = FeatherIcons[ICON_COMPONENTS[name]] || FeatherIcons.FiCircle;
   return <span className={`icon ${className}`} aria-hidden="true"><Component size={size} strokeWidth={strokeWidth} /></span>;
 }

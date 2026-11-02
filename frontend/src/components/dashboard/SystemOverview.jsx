@@ -13,7 +13,7 @@ export function SystemOverview({ system, ready, connected, configured, calendar,
     <div className="equipment-identity">
       <div><span>Network</span><strong>{ready ? r.network?.connected ? 'Connected' : 'Offline' : 'Unavailable'}</strong><p>{ready ? r.network?.name : 'Waiting for system data'}</p></div>
       <div className="pc-identity">
-        <svg className="pc-schematic" viewBox="0 0 250 150" role="img" aria-label="PC schematic, not a hardware diagram"><g fill="none" stroke="currentColor" strokeWidth="1.4"><rect x="13" y="14" width="166" height="105" rx="2" /><rect x="19" y="20" width="154" height="93" /><path d="M80 119v20h32v-20M59 140h75" /><rect x="194" y="27" width="38" height="112" rx="2" /><circle cx="213" cy="39" r="2.5" /><path d="M202 112h22m-22 6h22m-22 6h22" /><rect x="83" y="53" width="25" height="25" /><path d="M19 66h58m37 0h59" /></g></svg>
+        <img className="pc-illustration" src="/assets/workstation-v2.png" width="1536" height="1024" alt="Illustrative graphite workstation, not a detected hardware model" />
         <h2>{ready ? system.host.name : 'This PC'}</h2>
         <p>{ready ? `${system.host.os} · ${system.host.architecture}` : 'System information unavailable'}</p>
         <button type="button" className="text-action" onClick={onOpenSystem}>System details <Icon name="ChevronRight" size={14} /></button>

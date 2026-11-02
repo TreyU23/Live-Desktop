@@ -3,7 +3,7 @@ name: Live Desktop — Flight Deck
 description: A precise local Windows dashboard with PC telemetry at its center.
 colors:
   page: "#000000"
-  surface: "#090c10"
+  surface: "#0d1117"
   surface-hover: "#111923"
   line: "#303943"
   line-strong: "#657586"
@@ -28,26 +28,26 @@ colors:
   readable-accent-light-fallback: "#174C8C"
 typography:
   headline:
-    fontFamily: "Bahnschrift, 'Segoe UI', sans-serif"
+    fontFamily: "'Segoe UI Variable', 'Segoe UI', sans-serif"
     fontSize: "clamp(24px, 2.2vw, 30px)"
     fontWeight: 600
     lineHeight: 1.25
-    letterSpacing: ".025em"
+    letterSpacing: "-.02em"
   title:
-    fontFamily: "Bahnschrift, 'Segoe UI', sans-serif"
+    fontFamily: "'Segoe UI Variable', 'Segoe UI', sans-serif"
     fontSize: "18px"
     fontWeight: 600
     lineHeight: 1.25
   body:
-    fontFamily: "'Segoe UI', sans-serif"
+    fontFamily: "'Segoe UI Variable', 'Segoe UI', sans-serif"
     fontSize: "14px"
     lineHeight: 1.5
   prose:
-    fontFamily: "'Segoe UI', sans-serif"
+    fontFamily: "'Segoe UI Variable', 'Segoe UI', sans-serif"
     fontSize: "16px"
     lineHeight: 1.75
   label:
-    fontFamily: "Bahnschrift, 'Segoe UI', sans-serif"
+    fontFamily: "'Segoe UI Variable', 'Segoe UI', sans-serif"
     fontSize: "12px"
     fontWeight: 600
     lineHeight: 1.25
@@ -55,14 +55,14 @@ typography:
   measurement:
     fontFamily: "Consolas, monospace"
   instrument:
-    fontFamily: "Bahnschrift, 'Segoe UI', sans-serif"
+    fontFamily: "'Segoe UI Variable', 'Segoe UI', sans-serif"
     fontSize: "clamp(24px, 3vw, 42px)"
     fontWeight: 400
     lineHeight: 1.3
 rounded:
   square: "0"
-  control: "3px"
-  dialog: "4px"
+  control: "10px"
+  dialog: "14px"
 spacing:
   "1": "4px"
   "2": "8px"
@@ -124,12 +124,12 @@ components:
 
 Flight Deck is a quiet instrument panel for the state of a Windows PC. True black, clear blue telemetry, restrained headings, and compact operational detail make the system feel precise and immediately readable. The computer remains the primary subject; controls and connected services support it.
 
-The same typography and rectangular structure carry into text-first conversations, approvals, memories, and settings. Depth is restrained, status is explicit, and motion serves interaction. The system accommodates light mode and saved custom accents without changing the visual grammar.
+The same typography and restrained structure carry into text-first conversations, approvals, memories, and settings. Depth is restrained, status is explicit, and motion serves interaction. The system accommodates light mode and saved custom accents without changing the visual grammar.
 
 **Key Characteristics:**
 - PC state before assistant content.
 - Blue instruments and readable tabular measurements.
-- Rectangular surfaces with hairline structure.
+- Softened controls, quiet graphite grouping and hairline structure.
 - Text-first task workspaces with clear actions and availability.
 - Reserved header, scrolling content, and bottom navigation.
 
@@ -159,18 +159,18 @@ The default palette combines true black and cool neutral structure with an elect
 
 ## Typography
 
-**Display / Heading Font:** Bahnschrift with Segoe UI and sans-serif fallbacks.
-**Body Font:** Segoe UI with sans-serif fallback.
+**Display / Heading Font:** Segoe UI Variable with Segoe UI and sans-serif fallbacks.
+**Body Font:** Segoe UI Variable with Segoe UI and sans-serif fallbacks.
 **Measurement Font:** Consolas with monospace fallback, with tabular figures for numbers, IDs, code, and times.
 
-Bahnschrift gives headings an instrument-panel character while Segoe UI keeps operational prose familiar. Use weight and spacing to separate hierarchy; avoid turning body copy into widely tracked uppercase labels.
+Segoe UI Variable brings the V2 refinement to headings and operational prose. Use weight and spacing to separate hierarchy; avoid turning body copy into widely tracked uppercase labels.
 
 ### Hierarchy
 - **Headline:** page titles use the responsive headline role.
 - **Title:** section headings use the title role; compact tertiary headings use 14px.
 - **Body:** standard controls and explanatory text use the body role.
 - **Prose:** conversation messages use the prose role and a maximum line width of 72ch. Memory records also use 16px text.
-- **Label:** rail headings use the label role and uppercase. Supporting metadata is generally 11–12px.
+- **Label:** rail headings use sentence case at 16px; compact metadata uses the label role. Supporting metadata is generally 11–12px.
 - **Instrument:** gauge numerals use the instrument role with tabular figures; narrow screens use 27px numerals. Monospace is reserved for measurement-oriented content.
 
 ## Layout
@@ -179,9 +179,9 @@ The shell fills the dynamic viewport and reserves three grid rows: header, indep
 
 The desktop overview places controls at left, PC instruments in the broad center, and services at right. Three gauges form the central instrument row. System Info uses horizontal resource bars and specification rows. Task views use list/detail or rail/content arrangements, separated by rules rather than a grid of decorative cards.
 
-At widths up to 1199px, services move below the controls and instruments; settings collapse to one column. At widths up to 767px, content uses 16px horizontal padding and a single column, the PC schematic is hidden, and the instruments retain readable values. The dock shows Overview, System Info, Conversations, and More; More discloses Music, Approvals, Memories, and Settings with the pending approval count. The header wraps while preserving lifecycle and profile access.
+At widths up to 1199px, services move below the controls and instruments; settings collapse to one column. At widths up to 767px, content uses 16px horizontal padding and a single column, the illustrative graphite workstation is hidden, and the instruments retain readable values. The dock shows Overview, System Info, Conversations, and More; More discloses Music, Approvals, Memories, and Settings with the pending approval count. The header wraps while preserving lifecycle and profile access.
 
-Spacing follows the frontmatter scale. Larger layout separations also use observed 28px and 48px gaps; this is not a rule that every dimension must be a scale token. At desktop widths with viewport height up to 800px, the schematic and gauges shrink to preserve useful content.
+Spacing follows the frontmatter scale. Larger layout separations also use observed 28px and 48px gaps; this is not a rule that every dimension must be a scale token. At desktop widths with viewport height up to 800px, the workstation illustration and gauges shrink to preserve useful content.
 
 **The Reserved Shell Rule.** Put navigation in its own shell row and let only the content region scroll.
 
@@ -193,7 +193,7 @@ Interaction transitions last 150ms and change background, border, or text color.
 
 ## Shapes
 
-The form language is rectangular: square navigation and rows, lightly eased control corners, and a slightly eased confirmation dialog. Thin rules organize content. Circles belong to resource gauges, identity avatars, status dots, accent swatches, and the settings switch; they are functional exceptions rather than a general card language.
+The V2 form language uses 10px control/navigation corners and 14px containing surfaces and overlays. Rails and connections have quiet graphite grouping; text rows remain open. Thin rules organize content. Circles belong to resource gauges, identity avatars, status dots, accent swatches, and the settings switch; they are functional exceptions rather than a general card language.
 
 ## Components
 
@@ -215,11 +215,11 @@ Fields use the page surface, primary text, a strong one-pixel outline, the contr
 
 ### Navigation
 
-Desktop navigation uses seven labeled destinations with small Feather outline icons. The selected destination has primary text, a hover-slate surface, and an inset accent rule along its bottom edge. The narrow More control is an explicit disclosure with expanded state, Escape handling, and a reachable list of the remaining destinations. Preserve `aria-current` on the selected destination.
+Desktop navigation uses seven labeled destinations with 20px Feather outline icons with a consistent 1.75px stroke. The selected destination has readable accent text, a soft accent surface, rounded corners and an inset accent rule along its bottom edge. The narrow More control is an explicit disclosure with expanded state, Escape handling, and a reachable list of the remaining destinations. Preserve `aria-current` on the selected destination.
 
 ### Resource instruments
 
-Circular gauges use a restrained five-unit SVG stroke, structural track, accent fill, and a centered label/value/detail stack. Horizontal bars use a four-pixel track and a nearby numerical value. Only finite readings in the range 0–100 receive a fill and percentage; missing or invalid readings show a dash and explanatory detail. Instruments update when readings change, with no animation loop. Example readings in the sidecar are illustrative component previews, never production fixtures.
+Gauges use matching 240-degree open-bottom arcs, a four-unit round-ended SVG stroke, slate track and percentage-derived accent fill. Labels sit above, tabular values inside and details below. Zero has no active stroke; 100 fills the full sweep. The graphite workstation asset is generic illustration, never a detected hardware model. Horizontal bars use a four-pixel track and a nearby numerical value. Only finite readings in the range 0–100 receive a fill and percentage; missing or invalid readings show a dash and explanatory detail. Instruments update when readings change, with no animation loop. Example readings in the sidecar are illustrative component previews, never production fixtures.
 
 ## Do's and Don'ts
 

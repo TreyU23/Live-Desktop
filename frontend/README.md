@@ -2,7 +2,7 @@
 
 React 19/Vite 6 presents Live Desktop's true-black dashboard, System Info, Music, conversations, memories, approvals, account settings, and local profile picker. The browser calls the backend; it does not inspect Windows directly. See the [root README](../README.md) for installation, accounts, approval semantics, and troubleshooting.
 
-The Flight Deck interface prioritizes PC instruments. Header, scrollable content and dock occupy separate rows. Desktop exposes all seven views; below 768 px, More contains Music, Approvals, Memories and Settings. Calendar and phone expand inside Overview. Shutdown and eligible profile deletion have keyboard-contained confirmation, Escape/cancel and focus restoration. Restart follows service readiness; run `start.cmd` to recover after shutdown.
+The Flight Deck V2 refinement prioritizes PC instruments: percentage-driven 240-degree arcs, a generic graphite workstation illustration, Segoe UI Variable typography, rounded controls and quiet graphite grouping across all seven views. Header, scrollable content and dock occupy separate rows. Desktop exposes all seven views; below 768 px, More contains Music, Approvals, Memories and Settings. Calendar and phone expand inside Overview. Shutdown and eligible profile deletion have keyboard-contained confirmation, Escape/cancel and focus restoration. Restart follows service readiness; run `start.cmd` to recover after shutdown.
 
 `src/views/` and `src/components/` own presentation; `App.jsx` retains API, profile and mutation ownership. `src/styles.css` imports semantic tokens, shell, components and views. [DESIGN.md](../DESIGN.md) records the visual system. Dark mode is true black; light mode has separate tokens. Saved accent hex values remain intact; luminance chooses fill foreground and a readable variant provides text/focus contrast.
 
@@ -52,7 +52,7 @@ The custom player uses Windows media-session data and opaque artwork URLs. Apple
 
 Phone Link uses live metadata and platform-matched artwork, with a neutral unknown state. Opening Windows apps is labeled external. iCloud credentials are entered only in Settings and sent to the local backend; no password is returned. Wi-Fi/Bluetooth actions apply confirmed state immediately; unsupported toggles open approved Settings shortcuts.
 
-Only explicitly used Feather icons are imported, allowing the build to remove the rest of the icon library. Large optional views and image conversion remain profiling decisions; current images are unchanged.
+Only explicitly used Feather icons are imported, allowing the build to remove the rest of the icon library. Large optional views and image conversion remain profiling decisions; the workstation illustration is served locally from `public/assets/workstation-v2.png`.
 
 ## Browser validation and diagnostics
 

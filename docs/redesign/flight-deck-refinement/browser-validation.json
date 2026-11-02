@@ -1,0 +1,303 @@
+{
+  "passed": true,
+  "browser": "157.0.4341.30",
+  "matrix": [
+    {
+      "width": 1920,
+      "height": 1080,
+      "view": "home",
+      "overflow": false,
+      "reservedDock": true
+    },
+    {
+      "width": 1920,
+      "height": 1080,
+      "view": "system",
+      "overflow": false,
+      "reservedDock": true
+    },
+    {
+      "width": 1920,
+      "height": 1080,
+      "view": "music",
+      "overflow": false,
+      "reservedDock": true
+    },
+    {
+      "width": 1920,
+      "height": 1080,
+      "view": "approvals",
+      "overflow": false,
+      "reservedDock": true
+    },
+    {
+      "width": 1920,
+      "height": 1080,
+      "view": "memories",
+      "overflow": false,
+      "reservedDock": true
+    },
+    {
+      "width": 1920,
+      "height": 1080,
+      "view": "conversations",
+      "overflow": false,
+      "reservedDock": true
+    },
+    {
+      "width": 1920,
+      "height": 1080,
+      "view": "settings",
+      "overflow": false,
+      "reservedDock": true
+    },
+    {
+      "width": 1440,
+      "height": 900,
+      "view": "home",
+      "overflow": false,
+      "reservedDock": true
+    },
+    {
+      "width": 1440,
+      "height": 900,
+      "view": "system",
+      "overflow": false,
+      "reservedDock": true
+    },
+    {
+      "width": 1440,
+      "height": 900,
+      "view": "music",
+      "overflow": false,
+      "reservedDock": true
+    },
+    {
+      "width": 1440,
+      "height": 900,
+      "view": "approvals",
+      "overflow": false,
+      "reservedDock": true
+    },
+    {
+      "width": 1440,
+      "height": 900,
+      "view": "memories",
+      "overflow": false,
+      "reservedDock": true
+    },
+    {
+      "width": 1440,
+      "height": 900,
+      "view": "conversations",
+      "overflow": false,
+      "reservedDock": true
+    },
+    {
+      "width": 1440,
+      "height": 900,
+      "view": "settings",
+      "overflow": false,
+      "reservedDock": true
+    },
+    {
+      "width": 1280,
+      "height": 720,
+      "view": "home",
+      "overflow": false,
+      "reservedDock": true
+    },
+    {
+      "width": 1280,
+      "height": 720,
+      "view": "system",
+      "overflow": false,
+      "reservedDock": true
+    },
+    {
+      "width": 1280,
+      "height": 720,
+      "view": "music",
+      "overflow": false,
+      "reservedDock": true
+    },
+    {
+      "width": 1280,
+      "height": 720,
+      "view": "approvals",
+      "overflow": false,
+      "reservedDock": true
+    },
+    {
+      "width": 1280,
+      "height": 720,
+      "view": "memories",
+      "overflow": false,
+      "reservedDock": true
+    },
+    {
+      "width": 1280,
+      "height": 720,
+      "view": "conversations",
+      "overflow": false,
+      "reservedDock": true
+    },
+    {
+      "width": 1280,
+      "height": 720,
+      "view": "settings",
+      "overflow": false,
+      "reservedDock": true
+    },
+    {
+      "width": 768,
+      "height": 1024,
+      "view": "home",
+      "overflow": false,
+      "reservedDock": true
+    },
+    {
+      "width": 768,
+      "height": 1024,
+      "view": "system",
+      "overflow": false,
+      "reservedDock": true
+    },
+    {
+      "width": 768,
+      "height": 1024,
+      "view": "music",
+      "overflow": false,
+      "reservedDock": true
+    },
+    {
+      "width": 768,
+      "height": 1024,
+      "view": "approvals",
+      "overflow": false,
+      "reservedDock": true
+    },
+    {
+      "width": 768,
+      "height": 1024,
+      "view": "memories",
+      "overflow": false,
+      "reservedDock": true
+    },
+    {
+      "width": 768,
+      "height": 1024,
+      "view": "conversations",
+      "overflow": false,
+      "reservedDock": true
+    },
+    {
+      "width": 768,
+      "height": 1024,
+      "view": "settings",
+      "overflow": false,
+      "reservedDock": true
+    },
+    {
+      "width": 390,
+      "height": 844,
+      "view": "home",
+      "overflow": false,
+      "reservedDock": true
+    },
+    {
+      "width": 390,
+      "height": 844,
+      "view": "system",
+      "overflow": false,
+      "reservedDock": true
+    },
+    {
+      "width": 390,
+      "height": 844,
+      "view": "music",
+      "overflow": false,
+      "reservedDock": true
+    },
+    {
+      "width": 390,
+      "height": 844,
+      "view": "approvals",
+      "overflow": false,
+      "reservedDock": true
+    },
+    {
+      "width": 390,
+      "height": 844,
+      "view": "memories",
+      "overflow": false,
+      "reservedDock": true
+    },
+    {
+      "width": 390,
+      "height": 844,
+      "view": "conversations",
+      "overflow": false,
+      "reservedDock": true
+    },
+    {
+      "width": 390,
+      "height": 844,
+      "view": "settings",
+      "overflow": false,
+      "reservedDock": true
+    },
+    {
+      "width": 320,
+      "height": 740,
+      "view": "home",
+      "overflow": false,
+      "reservedDock": true
+    },
+    {
+      "width": 320,
+      "height": 740,
+      "view": "system",
+      "overflow": false,
+      "reservedDock": true
+    },
+    {
+      "width": 320,
+      "height": 740,
+      "view": "music",
+      "overflow": false,
+      "reservedDock": true
+    },
+    {
+      "width": 320,
+      "height": 740,
+      "view": "approvals",
+      "overflow": false,
+      "reservedDock": true
+    },
+    {
+      "width": 320,
+      "height": 740,
+      "view": "memories",
+      "overflow": false,
+      "reservedDock": true
+    },
+    {
+      "width": 320,
+      "height": 740,
+      "view": "conversations",
+      "overflow": false,
+      "reservedDock": true
+    },
+    {
+      "width": 320,
+      "height": 740,
+      "view": "settings",
+      "overflow": false,
+      "reservedDock": true
+    }
+  ],
+  "errors": [],
+  "synthetic": true,
+  "simulatedZoom": "640x360 CSS viewport approximates 200% of 1280x720; not browser UI zoom"
+}

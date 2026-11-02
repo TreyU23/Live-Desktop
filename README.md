@@ -64,7 +64,7 @@ See the [backend README](backend/README.md), [frontend README](frontend/README.m
 
 ## Flight Deck dashboard
 
-The dashboard implements the [Flight Deck redesign](docs/redesign/README.md): PC instruments first, system controls and connected services alongside them, and reserved bottom navigation for all seven views. On narrow windows, More contains Music, Approvals, Memories and Settings. The concept gallery remains illustrative; the application uses actual backend data. See [implementation validation](docs/redesign/implementation-validation/README.md) for checks and remaining release gates.
+The dashboard implements the V2 refinement of the [Flight Deck redesign](docs/redesign/README.md): PC instruments first, system controls and connected services alongside them, and reserved bottom navigation for all seven views. On narrow windows, More contains Music, Approvals, Memories and Settings. The concept gallery remains illustrative; the application uses actual backend data. See [implementation validation](docs/redesign/implementation-validation/README.md) for checks and remaining release gates.
 
 Calendar's **Open day view** expands the selected day; **Phone details** exposes metadata, copy/refresh and the explicitly external Phone Link action. Approvals separates pending requests from history and shows full targets, content, outcomes and reusable scope. Missing readings show a dash; failed refreshes retain last-known data with retry. Failed memory/assistant submissions preserve drafts. Voice input is not implemented.
 
