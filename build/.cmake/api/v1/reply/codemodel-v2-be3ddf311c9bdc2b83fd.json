@@ -1,0 +1,376 @@
+{
+	"configurations" : 
+	[
+		{
+			"directories" : 
+			[
+				{
+					"build" : ".",
+					"hasInstallRule" : true,
+					"jsonFile" : "directory-.-Debug-04df9cad3b1b16408e84.json",
+					"minimumCMakeVersion" : 
+					{
+						"string" : "3.24"
+					},
+					"projectIndex" : 0,
+					"source" : ".",
+					"targetIndexes" : 
+					[
+						0,
+						1,
+						2,
+						3,
+						4,
+						5
+					]
+				}
+			],
+			"name" : "Debug",
+			"projects" : 
+			[
+				{
+					"directoryIndexes" : 
+					[
+						0
+					],
+					"name" : "LiveDesktopWindowsBridge",
+					"targetIndexes" : 
+					[
+						0,
+						1,
+						2,
+						3,
+						4,
+						5
+					]
+				}
+			],
+			"targets" : 
+			[
+				{
+					"directoryIndex" : 0,
+					"id" : "ALL_BUILD::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-ALL_BUILD-Debug-55631b7080a32056d568.json",
+					"name" : "ALL_BUILD",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "ZERO_CHECK::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-ZERO_CHECK-Debug-5883ee4673d1b0fb06e4.json",
+					"name" : "ZERO_CHECK",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "live-desktop-credentials::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-live-desktop-credentials-Debug-0215a05d52c139eeb6fd.json",
+					"name" : "live-desktop-credentials",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "live-desktop-host::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-live-desktop-host-Debug-e588dcb8850eed5e9a26.json",
+					"name" : "live-desktop-host",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "live-desktop-launcher::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-live-desktop-launcher-Debug-b0b167f5ccf0f55e4e04.json",
+					"name" : "live-desktop-launcher",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "live-desktop-windows-bridge::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-live-desktop-windows-bridge-Debug-39cf9cd31784b49fbb65.json",
+					"name" : "live-desktop-windows-bridge",
+					"projectIndex" : 0
+				}
+			]
+		},
+		{
+			"directories" : 
+			[
+				{
+					"build" : ".",
+					"hasInstallRule" : true,
+					"jsonFile" : "directory-.-Release-4eb98fdd2656b9bcdb2a.json",
+					"minimumCMakeVersion" : 
+					{
+						"string" : "3.24"
+					},
+					"projectIndex" : 0,
+					"source" : ".",
+					"targetIndexes" : 
+					[
+						0,
+						1,
+						2,
+						3,
+						4,
+						5
+					]
+				}
+			],
+			"name" : "Release",
+			"projects" : 
+			[
+				{
+					"directoryIndexes" : 
+					[
+						0
+					],
+					"name" : "LiveDesktopWindowsBridge",
+					"targetIndexes" : 
+					[
+						0,
+						1,
+						2,
+						3,
+						4,
+						5
+					]
+				}
+			],
+			"targets" : 
+			[
+				{
+					"directoryIndex" : 0,
+					"id" : "ALL_BUILD::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-ALL_BUILD-Release-55631b7080a32056d568.json",
+					"name" : "ALL_BUILD",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "ZERO_CHECK::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-ZERO_CHECK-Release-5883ee4673d1b0fb06e4.json",
+					"name" : "ZERO_CHECK",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "live-desktop-credentials::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-live-desktop-credentials-Release-30646dfabfa47ffa3f81.json",
+					"name" : "live-desktop-credentials",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "live-desktop-host::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-live-desktop-host-Release-22ec4fc5a891b5255c9a.json",
+					"name" : "live-desktop-host",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "live-desktop-launcher::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-live-desktop-launcher-Release-50c8816b7ddfa6b9b213.json",
+					"name" : "live-desktop-launcher",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "live-desktop-windows-bridge::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-live-desktop-windows-bridge-Release-1c604b888adc99c19172.json",
+					"name" : "live-desktop-windows-bridge",
+					"projectIndex" : 0
+				}
+			]
+		},
+		{
+			"directories" : 
+			[
+				{
+					"build" : ".",
+					"hasInstallRule" : true,
+					"jsonFile" : "directory-.-MinSizeRel-d2f742c2a1858ab2d026.json",
+					"minimumCMakeVersion" : 
+					{
+						"string" : "3.24"
+					},
+					"projectIndex" : 0,
+					"source" : ".",
+					"targetIndexes" : 
+					[
+						0,
+						1,
+						2,
+						3,
+						4,
+						5
+					]
+				}
+			],
+			"name" : "MinSizeRel",
+			"projects" : 
+			[
+				{
+					"directoryIndexes" : 
+					[
+						0
+					],
+					"name" : "LiveDesktopWindowsBridge",
+					"targetIndexes" : 
+					[
+						0,
+						1,
+						2,
+						3,
+						4,
+						5
+					]
+				}
+			],
+			"targets" : 
+			[
+				{
+					"directoryIndex" : 0,
+					"id" : "ALL_BUILD::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-ALL_BUILD-MinSizeRel-55631b7080a32056d568.json",
+					"name" : "ALL_BUILD",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "ZERO_CHECK::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-ZERO_CHECK-MinSizeRel-5883ee4673d1b0fb06e4.json",
+					"name" : "ZERO_CHECK",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "live-desktop-credentials::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-live-desktop-credentials-MinSizeRel-d82b950faff7865fb283.json",
+					"name" : "live-desktop-credentials",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "live-desktop-host::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-live-desktop-host-MinSizeRel-a5cb4f2585d0fa498647.json",
+					"name" : "live-desktop-host",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "live-desktop-launcher::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-live-desktop-launcher-MinSizeRel-7331f12c015b0f8c9ea7.json",
+					"name" : "live-desktop-launcher",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "live-desktop-windows-bridge::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-live-desktop-windows-bridge-MinSizeRel-91f1cba80b4a893b78ff.json",
+					"name" : "live-desktop-windows-bridge",
+					"projectIndex" : 0
+				}
+			]
+		},
+		{
+			"directories" : 
+			[
+				{
+					"build" : ".",
+					"hasInstallRule" : true,
+					"jsonFile" : "directory-.-RelWithDebInfo-04ee26c18a20ae80343d.json",
+					"minimumCMakeVersion" : 
+					{
+						"string" : "3.24"
+					},
+					"projectIndex" : 0,
+					"source" : ".",
+					"targetIndexes" : 
+					[
+						0,
+						1,
+						2,
+						3,
+						4,
+						5
+					]
+				}
+			],
+			"name" : "RelWithDebInfo",
+			"projects" : 
+			[
+				{
+					"directoryIndexes" : 
+					[
+						0
+					],
+					"name" : "LiveDesktopWindowsBridge",
+					"targetIndexes" : 
+					[
+						0,
+						1,
+						2,
+						3,
+						4,
+						5
+					]
+				}
+			],
+			"targets" : 
+			[
+				{
+					"directoryIndex" : 0,
+					"id" : "ALL_BUILD::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-ALL_BUILD-RelWithDebInfo-55631b7080a32056d568.json",
+					"name" : "ALL_BUILD",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "ZERO_CHECK::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-ZERO_CHECK-RelWithDebInfo-5883ee4673d1b0fb06e4.json",
+					"name" : "ZERO_CHECK",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "live-desktop-credentials::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-live-desktop-credentials-RelWithDebInfo-d4bd4363c82ba5c9dcb0.json",
+					"name" : "live-desktop-credentials",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "live-desktop-host::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-live-desktop-host-RelWithDebInfo-c2802275eb00bae51926.json",
+					"name" : "live-desktop-host",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "live-desktop-launcher::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-live-desktop-launcher-RelWithDebInfo-a9de90a381586ecedb53.json",
+					"name" : "live-desktop-launcher",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "live-desktop-windows-bridge::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-live-desktop-windows-bridge-RelWithDebInfo-2ddd23d820c7e936c18d.json",
+					"name" : "live-desktop-windows-bridge",
+					"projectIndex" : 0
+				}
+			]
+		}
+	],
+	"kind" : "codemodel",
+	"paths" : 
+	{
+		"build" : "C:/Users/treyu/Personal Code/operatingSystemChatGPT/build",
+		"source" : "C:/Users/treyu/Personal Code/operatingSystemChatGPT/native"
+	},
+	"version" : 
+	{
+		"major" : 2,
+		"minor" : 8
+	}
+}
