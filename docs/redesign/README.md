@@ -1,5 +1,9 @@
 # Flight Deck dashboard redesign
 
+## New refinement study — November 1, 2026
+
+The [Flight Deck refinement concept](flight-deck-refinement/README.md) explores softer corners, clearer typography, consistent outline icons and quieter grouping while preserving the current SpaceX-heavy composition. It is a generated visual study and specification only, with no production changes. After reviewing a lighter Apple-inspired exploration, the user chose refinement of the current dashboard rather than another full redesign.
+
 Original design study dated October 15, 2026; implementation authorized November 1, 2026. **Flight Deck is now implemented in the local frontend. The gallery remains an illustrative reference.** The user requested a redesign of the entire dashboard using the supplied SpaceX vehicle-overview reference and confirmed **PC overview first**.
 
 ## Review the concepts
