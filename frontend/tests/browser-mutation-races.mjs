@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 const require = createRequire(import.meta.url);
 const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
-const browser = await chromium.launch({ channel: 'msedge', headless: true });
+const browser = await chromium.launch({ ...(process.env.PLAYWRIGHT_EXECUTABLE_PATH ? { executablePath: process.env.PLAYWRIGHT_EXECUTABLE_PATH } : { channel: 'msedge' }), headless: true });
 const page = await browser.newPage();
 const deferred = () => { let release; const promise = new Promise(resolve => { release = resolve; }); return { promise, release }; };
 const mutation = deferred();
@@ -44,7 +44,7 @@ await page.route('**/*', async route => {
   try { await route.fulfill({ json: body }); } catch { /* Expected aborted pre-confirmation read. */ }
 });
 try {
-  await page.goto('http://127.0.0.1:4174/');
+  await page.goto((process.env.BROWSER_TEST_BASE_URL || 'http://127.0.0.1:4174') + '/');
   await page.clock.runFor(200);
   const radio = page.getByRole('switch', { name: 'Wi-Fi: off. Request on', exact: true });
   await radio.waitFor();

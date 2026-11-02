@@ -4,14 +4,14 @@ import { fileURLToPath } from 'node:url';
 import { mkdir, writeFile } from 'node:fs/promises';
 const output = fileURLToPath(new URL('../../backend/target/performance/', import.meta.url));
 await mkdir(output, { recursive: true });
-const browser = await chromium.launch({ channel: 'msedge', headless: true });
+const browser = await chromium.launch({ ...(process.env.PLAYWRIGHT_EXECUTABLE_PATH ? { executablePath: process.env.PLAYWRIGHT_EXECUTABLE_PATH } : { channel: 'msedge' }), headless: true });
 const errors = [];
 try {
   const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
   page.on('pageerror', error => errors.push(error.message));
   const systemResponse = page.waitForResponse(response => new URL(response.url()).pathname === '/api/system');
   await page.goto('http://127.0.0.1:4173/');
-  await page.getByRole('heading', { name: 'Today on your PC' }).waitFor();
+  await page.getByRole('heading', { name: 'System overview' }).waitFor();
   const response = await systemResponse;
   assert.equal(response.status(), 200);
   const system = await response.json();

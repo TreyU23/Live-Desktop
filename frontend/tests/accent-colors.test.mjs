@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { accentForegroundColor, accentSoftColor, DEFAULT_ACCENT_COLOR, effectiveAccentColor, normalizeHexColor, readAccentColor } from "../src/accentColors.js";
+import { accentForegroundColor, accentSoftColor, DEFAULT_ACCENT_COLOR, effectiveAccentColor, normalizeHexColor, readAccentColor, relativeLuminance, readableAccentColor } from "../src/accentColors.js";
 
 test("normalizes full and shorthand hex colors", () => {
   assert.equal(normalizeHexColor(" #12abEF "), "#12ABEF");
@@ -24,7 +24,20 @@ test("renders the black preference as white only in dark mode", () => {
 
 test("uses black foreground content on the adaptive white accent", () => {
   assert.equal(accentForegroundColor("#FFFFFF"), "#000000");
-  assert.equal(accentForegroundColor("#1685FF"), "#FFFFFF");
+  assert.equal(accentForegroundColor("#1685FF"), "#000000");
+});
+
+test('custom accent foregrounds meet 4.5:1 and readable variants retain contrast', () => {
+  for (const color of ['#FFFFFE', '#010101', '#FFFF00', '#4A9AFF', '#A855F7', '#12AB34']) {
+    const fill = relativeLuminance(color);
+    const ink = relativeLuminance(accentForegroundColor(color));
+    assert.ok((Math.max(fill, ink) + .05) / (Math.min(fill, ink) + .05) >= 4.5, color);
+    for (const dark of [true, false]) {
+      const readable = relativeLuminance(readableAccentColor(color, dark));
+      const surface = dark ? .0036 : .95;
+      assert.ok((Math.max(readable, surface) + .05) / (Math.min(readable, surface) + .05) >= 4.5);
+    }
+  }
 });
 
 test("falls back to blue when the saved color is invalid", () => {

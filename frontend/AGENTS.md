@@ -8,7 +8,10 @@ When implementing from a selected generated mock, treat that image as the source
 
 ## Current visual direction
 
-- Use the selected Live Desktop modular dashboard layout.
+- Use the Flight Deck redesign in `../DESIGN.md` and `../docs/redesign/IMPLEMENTATION_PLAN.md`: PC overview first, instruments centered, controls left, connected services right, and reserved bottom navigation. The user authorized implementing the existing plan on November 1, 2026.
+- Below 768 px, instruments precede controls and services; navigation exposes Overview, System Info, Conversations and More. More contains Music, Approvals, Memories and Settings. Preserve all seven view IDs.
+- Keep one resource scheduler in App, mutation invalidation, profile request headers, and the persistent provider iframe. Views own presentation and drafts, never independent polling loops.
+- Missing readings are unavailable, not zero. Approval details explain reusable scope, including both on and off for radios. Do not add voice input, calendar editing, or unsupported playback features.
 - The application background is true black (`#000000`), never charcoal, navy, or a gradient.
 - Use near-black raised surfaces, subtle separators, warm-white text, cobalt-blue controls, mint health states, and amber approvals.
 - Preserve airy spacing and avoid a dense wall of bordered cards.

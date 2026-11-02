@@ -1,0 +1,30 @@
+import { Icon, InfoLine } from '../ui/index.jsx';
+import { ResourceGauge } from '../instruments/ResourceGauge.jsx';
+import { formatBytes } from '../../presentation/formatters.js';
+export function SystemOverview({ system, ready, connected, configured, calendar, musicPlayer, onOpenSystem }) {
+  const r = system.resources;
+  const ratio = (used, total) => ready && Number.isFinite(used) && total > 0 ? used / total * 100 : null;
+  return <section className="system-overview" aria-label="PC overview">
+    <div className="instrument-grid">
+      <ResourceGauge label="CPU load" value={ready ? r.cpuPercent : null} detail={ready ? 'Current utilization' : 'Waiting for system data'} />
+      <ResourceGauge label="Memory used" value={ratio(r.memoryUsedBytes, r.memoryTotalBytes)} detail={ready && r.memoryTotalBytes > 0 ? `${formatBytes(r.memoryUsedBytes)} / ${formatBytes(r.memoryTotalBytes)}` : 'Memory unavailable'} />
+      <ResourceGauge label="Storage used" value={ratio(r.storageUsedBytes, r.storageTotalBytes)} detail={ready && r.storageTotalBytes > 0 ? `${formatBytes(r.storageUsedBytes)} / ${formatBytes(r.storageTotalBytes)}` : 'Storage unavailable'} />
+    </div>
+    <div className="equipment-identity">
+      <div><span>Network</span><strong>{ready ? r.network?.connected ? 'Connected' : 'Offline' : 'Unavailable'}</strong><p>{ready ? r.network?.name : 'Waiting for system data'}</p></div>
+      <div className="pc-identity">
+        <svg className="pc-schematic" viewBox="0 0 250 150" role="img" aria-label="PC schematic, not a hardware diagram"><g fill="none" stroke="currentColor" strokeWidth="1.4"><rect x="13" y="14" width="166" height="105" rx="2" /><rect x="19" y="20" width="154" height="93" /><path d="M80 119v20h32v-20M59 140h75" /><rect x="194" y="27" width="38" height="112" rx="2" /><circle cx="213" cy="39" r="2.5" /><path d="M202 112h22m-22 6h22m-22 6h22" /><rect x="83" y="53" width="25" height="25" /><path d="M19 66h58m37 0h59" /></g></svg>
+        <h2>{ready ? system.host.name : 'This PC'}</h2>
+        <p>{ready ? `${system.host.os} · ${system.host.architecture}` : 'System information unavailable'}</p>
+        <button type="button" className="text-action" onClick={onOpenSystem}>System details <Icon name="ChevronRight" size={14} /></button>
+      </div>
+      <div><span>Power</span><strong>{ready && r.battery?.available && r.battery.percent != null ? `${r.battery.percent}%` : 'Not reported'}</strong><p>{ready ? r.battery?.detail || 'Power information unavailable' : 'Waiting for system data'}</p></div>
+    </div>
+    <section className="connection-list" aria-label="Connections"><h3>Connections</h3>
+      <InfoLine icon="Layers3" label="Backend" value={connected ? 'Local API available' : 'Unavailable'} healthy={connected} />
+      <InfoLine icon="Bot" label="OpenAI key" value={configured ? 'Key configured' : 'Not configured'} />
+      <InfoLine icon="CalendarDays" label="iCloud" value={calendar.connected ? 'Connected' : 'Not connected'} />
+      <InfoLine icon="Music2" label="Music session" value={musicPlayer.available ? 'Available' : 'Not playing'} />
+    </section>
+  </section>;
+}

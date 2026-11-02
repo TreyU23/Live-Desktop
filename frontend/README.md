@@ -2,6 +2,10 @@
 
 React 19/Vite 6 presents Live Desktop's true-black dashboard, System Info, Music, conversations, memories, approvals, account settings, and local profile picker. The browser calls the backend; it does not inspect Windows directly. See the [root README](../README.md) for installation, accounts, approval semantics, and troubleshooting.
 
+The Flight Deck interface prioritizes PC instruments. Header, scrollable content and dock occupy separate rows. Desktop exposes all seven views; below 768 px, More contains Music, Approvals, Memories and Settings. Calendar and phone expand inside Overview. Shutdown and eligible profile deletion have keyboard-contained confirmation, Escape/cancel and focus restoration. Restart follows service readiness; run `start.cmd` to recover after shutdown.
+
+`src/views/` and `src/components/` own presentation; `App.jsx` retains API, profile and mutation ownership. `src/styles.css` imports semantic tokens, shell, components and views. [DESIGN.md](../DESIGN.md) records the visual system. Dark mode is true black; light mode has separate tokens. Saved accent hex values remain intact; luminance chooses fill foreground and a readable variant provides text/focus contrast.
+
 ## Develop and build
 
 From the repository root, with Node.js 20+ and pnpm installed:
@@ -25,7 +29,7 @@ Production serves `dist/client/` using the native C++ host; it needs no Node, pn
 
 ## Refresh and loading behavior
 
-`resourceScheduler.js` owns dashboard reads. Each successful result commits immediately; Calendar, Phone Link, and media readiness do not block local content. Each resource has loading/error/stale status and one in-flight read. Reads use a 12-second deadline, captured profile identity, abort on teardown, and generation checks after invalidation. Manual refresh joins an existing read; mutation paths invalidate affected reads before the write and again after completion, before applying newer state. Healthy status updates stay in refs to avoid additional dashboard renders; error changes update the visible refresh banner.
+`resourceScheduler.js` owns dashboard reads. Each successful result commits immediately; Calendar, Phone Link, and media readiness do not block local content. Each resource has loading/error/stale status and one in-flight read. Reads use a 12-second deadline, captured profile identity, abort on teardown, and generation checks after invalidation. Manual refresh joins an existing read; mutation paths invalidate affected reads before the write and again after completion, before applying newer state. Healthy polling starts stay in refs. First success and error/recovery publish visible resource state; wall-clock freshness is separate from diagnostic `readyAt`. Missing values show a dash; failed reads retain last-known data with timestamps and resource-specific retry. Successful empty lists are ready/empty. Manual retry joins the existing scheduler.
 
 Polling is scheduled after completion, preventing overlapping intervals:
 
@@ -59,11 +63,13 @@ npm --prefix frontend run dev -- --host 127.0.0.1 --port 4174 --strictPort
 npm --prefix frontend run test:browser
 ```
 
-The harness uses Playwright with installed Microsoft Edge, mocks backend integrations, holds Calendar for a real ten seconds, and checks independent rendering, visible/hidden polling, control pending feedback, profile request headers, and deferred music iframe continuity. Five-minute polling windows use accelerated browser timers. It records browser version/results and desktop/mobile screenshots under `backend/target/performance/`. From `frontend/`, `node tests/browser-performance.mjs --baseline` compiles the Git HEAD baseline for comparison.
+The harness uses Playwright with installed Microsoft Edge, mocks backend integrations, holds Calendar for a real ten seconds, and checks independent rendering, visible/hidden polling, control pending feedback, profile request headers, and deferred music iframe continuity. Five-minute polling windows use accelerated browser timers. It records browser version/results and desktop/mobile screenshots under `backend/target/performance/`. From `frontend/`, `node tests/browser-performance.mjs --baseline` compiles pinned baseline `5d7539f` for comparison.
 
 Helper tests cover scheduling/deduplication/invalidation; the browser test establishes rendering behavior. Synthetic tests do not prove real audio, authenticated accounts, or hardware changes. See the [performance report](../docs/PERFORMANCE_RESULTS.md).
 
 With that server running, `node frontend/tests/browser-mutation-races.mjs` checks that a read started during a mutation cannot overwrite the confirmed result. It also verifies that a failed memory save preserves the draft, while a successful save clears it even if the subsequent list refresh fails.
+
+`node frontend/tests/browser-redesign.mjs` checks all seven views at 1920, 1440, 1280, 768, 390 and 320 px, reserved navigation, action scopes and literal content, chat drafts, confirmation focus, saved appearance, loading versus real zero, stale-data retry, and expanded agenda/phone panels. It writes synthetic screenshots/results under `backend/target/redesign/`. Its 640x360 check approximates the CSS viewport at 200% of 1280x720; it does not operate browser UI zoom. `capture-redesign-baseline.mjs` captures the seven original views from pinned revision `5d7539f` for comparison. Tests may use `BROWSER_TEST_BASE_URL` to select a separate loopback preview and `PLAYWRIGHT_EXECUTABLE_PATH` to select an installed browser explicitly. These overrides affect tests only.
 
 With the same server running, `node frontend/tests/browser-cpu-performance.mjs` observes five real minutes visible and five with hidden state emulated. It compares independent baseline/candidate headless Edge process CPU times and records them under `backend/target/performance/browser-cpu.json`; it does not sample working-set memory. This synthetic browser-only experiment excludes Java/native CPU, actual background-window throttling, authenticated integrations and playback; it does not close the full application CPU acceptance gate. Shared development-machine load and processes that exit between samples also limit the comparison.
 

@@ -10,14 +10,14 @@ const baseline = process.argv.includes('--baseline');
 let baselineSource;
 if (baseline) {
   const { transformSync } = createRequire(require.resolve('vite/package.json'))('esbuild');
-  const source = execFileSync('git', ['show', 'HEAD:frontend/src/App.jsx'], { encoding: 'utf8' })
-    .replace('import { useCallback, useEffect, useMemo, useState } from "react";', 'import React from "react"; const { useCallback, useEffect, useMemo, useState } = React;');
+  const source = execFileSync('git', ['show', '5d7539fed256744b56b0a7201cab773a3adc530c:frontend/src/App.jsx'], { encoding: 'utf8' })
+    .replace(/import \{([^}]+)\} from "react";/, 'import React from "react"; const {$1} = React;');
   baselineSource = transformSync(source, { loader: 'jsx', jsxFactory: 'React.createElement', jsxFragment: 'React.Fragment', define: { 'import.meta.env.VITE_API_BASE': '""' } }).code
     .replaceAll('"react"', '"/node_modules/.vite/deps/react.js"')
     .replaceAll('"react-icons/fi"', '"/node_modules/.vite/deps/react-icons_fi.js"')
     .replaceAll('from "./', 'from "/src/');
 }
-const browser = await chromium.launch({ channel: 'msedge', headless: true });
+const browser = await chromium.launch({ ...(process.env.PLAYWRIGHT_EXECUTABLE_PATH ? { executablePath: process.env.PLAYWRIGHT_EXECUTABLE_PATH } : { channel: 'msedge' }), headless: true });
 const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
 await page.clock.install();
 const counts = new Map();
@@ -52,7 +52,7 @@ await page.route('**/*', async route => {
 });
 try {
   const started = Date.now();
-  await page.goto('http://127.0.0.1:4174/?diagnostics=1');
+  await page.goto((process.env.BROWSER_TEST_BASE_URL || 'http://127.0.0.1:4174') + '/?diagnostics=1');
   await page.clock.runFor(200);
   await page.waitForTimeout(1000);
   const independentlyReady = await page.getByText('Local mode', { exact: true }).count() > 0;
@@ -108,7 +108,7 @@ try {
     await page.clock.runFor(200);
     await page.locator('iframe').waitFor();
     await page.locator('iframe').evaluate(element => { element.dataset.continuity = 'retained'; });
-    await page.getByRole('button', { name: 'Home', exact: true }).click();
+    await page.getByRole('button', { name: 'Overview', exact: true }).click();
     assert.equal(await page.locator('iframe').getAttribute('data-continuity'), 'retained');
     await page.getByRole('button', { name: 'Music', exact: true }).click();
     assert.equal(await page.locator('iframe').getAttribute('data-continuity'), 'retained');
