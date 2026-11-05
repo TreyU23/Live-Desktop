@@ -85,6 +85,7 @@ Readiness checks native `/_live/ready`, direct/proxied `/health` and dashboard `
 
 ## Documentation
 
+- [Project working guide](docs/PROJECT-WORKING-GUIDE.md): development, design, security, validation, and release procedures for contributors and agents.
 - [Backend](backend/README.md), [frontend](frontend/README.md), [native runtime](native/README.md): implementation contracts.
 - [Validation/performance](docs/VALIDATION.md): checks, diagnostics and evidence limits.
 - [System information](docs/SYSTEM_INFORMATION.md), [Windows controls](docs/WINDOWS_CONTROL_CAPABILITIES.md): sources and capability boundaries.
