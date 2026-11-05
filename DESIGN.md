@@ -125,8 +125,8 @@ CSS in `frontend/src/styles/` is the runtime authority; frontmatter records pale
 - Preserve the implemented composition: true-black canvas, graphite surfaces, blue PC instruments, controls left, services right, reserved header/dock. Refine in place.
 - Segoe UI Variable/Segoe UI for headings/body; Consolas for code/measurements; tabular numerals. Body 14px, prose/memories 16px, titles 18px, page titles 24–30px.
 - Controls/navigation use 10px corners; containing surfaces/overlays 14px. Structure text rows with spacing/rules. Standard targets are at least 44px high; focus uses a 2px readable-accent outline with 4px offset.
-- Default page `#000000`, surface `#0d1117`, text `#f1f4f6`, accent `#4a9aff`. Mint/amber/rose convey ready/pending/error alongside text. Light mode has separate tokens.
-- Preserve saved accents; derive readable text/focus colors and fill foreground. Black becomes white in dark mode. Runtime soft accent uses 16% opacity; semantic status colors remain independent.
+- Default page `#000000`, surface `#0d1117`, text `#f1f4f6`, accent `#4a9aff`. Mint/amber/rose convey ready/pending/error alongside text, and the same tokens color utilization severity on gauges/bars (`<75` ready, `75–89` attention, `≥90` error). Light mode has separate tokens.
+- Preserve saved accents; derive readable text/focus colors and fill foreground. Black becomes white in dark mode. Runtime soft accent uses 16% opacity; semantic status colors remain independent of the chosen accent (including utilization fills).
 - Explicitly import Feather outline icons, normally 20px/1.75px stroke. Color/background/border transitions last 150ms; reduced motion disables animation/transitions. No idle gauge animation/glow/backdrop.
 
 ## Layout and interaction
@@ -139,6 +139,6 @@ Selected navigation uses readable accent, soft fill, rounded corners and inset b
 
 ## Instruments and truthfulness
 
-Gauges share 240-degree open-bottom arcs, four-unit round-ended strokes and slate track. Labels sit above, values inside, details below. Only finite 0–100 readings get percentages/fill; zero has no active stroke, 100 fills the sweep, unavailable values show a dash. Bars use four-pixel tracks. Local graphite workstation art is generic, not detected hardware.
+Gauges share 240-degree open-bottom arcs, four-unit round-ended strokes and slate track. Labels sit above, values inside, details below. Only finite 0–100 readings get percentages/fill; zero has no active stroke, 100 fills the sweep, unavailable values show a dash. Fill color follows utilization severity rather than accent. Bars use four-pixel tracks with the same severity coloring. Compact sparklines under instruments and the network/disk activity strip show the last ~15 minutes of App-buffered samples; fewer than two finite points stay empty. Local graphite workstation art is generic, not detected hardware.
 
-Distinguish direct Wi-Fi/Bluetooth from Open Settings actions. Phone artwork follows available platform metadata; unknowns stay unknown. Provider availability never comes from decorative colors. Voice input/calendar editing are absent. Synthetic imagery/fixtures never become production telemetry. [Validation](docs/VALIDATION.md).
+Calendar and music empty states may offer one-click **externally** launches (Windows Calendar / provider app or HTTPS fallback) through approval-gated actions. Distinguish direct Wi-Fi/Bluetooth from Open Settings actions. Phone artwork follows available platform metadata; unknowns stay unknown. Provider availability never comes from decorative colors. Voice input/calendar editing are absent. Synthetic imagery/fixtures never become production telemetry. [Validation](docs/VALIDATION.md).

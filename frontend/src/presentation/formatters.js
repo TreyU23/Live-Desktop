@@ -11,6 +11,11 @@ export function formatBytes(value, digits = 1) {
   return `${(value / 1024 ** index).toFixed(index > 2 ? digits : 0)} ${units[index]}`;
 }
 
+export function formatBytesPerSec(value, digits = 0) {
+  if (!Number.isFinite(value) || value < 0) return "Unavailable";
+  return `${formatBytes(value, digits)}/s`;
+}
+
 export function percent(part, total) {
   if (!Number.isFinite(part) || !Number.isFinite(total) || total <= 0) return null;
   return Math.round((part / total) * 100);

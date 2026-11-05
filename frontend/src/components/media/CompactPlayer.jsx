@@ -1,6 +1,6 @@
 import { Icon } from '../ui/index.jsx';
 import { formatPlaybackTime } from '../../presentation/formatters.js';
-export function CompactPlayer({ musicProvider, musicPlayer, musicConfigured, onOpenMusic, onMusicAction, fullView = false }) { return (<div className="media-widget">
+export function CompactPlayer({ musicProvider, musicPlayer, musicConfigured, onOpenMusic, onMusicAction, onOpenMusicExternally, fullView = false }) { return (<div className="media-widget">
         <div className="media-label">
           <span><img src={musicProvider.icon} alt="" /> {musicProvider.name} {musicPlayer.ready ? "· live" : ""}</span>
           {fullView ? null : <button type="button" onClick={onOpenMusic}>{musicConfigured ? "Open player" : "Connect"}<Icon name="ChevronRight" size={13} /></button>}
@@ -9,6 +9,11 @@ export function CompactPlayer({ musicProvider, musicPlayer, musicConfigured, onO
           {musicPlayer.available && musicPlayer.artwork ? <img src={musicPlayer.artwork} onError={event => { event.currentTarget.style.visibility = 'hidden'; }} alt={`Current ${musicProvider.name} artwork`} /> : <span className="track-placeholder"><Icon name="Music2" size={24} /></span>}
           <div><strong>{musicPlayer.title}</strong><span>{musicPlayer.artist}</span><small>{musicPlayer.album}</small></div>
         </div>
+        {!musicPlayer.available && onOpenMusicExternally ? (
+          <button className="text-action media-empty-action" type="button" onClick={onOpenMusicExternally}>
+            Open {musicProvider.name} externally <Icon name="ExternalLink" size={14} />
+          </button>
+        ) : null}
         <div className="progress" aria-label="Playback progress"><i style={{ width: `${musicPlayer.duration ? Math.min(100, (musicPlayer.elapsed / musicPlayer.duration) * 100) : 0}%` }} /></div>
         <div className="track-time"><span>{formatPlaybackTime(musicPlayer.elapsed)}</span><span>{formatPlaybackTime(musicPlayer.duration)}</span></div>
         <div className="media-controls">

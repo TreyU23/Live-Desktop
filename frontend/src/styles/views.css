@@ -36,7 +36,8 @@
 .resource-bar strong { font-family: var(--measurement); font-weight: 400; }
 .resource-bar small { color: var(--muted); }
 .resource-bar__track { height: 4px; margin-block: 12px; background: var(--line); }
-.resource-bar__track i { display: block; height: 100%; background: var(--accent); }
+.resource-bar__track i { display: block; height: 100%; background: var(--green); }
+.resource-bar__fill--normal { background: var(--green); } .resource-bar__fill--elevated { background: var(--amber); } .resource-bar__fill--critical { background: var(--red); }
 .system-identity-bar { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px; padding: 24px 0; border-block: 1px solid var(--line); } .system-identity-bar > div { display: grid; gap: 6px; } .system-identity-bar span { color: var(--muted); } .system-spec-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 32px; margin-top: 32px; } .system-spec-panel > header { display: flex; gap: 12px; } .system-spec-panel header p { color: var(--muted); font-size: 13px; } .system-spec-panel--wide { grid-column: 1 / -1; }
 .system-detail-list { margin: 0; } .system-detail-list > div { display: grid; grid-template-columns: minmax(90px, 1fr) minmax(0, 2fr); gap: 16px; padding: 12px 0; border-bottom: 1px solid var(--line); } .system-detail-list dt { color: var(--muted); font-size: 13px; } .system-detail-list dd { margin: 0; font-size: 14px; overflow-wrap: anywhere; } .system-privacy-note { color: var(--muted); font-size: 12px; margin-top: 32px; }
 @media (min-width: 1200px) and (max-height: 800px) { .equipment-identity { min-height: 180px; } .pc-illustration { max-height: 100px; } .resource-gauge { max-width: 160px; } }
@@ -49,6 +50,7 @@
   .system-resource-bars { grid-template-columns: 1fr; gap: 24px; }
   .overview-layout { grid-template-columns: 1fr; gap: 32px; } .system-overview, .control-rail, .service-rail { grid-column: 1; grid-row: auto; } .service-rail { grid-template-columns: 1fr; } .service-rail > section + section { border-left: 0; padding-left: 0; border-top: 1px solid var(--line); padding-top: 24px; }
   .instrument-grid { gap: 8px; } .gauge-label { font-size: 12px; margin-bottom: 8px; } .gauge-value strong { font-size: 27px; } .gauge-detail { font-size: 11px; line-height: 1.4; }
+  .io-activity { grid-template-columns: 1fr; gap: 16px; }
 
   .equipment-identity { min-height: 0; margin-top: 24px; grid-template-columns: 1fr 1fr; gap: 16px; } .pc-identity { grid-column: 1 / -1; grid-row: 1; } .pc-illustration { display: none; } .pc-identity h2 { font-size: 18px; } .connection-list { grid-template-columns: 1fr; margin-top: 24px; }
   .control-strip { grid-template-columns: 1fr 1fr; gap: 0 16px; } .control-item { grid-template-columns: 20px minmax(0, 1fr); align-items: start; } .control-item .control-button { grid-column: 1 / -1; } .control-button { justify-self: start; min-width: 72px; }

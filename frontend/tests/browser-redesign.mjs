@@ -14,6 +14,7 @@ try {
   let failChat = true;
   let failSystem = false;
   let holdSystem = false;
+  let emptyCalendar = false;
   let releaseSystem;
   const systemGate = new Promise(resolve => { releaseSystem = resolve; });
   await mockDashboard(page, { handle: async (route, requestUrl) => {
@@ -21,6 +22,23 @@ try {
     if (requestUrl.pathname === '/api/system') {
       if (holdSystem) await systemGate;
       await route.fulfill(failSystem ? { status: 503, json: { error: 'Synthetic system offline' } } : { json: { ...system, resources: { ...system.resources, cpuPercent: 0 } } }); return true;
+    }
+    if (requestUrl.pathname === '/api/integrations/icloud-calendar/open' || requestUrl.pathname === '/api/integrations/icloud-calendar/open-web' || requestUrl.pathname === '/api/integrations/media-session/open-external') {
+      await route.fulfill({ status: 202, json: { id: 'synthetic-open', kind: 'windows_open_uri', status: 'pending', reason: 'Synthetic external open' } });
+      return true;
+    }
+    if (emptyCalendar && requestUrl.pathname === '/api/integrations/icloud-calendar') {
+      await route.fulfill({
+        json: {
+          connected: true,
+          status: 'connected',
+          date: requestUrl.searchParams.get('date'),
+          detail: 'Synthetic empty calendar',
+          capturedAt: new Date().toISOString(),
+          events: [],
+        },
+      });
+      return true;
     }
     return false;
   } });
@@ -103,11 +121,19 @@ try {
   await page.getByRole('switch', { name: 'Dark mode' }).click();
   await page.getByRole('button', { name: 'Use Blue accent' }).click();
   await navigate('Overview');
+  assert.ok(await page.locator('.resource-gauge.gauge--critical .gauge-fill--critical').count() > 0, 'high memory should use critical severity coloring');
+  assert.ok(await page.getByRole('button', { name: /Open Apple Music externally/ }).isVisible(), 'music empty state should offer an external open action');
+  assert.ok(await page.getByText('Network throughput').isVisible());
+  assert.ok(await page.getByText('Disk activity').isVisible());
   await page.getByRole('button', { name: 'Open day view' }).click();
   await page.getByRole('heading', { name: 'All-day events' }).waitFor();
   await page.getByRole('button', { name: 'Phone details', exact: true }).click();
   await page.getByRole('button', { name: 'Open Phone Link externally' }).waitFor();
   await page.screenshot({ path: `${output}/expanded-panels.png` });
+  emptyCalendar = true;
+  await page.getByRole('button', { name: 'Refresh iCloud Calendar' }).click();
+  await page.getByText('No iCloud events for this day.').waitFor();
+  await page.getByRole('button', { name: 'Open Calendar externally' }).waitFor();
   // Stale values survive a failed resource read. Retry touches only system.
   failSystem = true;
   await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));

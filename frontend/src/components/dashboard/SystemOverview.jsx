@@ -1,14 +1,41 @@
 import { Icon, InfoLine } from '../ui/index.jsx';
 import { ResourceGauge } from '../instruments/ResourceGauge.jsx';
-import { formatBytes } from '../../presentation/formatters.js';
-export function SystemOverview({ system, ready, connected, configured, calendar, musicPlayer, onOpenSystem }) {
+import { Sparkline } from '../instruments/Sparkline.jsx';
+import { formatBytes, formatBytesPerSec } from '../../presentation/formatters.js';
+
+export function SystemOverview({ system, ready, connected, configured, calendar, musicPlayer, onOpenSystem, series = [] }) {
   const r = system.resources;
   const ratio = (used, total) => ready && Number.isFinite(used) && total > 0 ? used / total * 100 : null;
+  const seriesValues = (key) => series.map((sample) => sample[key]);
+  const networkRates = ready && r.network?.ratesAvailable;
+  const diskRates = ready && r.diskActivity?.available;
   return <section className="system-overview" aria-label="PC overview">
     <div className="instrument-grid">
-      <ResourceGauge label="CPU load" value={ready ? r.cpuPercent : null} detail={ready ? 'Current utilization' : 'Waiting for system data'} />
-      <ResourceGauge label="Memory used" value={ratio(r.memoryUsedBytes, r.memoryTotalBytes)} detail={ready && r.memoryTotalBytes > 0 ? `${formatBytes(r.memoryUsedBytes)} / ${formatBytes(r.memoryTotalBytes)}` : 'Memory unavailable'} />
-      <ResourceGauge label="Storage used" value={ratio(r.storageUsedBytes, r.storageTotalBytes)} detail={ready && r.storageTotalBytes > 0 ? `${formatBytes(r.storageUsedBytes)} / ${formatBytes(r.storageTotalBytes)}` : 'Storage unavailable'} />
+      <ResourceGauge label="CPU load" value={ready ? r.cpuPercent : null} detail={ready ? 'Current utilization' : 'Waiting for system data'} series={seriesValues('cpu')} />
+      <ResourceGauge label="Memory used" value={ratio(r.memoryUsedBytes, r.memoryTotalBytes)} detail={ready && r.memoryTotalBytes > 0 ? `${formatBytes(r.memoryUsedBytes)} / ${formatBytes(r.memoryTotalBytes)}` : 'Memory unavailable'} series={seriesValues('memory')} />
+      <ResourceGauge label="Storage used" value={ratio(r.storageUsedBytes, r.storageTotalBytes)} detail={ready && r.storageTotalBytes > 0 ? `${formatBytes(r.storageUsedBytes)} / ${formatBytes(r.storageTotalBytes)}` : 'Storage unavailable'} series={seriesValues('storage')} />
+    </div>
+    <div className="io-activity" aria-label="Network and disk activity">
+      <div className="activity-stat">
+        <span>Network throughput</span>
+        <strong>{networkRates
+          ? `↓ ${formatBytesPerSec(r.network.rxBytesPerSec)} · ↑ ${formatBytesPerSec(r.network.txBytesPerSec)}`
+          : ready ? 'Rates unavailable' : 'Waiting for system data'}</strong>
+        <div className="activity-stat__sparks" aria-hidden="true">
+          <Sparkline values={seriesValues('netRx')} label="Network download trend" />
+          <Sparkline values={seriesValues('netTx')} label="Network upload trend" />
+        </div>
+      </div>
+      <div className="activity-stat">
+        <span>Disk activity</span>
+        <strong>{diskRates
+          ? `Read ${formatBytesPerSec(r.diskActivity.readBytesPerSec)} · Write ${formatBytesPerSec(r.diskActivity.writeBytesPerSec)}`
+          : ready ? 'Activity unavailable' : 'Waiting for system data'}</strong>
+        <div className="activity-stat__sparks" aria-hidden="true">
+          <Sparkline values={seriesValues('diskRead')} label="Disk read trend" />
+          <Sparkline values={seriesValues('diskWrite')} label="Disk write trend" />
+        </div>
+      </div>
     </div>
     <div className="equipment-identity">
       <div><span>Network</span><strong>{ready ? r.network?.connected ? 'Connected' : 'Offline' : 'Unavailable'}</strong><p>{ready ? r.network?.name : 'Waiting for system data'}</p></div>

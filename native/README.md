@@ -29,9 +29,10 @@ Protocol v1: newline-delimited UTF-8 JSON with `requestId`, allowlisted `operati
 | `bridge.health`, `bridge.capabilities` | Protocol status |
 | `radio.snapshot`, `radio.set` | Wi-Fi/Bluetooth |
 | `power.snapshot`, `system.staticSnapshot` | Power/device/OS/display adapters |
+| `system.ioCounters` | Cumulative network octets and physical-disk byte counters |
 | `process.knownApps`, `phoneLink.snapshot` | Known process/package observations |
 | `media.snapshot`, playback actions, `media.artwork` | Windows sessions/opaque-version raster artwork |
-| `windows.openUri`, `browser.openUrl` | Fixed Windows URI allowlist / HTTP(S) launch |
+| `windows.openUri`, `browser.openUrl` | Fixed Windows URI allowlist (`ms-settings:*`, `ms-phone:`, `outlookcal:`, `spotify:`) / HTTP(S) launch |
 
 Process snapshots cache for 2 seconds (phone refresh bypasses). Native radio enumeration/Java snapshots each cache for 30 seconds; adapter changes can take roughly 60 seconds. Media notifications update metadata with 30-second revalidation; position reads are independent. Artwork versions include bridge identity, retain four sources up to 4 MiB each and expose no filesystem path.
 

@@ -1,9 +1,14 @@
+#include <winsock2.h>
+#include <ws2tcpip.h>
 #include <windows.h>
 #include <tlhelp32.h>
 #include <appmodel.h>
 #include <powrprof.h>
 #include <shellapi.h>
 #include <dxgi.h>
+#include <iphlpapi.h>
+#include <netioapi.h>
+#include <pdh.h>
 #include <winrt/Windows.Foundation.h>
 #include <winrt/Windows.Foundation.Collections.h>
 #include <winrt/Windows.Media.Control.h>
@@ -313,9 +318,65 @@ JsonObject media_request(hstring const& operation, JsonObject const& arguments) 
     if (!artwork_version.empty()) result.Insert(L"artwork", text(L"/api/integrations/media-session/artwork/" + artwork_version));
     return result;
 }
+JsonObject io_counters() {
+    ULONG64 network_in = 0;
+    ULONG64 network_out = 0;
+    PMIB_IF_TABLE2 table = nullptr;
+    if (GetIfTable2(&table) == NO_ERROR && table) {
+        for (ULONG index = 0; index < table->NumEntries; ++index) {
+            auto const& row = table->Table[index];
+            if (row.Type == IF_TYPE_SOFTWARE_LOOPBACK) continue;
+            if (row.OperStatus != IfOperStatusUp) continue;
+            network_in += row.InOctets;
+            network_out += row.OutOctets;
+        }
+        FreeMibTable(table);
+    }
+
+    ULONG64 disk_read = 0;
+    ULONG64 disk_write = 0;
+    static PDH_HQUERY query = nullptr;
+    static PDH_HCOUNTER read_counter = nullptr;
+    static PDH_HCOUNTER write_counter = nullptr;
+    static bool pdh_ready = false;
+    static bool pdh_failed = false;
+    if (!pdh_ready && !pdh_failed) {
+        if (PdhOpenQueryW(nullptr, 0, &query) != ERROR_SUCCESS
+                || PdhAddEnglishCounterW(query, L"\\PhysicalDisk(_Total)\\Disk Read Bytes/sec", 0, &read_counter) != ERROR_SUCCESS
+                || PdhAddEnglishCounterW(query, L"\\PhysicalDisk(_Total)\\Disk Write Bytes/sec", 0, &write_counter) != ERROR_SUCCESS
+                || PdhCollectQueryData(query) != ERROR_SUCCESS) {
+            pdh_failed = true;
+            if (query) {
+                PdhCloseQuery(query);
+                query = nullptr;
+                read_counter = nullptr;
+                write_counter = nullptr;
+            }
+        } else {
+            pdh_ready = true;
+        }
+    }
+    if (pdh_ready && PdhCollectQueryData(query) == ERROR_SUCCESS) {
+        PDH_RAW_COUNTER raw{};
+        if (PdhGetRawCounterValue(read_counter, nullptr, &raw) == ERROR_SUCCESS && raw.CStatus == ERROR_SUCCESS) {
+            disk_read = static_cast<ULONG64>(raw.FirstValue);
+        }
+        if (PdhGetRawCounterValue(write_counter, nullptr, &raw) == ERROR_SUCCESS && raw.CStatus == ERROR_SUCCESS) {
+            disk_write = static_cast<ULONG64>(raw.FirstValue);
+        }
+    }
+
+    JsonObject result;
+    result.Insert(L"networkInBytes", number(static_cast<double>(network_in)));
+    result.Insert(L"networkOutBytes", number(static_cast<double>(network_out)));
+    result.Insert(L"diskReadBytes", number(static_cast<double>(disk_read)));
+    result.Insert(L"diskWriteBytes", number(static_cast<double>(disk_write)));
+    result.Insert(L"diskAvailable", flag(pdh_ready));
+    return result;
+}
 JsonObject open_uri(hstring const& operation, JsonObject const& arguments) {
     std::wstring uri(arguments.GetNamedString(L"uri"));
-    static std::set<std::wstring> const allowed{L"ms-settings:network-wifi", L"ms-settings:bluetooth", L"ms-settings:quiethours", L"ms-settings:nightlight", L"ms-settings:privacy-microphone", L"ms-settings:batterysaver", L"ms-phone:"};
+    static std::set<std::wstring> const allowed{L"ms-settings:network-wifi", L"ms-settings:bluetooth", L"ms-settings:quiethours", L"ms-settings:nightlight", L"ms-settings:privacy-microphone", L"ms-settings:batterysaver", L"ms-phone:", L"outlookcal:", L"spotify:"};
     if (uri.size() > 4096 || uri.find_first_of(L"\r\n\0", 0, 3) != std::wstring::npos) throw hresult_invalid_argument(L"Invalid URI.");
     if (operation == L"windows.openUri" && !allowed.contains(uri)) throw hresult_invalid_argument(L"Windows URI is not allowlisted.");
     if (operation == L"browser.openUrl" && !lower(uri).starts_with(L"http://") && !lower(uri).starts_with(L"https://")) throw hresult_invalid_argument(L"Only HTTP and HTTPS URLs are allowed.");
@@ -332,13 +393,14 @@ JsonObject open_uri(hstring const& operation, JsonObject const& arguments) {
 }
 
 bool supports_native_operation(hstring const& operation) {
-    static std::set<std::wstring> const operations{L"power.snapshot", L"system.staticSnapshot", L"process.knownApps", L"phoneLink.snapshot",
+    static std::set<std::wstring> const operations{L"power.snapshot", L"system.staticSnapshot", L"system.ioCounters", L"process.knownApps", L"phoneLink.snapshot",
         L"media.snapshot", L"media.artwork", L"media.play", L"media.pause", L"media.next", L"media.previous", L"media.shuffle", L"media.mute", L"windows.openUri", L"browser.openUrl"};
     return operations.contains(std::wstring(operation));
 }
 JsonObject native_dispatch(hstring const& operation, JsonObject const& arguments) {
     if (operation == L"power.snapshot") return power_snapshot();
     if (operation == L"system.staticSnapshot") return static_snapshot();
+    if (operation == L"system.ioCounters") return io_counters();
     if (operation == L"process.knownApps" || operation == L"phoneLink.snapshot") return cached_app_snapshot(arguments.GetNamedBoolean(L"refresh", false));
     if (operation == L"media.artwork") return artwork_request(arguments);
     if (operation == L"windows.openUri" || operation == L"browser.openUrl") return open_uri(operation, arguments);
