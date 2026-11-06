@@ -8,7 +8,7 @@ Download the Windows x64 ZIP and checksum from [GitHub Releases](https://github.
 
 Requires Windows 10/11 x64 and Java 21. Java-inclusive packages contain `.tools/jdk-21`; otherwise install Java 21 with `JAVA_HOME`, or run `scripts/bootstrap-java.ps1`. Packages need no Node, Maven, Visual Studio, CMake or separate Visual C++ runtime. [Package publishing/registry downloads](docs/PACKAGES.md).
 
-Production binds to `127.0.0.1:4173` and `127.0.0.1:4317`; the frontend host proxies `/api` and `/health`. Use the top-bar restart/shutdown controls or, from the installation directory:
+Production binds to `127.0.0.1:4173` and `127.0.0.1:4317`; the frontend host proxies `/api` and `/health`. Each backend launch issues a local access token on `GET /health` as `X-Live-Desktop-Token`. Every other route requires that header. `Host` must be `127.0.0.1` or `localhost` on the backend port. A sent `Origin` must be `http://127.0.0.1:4173`, `http://localhost:4173`, or the same hosts on the backend port. `POST` and `DELETE` require `Content-Type: application/json`. Use the top-bar restart/shutdown controls or, from the installation directory:
 
 ```powershell
 .\native\build\Release\live-desktop-launcher.exe status
@@ -80,6 +80,7 @@ The supervisor imports root `.env` and sets internal `LIVE_DESKTOP_ROOT` for dat
 | Unknown mutation outcome | Refresh state before retrying. Bridge mutations never automatically replay. |
 | Unavailable integration | Check account/device setup. Corrupt keys report unavailable; reconnect iCloud if its password was revoked. |
 | Startup failure | Root `.launcher.log`, `.backend-preview.{out,err}.log`, `.frontend-preview.{out,err}.log`; lifecycle requests: `data/runtime-control.log`. |
+| `403` Local access only | Read `X-Live-Desktop-Token` from `GET /health` and send it on the next call. `POST` and `DELETE` also need `Content-Type: application/json`. Call `127.0.0.1` or `localhost` on the backend port. |
 
 Readiness checks native `/_live/ready`, direct/proxied `/health` and dashboard `/` for up to 60 seconds; integrations may finish later. `.startup-metrics.jsonl` records cumulative stages/reuse: do not add stages or compare reused starts with fresh launches. A current-user mutex deduplicates starts; Job Object cleanup handles owned descendants on shutdown, supervisor exit or service failure.
 

@@ -16,7 +16,7 @@ The build finds CMake in PATH or Visual Studio, requires Windows SDK C++/WinRT a
 
 A current-user workspace mutex deduplicates starts. Suspended children enter a Windows Job Object before execution; supervisor/service failure cleans up owned descendants. Ownership never derives from names, ports or saved PIDs. Initial startup rejects unrelated listeners without terminating them. Restart waits for three clear listener samples 100 ms apart within five seconds after cleanup; TIME_WAIT does not count as listening.
 
-The host serves client assets on loopback 4173 and proxies `/api`/`/health` to loopback 4317. Host/Origin checks, canonical/open-handle path confinement, framing/body limits and header filtering apply. Stable assets/HTML use weak ETags and `no-cache`; hashed assets use immutable caching. API responses are not shared immutable assets. Sixteen blocking workers and a 64-entry queue use socket timeouts and close each browser connection after response; streaming/reuse need separate capacity work.
+The host serves client assets on loopback 4173 and proxies `/api`/`/health` to loopback 4317. Host/Origin checks, canonical/open-handle path confinement, framing/body limits and header filtering apply. Direct clients of port 4317 still pass the backend local-access filter described in the backend README: per-launch token, loopback `Host`, allowlisted `Origin`, and JSON `POST`/`DELETE`. Stable assets/HTML use weak ETags and `no-cache`; hashed assets use immutable caching. API responses are not shared immutable assets. Sixteen blocking workers and a 64-entry queue use socket timeouts and close each browser connection after response; streaming/reuse need separate capacity work.
 
 ## Windows bridge
 

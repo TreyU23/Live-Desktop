@@ -2,6 +2,7 @@ package com.localassistant.os;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.localassistant.os.web.LocalAccessClients;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -26,15 +27,16 @@ class AssistantApplicationTest {
                 HttpResponse.BodyHandlers.ofString());
 
         assertThat(response.statusCode()).isEqualTo(200);
-        assertThat(response.body()).contains("\"status\":\"ok\"");
+        String token = response.headers().firstValue("X-Live-Desktop-Token").orElseThrow();
+        assertThat(token).matches("[0-9a-f]{64}");
+        assertThat(response.body()).contains("\"status\":\"ok\"").doesNotContain(token);
         assertThat(response.body()).contains("\"openAiConfigured\":false");
     }
 
     @Test
     void chatEndpointRequiresAnApiKey() throws Exception {
         HttpResponse<String> response = HttpClient.newHttpClient().send(
-                HttpRequest.newBuilder(URI.create("http://127.0.0.1:" + port + "/api/chat"))
-                        .header("Content-Type", "application/json")
+                LocalAccessClients.request(port, "/api/chat", LocalAccessClients.token(port))
                         .POST(HttpRequest.BodyPublishers.ofString("{\"message\":\"hello\"}"))
                         .build(),
                 HttpResponse.BodyHandlers.ofString());
@@ -46,7 +48,7 @@ class AssistantApplicationTest {
     @Test
     void runtimeEndpointReportsTheLocalBackend() throws Exception {
         HttpResponse<String> response = HttpClient.newHttpClient().send(
-                HttpRequest.newBuilder(URI.create("http://127.0.0.1:" + port + "/api/runtime")).GET().build(),
+                LocalAccessClients.request(port, "/api/runtime", LocalAccessClients.token(port)).GET().build(),
                 HttpResponse.BodyHandlers.ofString());
 
         assertThat(response.statusCode()).isEqualTo(200);
@@ -57,7 +59,7 @@ class AssistantApplicationTest {
     @Test
     void systemEndpointIncludesDeviceAndWindowsSpecifications() throws Exception {
         HttpResponse<String> response = HttpClient.newHttpClient().send(
-                HttpRequest.newBuilder(URI.create("http://127.0.0.1:" + port + "/api/system")).GET().build(),
+                LocalAccessClients.request(port, "/api/system", LocalAccessClients.token(port)).GET().build(),
                 HttpResponse.BodyHandlers.ofString());
 
         assertThat(response.statusCode()).isEqualTo(200);
@@ -72,10 +74,8 @@ class AssistantApplicationTest {
     @Test
     void iCloudCalendarStartsDisconnectedWithoutStoredCredentials() throws Exception {
         HttpResponse<String> response = HttpClient.newHttpClient().send(
-                HttpRequest.newBuilder(URI.create("http://127.0.0.1:" + port
-                                + "/api/integrations/icloud-calendar?date=2026-08-02"))
-                        .GET()
-                        .build(),
+                LocalAccessClients.request(port, "/api/integrations/icloud-calendar?date=2026-08-02",
+                        LocalAccessClients.token(port)).GET().build(),
                 HttpResponse.BodyHandlers.ofString());
 
         assertThat(response.statusCode()).isEqualTo(200);

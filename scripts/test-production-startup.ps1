@@ -10,6 +10,14 @@ $sentinel = $null
 $nodePath = (Get-Command node).Source
 
 function Assert-True($condition, $message) { if (-not $condition) { throw $message } }
+function Invoke-LocalApi([string]$Method, [string]$Path) {
+    $health = Invoke-WebRequest http://127.0.0.1:4173/health -TimeoutSec 5
+    $token = [string]@($health.Headers['X-Live-Desktop-Token'])[0]
+    Assert-True (-not [string]::IsNullOrWhiteSpace($token)) 'Local access token was not issued.'
+    $params = @{ Method = $Method; Uri = "http://127.0.0.1:4173$Path"; Headers = @{ 'X-Live-Desktop-Token' = $token } }
+    if ($Method -eq 'Post' -or $Method -eq 'Delete') { $params.ContentType = 'application/json' }
+    return Invoke-RestMethod @params
+}
 function Invoke-Launcher([string]$action) {
     $testSavedPath = $env:PATH
     try {
@@ -95,14 +103,14 @@ try {
     }
     foreach ($request in $requests) { Assert-True ($request.WaitForExit(70000)) 'Concurrent start timed out.'; Assert-True ($request.ExitCode -eq 0) 'Concurrent start failed.' }
     $apiBefore = Read-Children
-    $apiRestart = Invoke-RestMethod -Method Post http://127.0.0.1:4173/api/runtime/restart
+    $apiRestart = Invoke-LocalApi Post /api/runtime/restart
     Assert-True ($apiRestart.status -eq 'accepted') 'Dashboard restart was not accepted.'
     # The launcher waits for readiness again after the request cleared its readiness event.
     Invoke-Launcher start
     $apiAfter = Read-Children
     Assert-True (($apiBefore -join ',') -ne ($apiAfter -join ',')) 'Dashboard restart did not replace services.'
     Wait-Stopped $apiBefore
-    $apiShutdown = Invoke-RestMethod -Method Post http://127.0.0.1:4173/api/runtime/shutdown
+    $apiShutdown = Invoke-LocalApi Post /api/runtime/shutdown
     Assert-True ($apiShutdown.status -eq 'accepted') 'Dashboard shutdown was not accepted.'
     Wait-Stopped $apiAfter
     Invoke-Launcher shutdown
@@ -132,7 +140,7 @@ try {
 
     Invoke-Launcher start
     $fourth = Read-Children
-    Invoke-RestMethod http://127.0.0.1:4173/api/system | Out-Null
+    Invoke-LocalApi Get /api/system | Out-Null
     $bridges = @(Get-CimInstance Win32_Process -Filter "Name = 'live-desktop-windows-bridge.exe'" | Where-Object ParentProcessId -eq $fourth[0] | ForEach-Object { [int]$_.ProcessId })
     Assert-True ($bridges.Count -gt 0) 'Backend bridge descendant was not observed.'
     $supervisorMatches = [regex]::Matches((Get-Content -LiteralPath (Join-Path $testRoot '.launcher.log') -Raw), 'Supervisor PID (\d+)')

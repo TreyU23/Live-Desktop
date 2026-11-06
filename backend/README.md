@@ -31,6 +31,8 @@ For development, `scripts/run-backend.ps1` checks the built bridge/DLL, selects 
 
 `X-Profile-Id` selects records: default uses `data/`, others `data/profiles/<id>/`. Request context clears afterward; deletion waits for in-flight profile requests. Profiles do not authenticate Windows users. State format remains version 1. Targeted defensive reads avoid unrelated history; writes atomically replace disk state before publishing memory state. Approval persistence is synchronous.
 
+`LocalAccessFilter` runs before profile handling. Each launch creates a 32-byte token and returns it in the `X-Live-Desktop-Token` response header on `GET /health`; the token is not part of the JSON body. Every other method and route requires that header. `Host` must be `127.0.0.1` or `localhost` with the accepting port. A missing `Origin` is accepted for same-origin and local clients. A present `Origin` must be `http://127.0.0.1` or `http://localhost` on port `4173` or the backend port; `null` and any other origin are rejected. `POST` and `DELETE` require a single `Content-Type: application/json` (a charset parameter is accepted). The filter reads `Host` and `Origin` directly. Rejected calls return `403` `{"error":"Local access only"}` and do not create, approve, or run actions. An allowlisted dashboard origin receives CORS headers for direct calls to the backend port; private-network access is not enabled.
+
 ## Integration lifecycle
 
 | Component | Bounds and behavior |

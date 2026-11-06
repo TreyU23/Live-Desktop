@@ -12,8 +12,8 @@ export default defineConfig({
     host: "0.0.0.0",
     allowedHosts: ["terminal.local"],
     proxy: {
-      "/api": "http://127.0.0.1:4317",
-      "/health": "http://127.0.0.1:4317",
+      "/api": { target: "http://127.0.0.1:4317", changeOrigin: true },
+      "/health": { target: "http://127.0.0.1:4317", changeOrigin: true },
     },
     warmup: {
       clientFiles: ["./src/main.jsx"],

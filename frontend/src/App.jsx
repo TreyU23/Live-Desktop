@@ -188,17 +188,58 @@ function readMusicIntegration(profileId = activeProfileId()) {
   }
 }
 
-async function api(path, options = {}) {
+let localAccessTokenValue = "";
+let localAccessSettled = false;
+let localAccessTokenTask = null;
+let localAccessGeneration = 0;
+
+function resetLocalAccessToken() {
+  localAccessGeneration += 1;
+  localAccessTokenValue = "";
+  localAccessSettled = false;
+  localAccessTokenTask = null;
+}
+
+function localAccessToken() {
+  if (localAccessSettled) return Promise.resolve(localAccessTokenValue);
+  if (!localAccessTokenTask) {
+    const generation = localAccessGeneration;
+    localAccessTokenTask = fetch(`${API_BASE}/health`, { cache: "no-store" })
+      .then((response) => {
+        if (generation !== localAccessGeneration) return localAccessTokenValue;
+        const token = response.headers.get("X-Live-Desktop-Token") || "";
+        if (response.ok) {
+          localAccessTokenValue = token;
+          localAccessSettled = true;
+        }
+        return localAccessTokenValue;
+      })
+      .catch(() => localAccessTokenValue)
+      .finally(() => {
+        if (generation === localAccessGeneration) localAccessTokenTask = null;
+      });
+  }
+  return localAccessTokenTask;
+}
+
+async function api(path, options = {}, allowTokenRefresh = true) {
   const { profileId = activeProfileId(), headers, ...requestOptions } = options;
+  const method = String(requestOptions.method || "GET").toUpperCase();
+  const token = await localAccessToken();
   const response = await fetch(`${API_BASE}${path}`, {
     ...requestOptions,
     cache: "no-store",
     headers: {
-      "X-Profile-Id": profileId,
-      ...(options.body ? { "Content-Type": "application/json" } : {}),
       ...headers,
+      "X-Profile-Id": profileId,
+      ...(token ? { "X-Live-Desktop-Token": token } : {}),
+      ...(method === "POST" || method === "DELETE" ? { "Content-Type": "application/json" } : {}),
     },
   });
+  if (response.status === 403 && allowTokenRefresh) {
+    resetLocalAccessToken();
+    return api(path, options, false);
+  }
   const contentType = response.headers.get("content-type") || "";
   const payload = contentType.includes("application/json") ? await response.json() : null;
   if (!response.ok) {
@@ -212,7 +253,12 @@ const delay = (milliseconds) => new Promise((resolve) => window.setTimeout(resol
 async function waitForRestartReady() {
   for (let attempt = 0; attempt < 60; attempt += 1) {
     try {
-      const response = await fetch(`${API_BASE}/api/runtime?restart=${Date.now()}`, { cache: "no-store" });
+      resetLocalAccessToken();
+      const token = await localAccessToken();
+      const response = await fetch(`${API_BASE}/api/runtime?restart=${Date.now()}`, {
+        cache: "no-store",
+        headers: token ? { "X-Live-Desktop-Token": token } : {},
+      });
       if (response.ok) {
         const status = await response.json();
         if (status.backendOnline && status.frontendOnline) return true;
