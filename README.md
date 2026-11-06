@@ -8,7 +8,7 @@ Download the Windows x64 ZIP and checksum from [GitHub Releases](https://github.
 
 Requires Windows 10/11 x64 and Java 21. Java-inclusive packages contain `.tools/jdk-21`; otherwise install Java 21 with `JAVA_HOME`, or run `scripts/bootstrap-java.ps1`. Packages need no Node, Maven, Visual Studio, CMake or separate Visual C++ runtime. [Package publishing/registry downloads](docs/PACKAGES.md).
 
-Production binds to `127.0.0.1:4173` and `127.0.0.1:4317`; the frontend host proxies `/api` and `/health`. Each backend launch issues a local access token on `GET /health` as `X-Live-Desktop-Token`. Every other route requires that header. `Host` must be `127.0.0.1` or `localhost` on the backend port. A sent `Origin` must be `http://127.0.0.1:4173`, `http://localhost:4173`, or the same hosts on the backend port. `POST` and `DELETE` require `Content-Type: application/json`. Use the top-bar restart/shutdown controls or, from the installation directory:
+Production binds to `127.0.0.1:4173` and `127.0.0.1:4317`; the frontend host proxies `/api` and `/health`. Each backend launch issues a local access token on loopback `GET /health` as `X-Live-Desktop-Token`. Development Vite listens on `127.0.0.1:4173` unless `VITE_HOST` is set. Every other route requires that header. `Host` must be `127.0.0.1` or `localhost` on the backend port. A sent `Origin` must be `http://127.0.0.1:4173`, `http://localhost:4173`, or the same hosts on the backend port. `POST` and `DELETE` require `Content-Type: application/json`. Use the top-bar restart/shutdown controls or, from the installation directory:
 
 ```powershell
 .\native\build\Release\live-desktop-launcher.exe status

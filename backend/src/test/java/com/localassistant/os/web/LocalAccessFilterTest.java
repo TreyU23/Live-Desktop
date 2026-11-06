@@ -13,9 +13,15 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.MvcResult;
+import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import org.springframework.web.context.WebApplicationContext;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT, properties = {
         "assistant.data-dir=target/local-access-data",
@@ -29,6 +35,19 @@ class LocalAccessFilterTest {
     @LocalServerPort
     int port;
 
+    @Autowired
+    WebApplicationContext context;
+
+    @Autowired
+    LocalAccessFilter localAccess;
+
+    MockMvc mockMvc;
+
+    @BeforeEach
+    void mockMvcWithLocalAccessFilter() {
+        mockMvc = MockMvcBuilders.webAppContextSetup(context).addFilters(localAccess).build();
+    }
+
     @Test
     void healthIssuesTheLaunchTokenWithoutPuttingItInTheBody() throws Exception {
         HttpResponse<String> response = client.send(get("/health"), HttpResponse.BodyHandlers.ofString());
@@ -36,9 +55,35 @@ class LocalAccessFilterTest {
         String token = response.headers().firstValue(LocalAccessFilter.TOKEN_HEADER).orElseThrow();
         assertThat(response.statusCode()).isEqualTo(200);
         assertThat(token).matches("[0-9a-f]{64}");
-        assertThat(response.body()).contains("\"status\":\"ok\"").doesNotContain(token);
+        assertThat(response.body()).contains("\"status\":\"ok\"").doesNotContain(token).doesNotContain("workspaceRoot");
         assertThat(response.headers().firstValue("Access-Control-Allow-Origin")).isEmpty();
         assertThat(response.headers().firstValue("Access-Control-Allow-Private-Network")).isEmpty();
+    }
+
+    @Test
+    void healthIssuesTheTokenOnlyToALoopbackPeer() throws Exception {
+        MvcResult loopback = mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+                .get("/health").with(peer("127.0.0.1"))).andReturn();
+        MvcResult lan = mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+                .get("/health").with(peer("172.30.0.2"))).andReturn();
+        int before = actionCount();
+        MvcResult attack = mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+                .post("/api/integrations/media-session/open-external")
+                .param("provider", "spotify")
+                .header("Content-Type", "application/json")
+                .header(LocalAccessFilter.TOKEN_HEADER, "f".repeat(64))
+                .with(peer("172.30.0.2")))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isForbidden())
+                .andReturn();
+
+        String issued = loopback.getResponse().getHeader(LocalAccessFilter.TOKEN_HEADER);
+        assertThat(loopback.getResponse().getStatus()).isEqualTo(200);
+        assertThat(issued).isEqualTo(LocalAccessClients.token(port));
+        assertThat(lan.getResponse().getStatus()).isEqualTo(200);
+        assertThat(lan.getResponse().getHeader(LocalAccessFilter.TOKEN_HEADER)).isNull();
+        assertThat(lan.getResponse().getContentAsString()).doesNotContain(issued).doesNotContain("workspaceRoot");
+        assertThat(attack.getResponse().getHeader(LocalAccessFilter.TOKEN_HEADER)).isNull();
+        assertThat(actionCount()).isEqualTo(before);
     }
 
     @Test
@@ -182,6 +227,20 @@ class LocalAccessFilterTest {
         assertThat(wrongToken.statusCode()).isEqualTo(403);
         assertThat(statusOf(localhost)).isEqualTo(200);
         assertThat(localhost).contains(LocalAccessClients.token(port));
+    }
+
+    private org.springframework.test.web.servlet.request.RequestPostProcessor peer(String address) {
+        return request -> {
+            request.setRemoteAddr(address);
+            request.setLocalPort(port);
+            request.setServerPort(port);
+            request.setServerName("127.0.0.1");
+            if (request instanceof org.springframework.mock.web.MockHttpServletRequest mock) {
+                mock.removeHeader("Host");
+            }
+            request.addHeader("Host", "127.0.0.1:" + port);
+            return request;
+        };
     }
 
     private int actionCount() throws Exception {

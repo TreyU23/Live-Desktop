@@ -33,6 +33,8 @@ public class LocalAccessFilter extends OncePerRequestFilter {
     private static final byte[] REJECTION =
             "{\"error\":\"Local access only\"}".getBytes(StandardCharsets.UTF_8);
     private static final Set<String> MUTATING = Set.of("POST", "DELETE");
+    private static final Set<String> LOOPBACK_PEERS = Set.of(
+            "127.0.0.1", "localhost", "::1", "0:0:0:0:0:0:0:1");
 
     private final String token = HexFormat.of().formatHex(randomToken());
 
@@ -69,10 +71,15 @@ public class LocalAccessFilter extends OncePerRequestFilter {
             return;
         }
         if (health) {
-            response.setHeader(TOKEN_HEADER, token);
+            if (isLoopbackPeer(request)) response.setHeader(TOKEN_HEADER, token);
             response.setHeader("Cache-Control", "no-store");
         }
         chain.doFilter(request, response);
+    }
+
+    static boolean isLoopbackPeer(HttpServletRequest request) {
+        String address = request.getRemoteAddr();
+        return address != null && LOOPBACK_PEERS.contains(address);
     }
 
     private boolean authorized(String provided) {

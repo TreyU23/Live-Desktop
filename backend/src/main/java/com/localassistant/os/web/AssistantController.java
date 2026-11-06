@@ -9,7 +9,6 @@ import com.localassistant.os.service.ProfileCredentialStore;
 import com.localassistant.os.service.ProfileDataService;
 import com.localassistant.os.service.RuntimeService;
 import com.localassistant.os.service.ICloudCalendarService;
-import com.localassistant.os.service.WorkspaceService;
 import com.localassistant.os.service.SystemService;
 import com.localassistant.os.service.WindowsMediaSessionService;
 import com.localassistant.os.store.StateStore;
@@ -36,7 +35,6 @@ public class AssistantController {
     private final OpenAiAgent agent;
     private final ActionService actions;
     private final MemoryService memories;
-    private final WorkspaceService workspace;
     private final SystemService system;
     private final RuntimeService runtime;
     private final ICloudCalendarService iCloudCalendar;
@@ -49,7 +47,6 @@ public class AssistantController {
             OpenAiAgent agent,
             ActionService actions,
             MemoryService memories,
-            WorkspaceService workspace,
             SystemService system,
             RuntimeService runtime,
             ICloudCalendarService iCloudCalendar,
@@ -60,7 +57,6 @@ public class AssistantController {
         this.agent = agent;
         this.actions = actions;
         this.memories = memories;
-        this.workspace = workspace;
         this.system = system;
         this.runtime = runtime;
         this.iCloudCalendar = iCloudCalendar;
@@ -71,10 +67,7 @@ public class AssistantController {
 
     @GetMapping("/health")
     public Map<String, Object> health() {
-        return Map.of(
-                "status", "ok",
-                "openAiConfigured", agent.configured(),
-                "workspaceRoot", workspace.root().toString());
+        return Map.of("status", "ok", "openAiConfigured", agent.configured());
     }
 
     @GetMapping("/api/profile/settings")

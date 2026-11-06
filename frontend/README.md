@@ -14,7 +14,7 @@ npm --prefix frontend run build
 npm --prefix frontend run test:sites
 ```
 
-The script can use Codex's bundled Node/pnpm and starts loopback Vite on strict port 4173, proxying `/api` and `/health` to 4317. The dev proxy rewrites `Host` to the backend so the backend allowlist matches the accepting port. `App.jsx` reads `X-Live-Desktop-Token` from `GET /health` and sends it on later calls. `POST` and `DELETE` send `Content-Type: application/json`. Raw Vite uses the broader bind in `vite.config.mjs`; use the script for local development. `VITE_API_BASE` overrides the API at build/development time; a loopback override on port 4173 or the backend port can read the token header.
+The script can use Codex's bundled Node/pnpm and starts loopback Vite on strict port 4173, proxying `/api` and `/health` to 4317. The dev proxy rewrites `Host` to the backend so the backend allowlist matches the accepting port. `vite.config.mjs` binds to `127.0.0.1` unless `VITE_HOST` is set. `App.jsx` reads `X-Live-Desktop-Token` from a loopback `GET /health` and sends it on later calls. `POST` and `DELETE` send `Content-Type: application/json`. `VITE_API_BASE` overrides the API at build/development time; a loopback override on port 4173 or the backend port can read the token header.
 
 Production serves `dist/client/` through the native host without Node. The build also emits `dist/server/index.js` and `dist/.openai/hosting.json`; preserve `.openai/hosting.json`, `worker/index.js`, the preparation script and Sites tests. A hosted preview needs its own backend integration for local Windows features.
 

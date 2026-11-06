@@ -190,7 +190,7 @@ Constraints:
 - The frontend script binds Vite to loopback and strict port 4173.
 - The backend normally uses loopback port 4317.
 - The frontend proxies `/api` and `/health`.
-- Prefer the frontend script for ordinary local development; raw Vite has a broader bind in its configuration.
+- Prefer the frontend script for ordinary local development. Vite binds to `127.0.0.1` unless `VITE_HOST` is set.
 - Stop development terminals before starting production.
 - The production supervisor manages its own children, not arbitrary development processes.
 - Rebuild production artifacts after source changes.
@@ -501,7 +501,7 @@ Additional constraints:
 - Validate PNG/JPEG/GIF/WebP signatures.
 - Use private artwork caching and nosniff.
 - Snapshots contain artwork references rather than Base64 payloads.
-- Local API access stays on `LocalAccessFilter`, ahead of profile handling. Each launch issues a token on `GET /health`; every other route requires `X-Live-Desktop-Token`. `Host` must be `127.0.0.1` or `localhost` on the accepting port. A present `Origin` must be `http://127.0.0.1` or `http://localhost` on port 4173 or the backend port. Every `POST` and `DELETE` requires `Content-Type: application/json`. The filter reads `Host` and `Origin` directly.
+- Local API access stays on `LocalAccessFilter`, ahead of profile handling. Each launch issues a token on loopback `GET /health`; every other route requires `X-Live-Desktop-Token`. A non-loopback peer receives health status without the token. `Host` must be `127.0.0.1` or `localhost` on the accepting port. A present `Origin` must be `http://127.0.0.1` or `http://localhost` on port 4173 or the backend port. Every `POST` and `DELETE` requires `Content-Type: application/json`. The filter reads `Host` and `Origin` directly.
 
 ## 16. Preserve the native runtime's ownership and security model
 
