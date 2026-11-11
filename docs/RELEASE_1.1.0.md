@@ -15,6 +15,10 @@ Final 1.x release. It refines the Flight Deck Overview and hardens the local API
 - Network and disk activity sparklines are fed by real Windows I/O counters (new `system.ioCounters` bridge call). Rates stay unavailable rather than zero until two valid samples exist.
 - Calendar and music empty states offer labeled "open externally" actions (Windows Calendar or iCloud Calendar on the web; Spotify or Apple Music). They use fixed destinations, and each one needs first-use approval like other device actions.
 
+### Build and packaging
+- Release scripts now work under Windows PowerShell 5.1 as well as PowerShell 7. CDS training, the packaged-runtime test and the performance script no longer abort on harmless native stderr, and `Invoke-WebRequest` calls use `-UseBasicParsing` to avoid the interactive "Script Execution Risk" prompt.
+- The runtime ZIP always stores `/` path separators as the ZIP specification requires.
+
 ### Documentation and repository
 - Consolidated README, backend/frontend/native READMEs and `docs/VALIDATION.md`; added the [Project working guide](PROJECT-WORKING-GUIDE.md).
 - Removed obsolete performance data, screenshots and planning artifacts (about 21k lines).
