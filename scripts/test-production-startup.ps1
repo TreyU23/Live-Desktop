@@ -11,7 +11,7 @@ $nodePath = (Get-Command node).Source
 
 function Assert-True($condition, $message) { if (-not $condition) { throw $message } }
 function Invoke-LocalApi([string]$Method, [string]$Path) {
-    $health = Invoke-WebRequest http://127.0.0.1:4173/health -TimeoutSec 5
+    $health = Invoke-WebRequest -UseBasicParsing http://127.0.0.1:4173/health -TimeoutSec 5
     $token = [string]@($health.Headers['X-Live-Desktop-Token'])[0]
     Assert-True (-not [string]::IsNullOrWhiteSpace($token)) 'Local access token was not issued.'
     $params = @{ Method = $Method; Uri = "http://127.0.0.1:4173$Path"; Headers = @{ 'X-Live-Desktop-Token' = $token } }
@@ -121,14 +121,14 @@ try {
     $sentinel = Start-Process -FilePath $nodePath -ArgumentList @(('"' + $sentinelScript + '"')) -WindowStyle Hidden -PassThru -RedirectStandardError (Join-Path $testRoot 'sentinel.err.log')
     $deadline = [DateTime]::UtcNow.AddSeconds(10)
     do {
-        try { $body = (Invoke-WebRequest http://127.0.0.1:4173 -TimeoutSec 1).Content } catch { $body = '' }
+        try { $body = (Invoke-WebRequest -UseBasicParsing http://127.0.0.1:4173 -TimeoutSec 1).Content } catch { $body = '' }
         if ($body -eq 'sentinel') { break }
         Start-Sleep -Milliseconds 100
     } while ([DateTime]::UtcNow -lt $deadline)
     if ($body -ne 'sentinel') { Get-Content -LiteralPath (Join-Path $testRoot 'sentinel.err.log'); throw 'Sentinel did not start.' }
     & $launcher start --root $testRoot
     Assert-True ($LASTEXITCODE -ne 0) 'Occupied port was accepted.'
-    Assert-True ((Invoke-WebRequest http://127.0.0.1:4173).Content -eq 'sentinel') 'Unrelated listener was killed.'
+    Assert-True ((Invoke-WebRequest -UseBasicParsing http://127.0.0.1:4173).Content -eq 'sentinel') 'Unrelated listener was killed.'
     Stop-Process -InputObject $sentinel -Force; $sentinel.WaitForExit(); $sentinel = $null
 
     Invoke-Launcher start
@@ -149,11 +149,17 @@ try {
     Wait-Stopped ($fourth + $bridges)
     $hostExe = Join-Path $testRoot 'native\build\Release\live-desktop-host.exe'
     Move-Item -LiteralPath $hostExe -Destination ($hostExe + '.missing')
+    # These launches are expected to fail. Windows PowerShell 5.1 turns captured native stderr into
+    # terminating errors under 'Stop', so capture them with 'Continue' and assert on exit code and text.
+    $ErrorActionPreference = 'Continue'
     $missingOutput = (& $launcher start --root $testRoot 2>&1 | Out-String)
-    Assert-True ($LASTEXITCODE -ne 0 -and $missingOutput.Contains('live-desktop-host.exe')) 'Missing native host diagnostic failed.'
+    $missingExit = $LASTEXITCODE
     Copy-Item -LiteralPath $launcher -Destination $hostExe
     $failureOutput = (& $launcher start --root $testRoot 2>&1 | Out-String)
-    Assert-True ($LASTEXITCODE -ne 0 -and $failureOutput.Contains('Native frontend host exited with code')) 'Native child failure diagnostic failed.'
+    $failureExit = $LASTEXITCODE
+    $ErrorActionPreference = 'Stop'
+    Assert-True ($missingExit -ne 0 -and $missingOutput.Contains('live-desktop-host.exe')) 'Missing native host diagnostic failed.'
+    Assert-True ($failureExit -ne 0 -and $failureOutput.Contains('Native frontend host exited with code')) 'Native child failure diagnostic failed.'
     Move-Item -LiteralPath ($hostExe + '.missing') -Destination $hostExe -Force
     # CDS is optional: missing and corrupt archives must fall back safely.
     $cds = Join-Path $testRoot 'backend\target\runtime\application.jsa'

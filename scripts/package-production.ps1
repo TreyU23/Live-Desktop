@@ -50,10 +50,19 @@ This package contains no saved user data, .env, logs, node_modules, or build too
         [ordered]@{ path = $_.FullName.Substring($packageRoot.Length + 1).Replace('\', '/'); sha256 = (Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant(); bytes = $_.Length }
     })
     [ordered]@{ formatVersion = 1; platform = 'windows-x64'; includesJavaRuntime = [bool]$IncludeJavaRuntime; files = $manifest } | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath (Join-Path $packageRoot 'manifest.json')
-    # ZipFile includes hidden .tools/.env.example files which Compress-Archive can omit.
-    Add-Type -AssemblyName System.IO.Compression.FileSystem
+    # Write entries explicitly: Compress-Archive can omit hidden .tools/.env.example files, and
+    # ZipFile.CreateFromDirectory on Windows PowerShell 5.1 (.NET Framework) stores '\' separators,
+    # which the ZIP specification forbids and non-Windows/7-Zip extractors mishandle.
+    Add-Type -AssemblyName System.IO.Compression, System.IO.Compression.FileSystem
     if (Test-Path -LiteralPath $archive) { Remove-Item -LiteralPath $archive -Force }
-    [IO.Compression.ZipFile]::CreateFromDirectory($stage, $archive)
+    $zipStream = [IO.File]::Open($archive, [IO.FileMode]::CreateNew)
+    $zip = New-Object IO.Compression.ZipArchive($zipStream, [IO.Compression.ZipArchiveMode]::Create)
+    try {
+        foreach ($file in Get-ChildItem -LiteralPath $stage -Recurse -File -Force) {
+            $entryName = $file.FullName.Substring($stage.Length + 1).Replace('\', '/')
+            [IO.Compression.ZipFileExtensions]::CreateEntryFromFile($zip, $file.FullName, $entryName, [IO.Compression.CompressionLevel]::Optimal) | Out-Null
+        }
+    } finally { $zip.Dispose(); $zipStream.Dispose() }
     Write-Output "Packaged $archive"
 } finally {
     $resolvedStage = [IO.Path]::GetFullPath($stage)

@@ -31,7 +31,7 @@ The same archive is published as `com.localassistant:live-desktop-windows-x64:1.
 
 ## Release validation
 
-RELEASE_VALIDATION_PLACEHOLDER
+Results of the release build, the automated tests and the packaged-runtime checks, plus the SHA-256 of the published ZIP, are on the [GitHub release page](https://github.com/TreyU23/Live-Desktop/releases/tag/v1.1.0).
 
 ## Evidence limits
 

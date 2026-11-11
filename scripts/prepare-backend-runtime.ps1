@@ -19,7 +19,13 @@ if ($Cds) {
     $training = Join-Path $projectRoot ('backend/target/cds-training-' + [Guid]::NewGuid().ToString('N'))
     Push-Location $runtime
     try {
-        & $java '-XX:ArchiveClassesAtExit=application.jsa' '-Dspring.context.exit=onRefresh' -jar live-desktop-backend.jar '--spring.config.import=' '--assistant.openai-api-key=' "--assistant.data-dir=$training" "--assistant.workspace-root=$training" *> (Join-Path $runtime 'cds-training.log')
+        # Windows PowerShell 5.1 turns redirected native stderr (e.g. SLF4J notices) into terminating errors under 'Stop'.
+        # Let the training run write stderr to its log and rely on the exit code instead.
+        $previousErrorAction = $ErrorActionPreference
+        $ErrorActionPreference = 'Continue'
+        try {
+            & $java '-XX:ArchiveClassesAtExit=application.jsa' '-Dspring.context.exit=onRefresh' -jar live-desktop-backend.jar '--spring.config.import=' '--assistant.openai-api-key=' "--assistant.data-dir=$training" "--assistant.workspace-root=$training" *> (Join-Path $runtime 'cds-training.log')
+        } finally { $ErrorActionPreference = $previousErrorAction }
         if ($LASTEXITCODE -ne 0) { throw 'Isolated CDS training failed.' }
         $release = Join-Path (Split-Path (Split-Path $java)) 'release'
         Copy-Item -LiteralPath $release -Destination (Join-Path $runtime 'cds-java-release.txt')

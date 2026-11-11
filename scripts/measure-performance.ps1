@@ -27,7 +27,7 @@ try {
         if ($LASTEXITCODE -ne 0) { throw "Benchmark launch $iteration failed." }
         $raw += [ordered]@{ label = $Label; iteration = $iteration; metrics = @(Get-Content -LiteralPath (Join-Path $stage '.startup-metrics.jsonl') | ForEach-Object { $_ | ConvertFrom-Json })[-1] }
         if ($iteration -eq 1) {
-            $health = Invoke-WebRequest 'http://127.0.0.1:4317/health' -TimeoutSec 5
+            $health = Invoke-WebRequest -UseBasicParsing 'http://127.0.0.1:4317/health' -TimeoutSec 5
             $token = [string]@($health.Headers['X-Live-Desktop-Token'])[0]
             if ([string]::IsNullOrWhiteSpace($token)) { throw 'Local access token was not issued.' }
             $routeHeaders = @{ 'X-Profile-Id' = 'perf-synthetic'; 'X-Live-Desktop-Token' = $token }
@@ -36,7 +36,7 @@ try {
                 foreach ($port in @(4317,4173)) {
                     for ($sample = 0; $sample -lt 100; $sample++) {
                         $watch = [Diagnostics.Stopwatch]::StartNew()
-                        $response = Invoke-WebRequest "http://127.0.0.1:$port$route" -Headers $routeHeaders
+                        $response = Invoke-WebRequest -UseBasicParsing "http://127.0.0.1:$port$route" -Headers $routeHeaders
                         $watch.Stop()
                         $routes += [ordered]@{ route = $route; port = $port; milliseconds = $watch.Elapsed.TotalMilliseconds; bytes = [Text.Encoding]::UTF8.GetByteCount($response.Content) }
                     }
@@ -47,7 +47,8 @@ try {
         & $launcher shutdown --root $stage | Out-Null
         if ($LASTEXITCODE -ne 0) { throw 'Benchmark shutdown failed.' }
     }
-    $javaVersion = & (Join-Path $env:JAVA_HOME 'bin/java.exe') -version 2>&1 | Out-String
+    $savedErrorAction = $ErrorActionPreference; $ErrorActionPreference = 'Continue'  # java -version writes to stderr
+    try { $javaVersion = & (Join-Path $env:JAVA_HOME 'bin/java.exe') -version 2>&1 | Out-String } finally { $ErrorActionPreference = $savedErrorAction }
     $artifactHashes = @(foreach ($relative in @('native/build/Release', 'backend/target/runtime', 'frontend/dist/client')) {
         Get-ChildItem -LiteralPath (Join-Path $stage $relative) -Recurse -File | ForEach-Object {
             [ordered]@{ path = $_.FullName.Substring($stage.Length + 1).Replace('\', '/'); sha256 = (Get-FileHash -LiteralPath $_.FullName).Hash }
