@@ -23,7 +23,7 @@ class ArtworkResponseTest {
         var media = mock(WindowsMediaSessionService.class);
         byte[] png = bytes(0x89, 'P', 'N', 'G', 13, 10, 26, 10);
         when(media.artwork("1-2-3")).thenReturn(png);
-        var controller = new AssistantController(null, null, null, null, null, null, null, null, media, null, null);
+        var controller = new AssistantController(null, null, null, null, null, null, null, media, null, null);
         var response = controller.mediaArtwork("1-2-3");
         assertThat(response.getStatusCode().value()).isEqualTo(200);
         assertThat(response.getHeaders().getFirst("Content-Type")).isEqualTo("image/png");

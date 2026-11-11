@@ -8,7 +8,7 @@ add_executable(live-desktop-windows-bridge windows-bridge/main.cpp windows-bridg
 target_compile_features(live-desktop-windows-bridge PRIVATE cxx_std_20)
 target_compile_definitions(live-desktop-windows-bridge PRIVATE UNICODE _UNICODE WIN32_LEAN_AND_MEAN NOMINMAX _WIN32_WINNT=0x0A00)
 target_compile_options(live-desktop-windows-bridge PRIVATE /W4 /EHsc /permissive-)
-target_link_libraries(live-desktop-windows-bridge PRIVATE windowsapp advapi32 dxgi powrprof shell32 user32)
+target_link_libraries(live-desktop-windows-bridge PRIVATE windowsapp advapi32 dxgi powrprof shell32 user32 iphlpapi pdh ws2_32)
 install(TARGETS live-desktop-windows-bridge RUNTIME DESTINATION bin)
 find_path(JNI_HEADERS jni.h HINTS "$ENV{JAVA_HOME}/include" "${CMAKE_CURRENT_SOURCE_DIR}/../.tools/jdk-21/include" REQUIRED)
 add_library(live-desktop-credentials SHARED credentials/dpapi.cpp)

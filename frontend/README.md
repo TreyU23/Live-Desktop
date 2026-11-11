@@ -1,78 +1,40 @@
 # Frontend
 
-React 19/Vite 6 presents Live Desktop's true-black dashboard, System Info, Music, conversations, memories, approvals, account settings, and local profile picker. The browser calls the backend; it does not inspect Windows directly. See the [root README](../README.md) for installation, accounts, approval semantics, and troubleshooting.
+React 19/Vite 6 renders seven Flight Deck views. `App.jsx` owns APIs, profiles and mutations; `src/views/` and `src/components/` own presentation. Styles split into tokens, shell, components and views. [Root setup/accounts](../README.md), [design contract](../DESIGN.md).
 
-The Flight Deck interface prioritizes PC instruments. Header, scrollable content and dock occupy separate rows. Desktop exposes all seven views; below 768 px, More contains Music, Approvals, Memories and Settings. Calendar and phone expand inside Overview. Shutdown and eligible profile deletion have keyboard-contained confirmation, Escape/cancel and focus restoration. Restart follows service readiness; run `start.cmd` to recover after shutdown.
+## Development and build
 
-`src/views/` and `src/components/` own presentation; `App.jsx` retains API, profile and mutation ownership. `src/styles.css` imports semantic tokens, shell, components and views. [DESIGN.md](../DESIGN.md) records the visual system. Dark mode is true black; light mode has separate tokens. Saved accent hex values remain intact; luminance chooses fill foreground and a readable variant provides text/focus contrast.
-
-## Develop and build
-
-From the repository root, with Node.js 20+ and pnpm installed:
+From the repository root, with Node 20.19+ or 22.12+ and pnpm:
 
 ```powershell
 pnpm --dir frontend install --frozen-lockfile
 .\scripts\run-frontend.ps1
-```
-
-The script can use Codex desktop's bundled Node/pnpm. Vite binds to loopback port 4173 with strict port selection and proxies `/api` and `/health` to backend 4317. Start the backend separately with `scripts/run-backend.ps1`. Stop development terminals before using the production supervisor.
-
-```powershell
 npm --prefix frontend test
 npm --prefix frontend run build
 npm --prefix frontend run test:sites
 ```
 
-Production serves `dist/client/` using the native C++ host; it needs no Node, pnpm, or Vite runtime. The build also preserves Sites outputs `dist/server/index.js` and `dist/.openai/hosting.json`. Keep `.openai/hosting.json`, `worker/index.js`, `scripts/prepare-sites-build.mjs`, and Sites tests in sync. A hosted Sites preview cannot access this PC's backend without its own suitable integration; local Windows features need the local application.
+The script can use Codex's bundled Node/pnpm and starts loopback Vite on strict port 4173, proxying `/api` and `/health` to 4317. The dev proxy rewrites `Host` to the backend so the backend allowlist matches the accepting port. `vite.config.mjs` binds to `127.0.0.1` unless `VITE_HOST` is set. `App.jsx` reads `X-Live-Desktop-Token` from a loopback `GET /health` and sends it on later calls. `POST` and `DELETE` send `Content-Type: application/json`. `VITE_API_BASE` overrides the API at build/development time; a loopback override on port 4173 or the backend port can read the token header. When `VITE_HOST` exposes the dev server beyond loopback, every proxied call reaches the backend from `127.0.0.1`, so the proxy itself removes `X-Live-Desktop-Token` from `/health` responses to non-loopback callers.
 
-`VITE_API_BASE` is a build/development override; the normal application uses same-origin routes. Build complete production assets through the root build script after changing code.
+Production serves `dist/client/` through the native host without Node. The build also emits `dist/server/index.js` and `dist/.openai/hosting.json`; preserve `.openai/hosting.json`, `worker/index.js`, the preparation script and Sites tests. A hosted preview needs its own backend integration for local Windows features.
 
-## Refresh and loading behavior
+## State and refresh contracts
 
-`resourceScheduler.js` owns dashboard reads. Each successful result commits immediately; Calendar, Phone Link, and media readiness do not block local content. Each resource has loading/error/stale status and one in-flight read. Reads use a 12-second deadline, captured profile identity, abort on teardown, and generation checks after invalidation. Manual refresh joins an existing read; mutation paths invalidate affected reads before the write and again after completion, before applying newer state. Healthy polling starts stay in refs. First success and error/recovery publish visible resource state; wall-clock freshness is separate from diagnostic `readyAt`. Missing values show a dash; failed reads retain last-known data with timestamps and resource-specific retry. Successful empty lists are ready/empty. Manual retry joins the existing scheduler.
+`resourceScheduler.js` commits resources independently, permits one read per resource and applies a 12-second deadline. Reads capture profile identity; teardown aborts them. Mutations invalidate reads before and after writes so older responses cannot overwrite confirmed results. Manual refresh joins existing reads. Healthy scheduling stays in refs; visible state tracks loading, errors/recovery and freshness. Failures retain last-known data with retry; successful empty lists remain empty; missing readings show a dash.
 
-Polling is scheduled after completion, preventing overlapping intervals:
-
-| Resource | Visible interval |
+| Resource | Interval after completion |
 | --- | --- |
-| Windows media | 5 seconds |
+| Media | 5 seconds |
 | Phone Link | 10 seconds |
-| System data | 15 seconds |
-| Health and runtime | 30 seconds |
-| Apps, actions, memories, conversations, settings | 60 seconds |
+| System | 15 seconds |
+| Health/runtime | 30 seconds |
+| Apps/actions/memories/conversations/settings | 60 seconds |
 | Calendar | 4 minutes |
 
-Hidden documents pause routine polling. Returning to visibility triggers one deduplicated refresh per resource. This pauses metadata work, not mounted playback. Mutations refresh affected lists immediately; slower reconciliation detects changes from another window. Failures preserve useful last-known data and show a refresh status. Initial system controls are unavailable until live information arrives.
+Hidden documents pause routine reads; visibility restoration triggers deduplicated refreshes. Profile switching stops old reads and reloads; request headers/browser preferences retain profile identity. Failed assistant/memory submissions preserve drafts. Successful saves clear drafts even if list refresh fails.
 
-Profiles use browser storage namespaced by local profile ID for theme, accent, avatars, music provider and links. Profile switching reloads the page after stopping old reads. Backend keys and state use the profile header. The Black accent uses white in dark mode for contrast. The profile picker is local organization, not account authentication.
+The selected music embed mounts on first Music visit and persists across navigation; provider switches replace it. Metadata comes from Windows sessions. Phone artwork reflects available platform metadata. Calendar/phone details expand within Overview. Unsupported controls say Open Settings; direct radio state uses confirmed results. Voice input/calendar editing are not implemented.
 
-## Music and integrations
+Header, scrolling content and dock use separate rows. Below 768 px, More contains Music, Approvals, Memories and Settings. Saved theme/accent preferences are profile scoped; readable accents preserve contrast. Shutdown/profile deletion confirmations contain keyboard focus, support Escape and restore focus. Generic workstation art does not identify detected hardware.
 
-The custom player uses Windows media-session data and opaque artwork URLs. Apple Music and Spotify links remain separate per profile. The selected web embed loads on the first visit to Music; once mounted it persists across view navigation. Switching provider intentionally replaces the selected embed. Neither provider requires developer credentials. Provider login, subscription, autoplay, and media-session publication remain external constraints.
-
-Phone Link uses live metadata and platform-matched artwork, with a neutral unknown state. Opening Windows apps is labeled external. iCloud credentials are entered only in Settings and sent to the local backend; no password is returned. Wi-Fi/Bluetooth actions apply confirmed state immediately; unsupported toggles open approved Settings shortcuts.
-
-Only explicitly used Feather icons are imported, allowing the build to remove the rest of the icon library. Large optional views and image conversion remain profiling decisions; current images are unchanged.
-
-## Browser validation and diagnostics
-
-For the performance regression harness, start a separate test server from the root:
-
-```powershell
-npm --prefix frontend run dev -- --host 127.0.0.1 --port 4174 --strictPort
-npm --prefix frontend run test:browser
-```
-
-The harness uses Playwright with installed Microsoft Edge, mocks backend integrations, holds Calendar for a real ten seconds, and checks independent rendering, visible/hidden polling, control pending feedback, profile request headers, and deferred music iframe continuity. Five-minute polling windows use accelerated browser timers. It records browser version/results and desktop/mobile screenshots under `backend/target/performance/`. From `frontend/`, `node tests/browser-performance.mjs --baseline` compiles pinned baseline `5d7539f` for comparison.
-
-Helper tests cover scheduling/deduplication/invalidation; the browser test establishes rendering behavior. Synthetic tests do not prove real audio, authenticated accounts, or hardware changes. See the [performance report](../docs/PERFORMANCE_RESULTS.md).
-
-With that server running, `node frontend/tests/browser-mutation-races.mjs` checks that a read started during a mutation cannot overwrite the confirmed result. It also verifies that a failed memory save preserves the draft, while a successful save clears it even if the subsequent list refresh fails.
-
-`node frontend/tests/browser-redesign.mjs` checks all seven views at 1920, 1440, 1280, 768, 390 and 320 px, reserved navigation, action scopes and literal content, chat drafts, confirmation focus, saved appearance, loading versus real zero, stale-data retry, and expanded agenda/phone panels. It writes synthetic screenshots/results under `backend/target/redesign/`. Its 640x360 check approximates the CSS viewport at 200% of 1280x720; it does not operate browser UI zoom. `capture-redesign-baseline.mjs` captures the seven original views from pinned revision `5d7539f` for comparison. Tests may use `BROWSER_TEST_BASE_URL` to select a separate loopback preview and `PLAYWRIGHT_EXECUTABLE_PATH` to select an installed browser explicitly. These overrides affect tests only.
-
-With the same server running, `node frontend/tests/browser-cpu-performance.mjs` observes five real minutes visible and five with hidden state emulated. It compares independent baseline/candidate headless Edge process CPU times and records them under `backend/target/performance/browser-cpu.json`; it does not sample working-set memory. This synthetic browser-only experiment excludes Java/native CPU, actual background-window throttling, authenticated integrations and playback; it does not close the full application CPU acceptance gate. Shared development-machine load and processes that exit between samples also limit the comparison.
-
-Open the dashboard with `?diagnostics=1` to collect up to 1,000 request/commit timing samples. `window.liveDesktopTimings()` returns copies. Sampling records resource names/times only, with no query values or response content. Normal operation does not collect these browser diagnostics.
-
-The production lifecycle suite also runs `tests/runtime-smoke.mjs` against the built dashboard, native host and real backend in an isolated installation. It requires Playwright dependencies and installed Microsoft Edge on the development machine; these are test dependencies, not runtime package requirements.
+[Validation commands/limits](../docs/VALIDATION.md) cover browser rendering, polling, mutation races, production smoke and diagnostics. Synthetic browser evidence goes under ignored `backend/target/`.

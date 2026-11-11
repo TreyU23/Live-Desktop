@@ -51,10 +51,15 @@ public class SystemService {
     private final WindowsSystemControlService systemControls;
     private final WindowsBridgeClient bridge;
     private final ObjectMapper objectMapper = new ObjectMapper();
+    private static final Duration IO_RATE_MIN_ELAPSED = Duration.ofSeconds(1);
+    private static final Duration IO_RATE_MAX_ELAPSED = Duration.ofMinutes(5);
+
     private final Object batteryLock = new Object();
+    private final Object ioRateLock = new Object();
     private final PhoneMetadataCache phoneMetadata = new PhoneMetadataCache();
     private volatile WindowsDetails cachedWindowsDetails;
     private volatile CachedBattery cachedBattery;
+    private volatile IoCounterSample previousIoCounters;
 
     public SystemService(AssistantProperties properties, WindowsSystemControlService systemControls) {
         workspaceRoot = Path.of(properties.getWorkspaceRoot()).toAbsolutePath().normalize();
@@ -77,6 +82,7 @@ public class SystemService {
     public SystemSnapshot snapshot() {
         CompletableFuture<BatteryInfo> battery = CompletableFuture.supplyAsync(this::batteryInfo);
         CompletableFuture<List<SystemControl>> controls = CompletableFuture.supplyAsync(this::controls);
+        CompletableFuture<IoRates> ioRates = CompletableFuture.supplyAsync(this::ioRates);
         OperatingSystemMXBean osBean = (OperatingSystemMXBean) ManagementFactory.getOperatingSystemMXBean();
         long totalMemory = Math.max(0, osBean.getTotalMemorySize());
         long freeMemory = Math.max(0, osBean.getFreeMemorySize());
@@ -84,8 +90,16 @@ public class SystemService {
         File disk = Optional.ofNullable(workspaceRoot.toFile().toPath().getRoot())
                 .map(Path::toFile)
                 .orElse(workspaceRoot.toFile());
-        NetworkInfo network = networkInfo();
+        NetworkInfo baseNetwork = networkInfo();
         WindowsDetails windowsDetails = windowsDetails(totalMemory);
+        IoRates rates = ioRates.join();
+        NetworkInfo network = new NetworkInfo(
+                baseNetwork.name(),
+                baseNetwork.address(),
+                baseNetwork.connected(),
+                rates.rxBytesPerSec(),
+                rates.txBytesPerSec(),
+                rates.networkAvailable());
 
         return new SystemSnapshot(
                 Instant.now().toString(),
@@ -103,7 +117,8 @@ public class SystemService {
                         Math.max(0, disk.getTotalSpace() - disk.getUsableSpace()),
                         Math.max(0, disk.getTotalSpace()),
                         network,
-                        battery.join()),
+                        battery.join(),
+                        rates.diskActivity()),
                 controls.join(),
                 windowsDetails.device(),
                 windowsDetails.windows());
@@ -447,13 +462,79 @@ public class SystemService {
                                         || rawName.contains("wlan") || rawName.contains("wireless")
                                 ? "Wi-Fi"
                                 : item.getName();
-                        return new NetworkInfo(label, address, true);
+                        return new NetworkInfo(label, address, true, null, null, false);
                     })
-                    .orElseGet(() -> new NetworkInfo("No active network", "Offline", false));
+                    .orElseGet(() -> new NetworkInfo("No active network", "Offline", false, null, null, false));
         } catch (Exception ignored) {
             // Return the explicit offline state below.
         }
-        return new NetworkInfo("No active network", "Offline", false);
+        return new NetworkInfo("No active network", "Offline", false, null, null, false);
+    }
+
+    private IoRates ioRates() {
+        if (!isWindows()) {
+            return IoRates.unavailable();
+        }
+        try {
+            Map<String, Object> result = bridge.request("system.ioCounters", Map.of());
+            JsonNode root = objectMapper.valueToTree(result);
+            long networkIn = longValue(root, "networkInBytes", -1);
+            long networkOut = longValue(root, "networkOutBytes", -1);
+            long diskRead = longValue(root, "diskReadBytes", -1);
+            long diskWrite = longValue(root, "diskWriteBytes", -1);
+            boolean diskAvailable = Boolean.TRUE.equals(result.get("diskAvailable"));
+            if (networkIn < 0 || networkOut < 0) {
+                return IoRates.unavailable();
+            }
+            Instant now = Instant.now();
+            IoCounterSample current = new IoCounterSample(now, networkIn, networkOut, diskRead, diskWrite, diskAvailable);
+            synchronized (ioRateLock) {
+                IoCounterSample previous = previousIoCounters;
+                previousIoCounters = current;
+                if (previous == null) {
+                    return IoRates.unavailable();
+                }
+                return computeIoRates(previous, current);
+            }
+        } catch (Exception ignored) {
+            return IoRates.unavailable();
+        }
+    }
+
+    static IoRates computeIoRates(IoCounterSample previous, IoCounterSample current) {
+        Duration elapsed = Duration.between(previous.capturedAt(), current.capturedAt());
+        if (elapsed.compareTo(IO_RATE_MIN_ELAPSED) < 0 || elapsed.compareTo(IO_RATE_MAX_ELAPSED) > 0) {
+            return IoRates.unavailable();
+        }
+        double seconds = Math.max(elapsed.toMillis() / 1000.0, 0.001);
+        Long rx = rateOrNull(previous.networkInBytes(), current.networkInBytes(), seconds);
+        Long tx = rateOrNull(previous.networkOutBytes(), current.networkOutBytes(), seconds);
+        boolean networkAvailable = rx != null && tx != null;
+        Long diskRead = null;
+        Long diskWrite = null;
+        boolean diskAvailable = false;
+        if (previous.diskAvailable() && current.diskAvailable()
+                && previous.diskReadBytes() >= 0 && current.diskReadBytes() >= 0
+                && previous.diskWriteBytes() >= 0 && current.diskWriteBytes() >= 0) {
+            diskRead = rateOrNull(previous.diskReadBytes(), current.diskReadBytes(), seconds);
+            diskWrite = rateOrNull(previous.diskWriteBytes(), current.diskWriteBytes(), seconds);
+            diskAvailable = diskRead != null && diskWrite != null;
+        }
+        return new IoRates(
+                networkAvailable ? rx : null,
+                networkAvailable ? tx : null,
+                networkAvailable,
+                new DiskActivityInfo(
+                        diskAvailable,
+                        diskAvailable ? diskRead : null,
+                        diskAvailable ? diskWrite : null));
+    }
+
+    private static Long rateOrNull(long previous, long current, double seconds) {
+        if (current < previous) {
+            return null;
+        }
+        return Math.round((current - previous) / seconds);
     }
 
     private int networkPriority(NetworkInterface item) {
@@ -520,11 +601,38 @@ public class SystemService {
             long storageUsedBytes,
             long storageTotalBytes,
             NetworkInfo network,
-            BatteryInfo battery) {}
+            BatteryInfo battery,
+            DiskActivityInfo diskActivity) {}
 
-    public record NetworkInfo(String name, String address, boolean connected) {}
+    public record NetworkInfo(
+            String name,
+            String address,
+            boolean connected,
+            Long rxBytesPerSec,
+            Long txBytesPerSec,
+            boolean ratesAvailable) {}
+
+    public record DiskActivityInfo(boolean available, Long readBytesPerSec, Long writeBytesPerSec) {}
 
     public record BatteryInfo(boolean available, Integer percent, String detail) {}
+
+    record IoCounterSample(
+            Instant capturedAt,
+            long networkInBytes,
+            long networkOutBytes,
+            long diskReadBytes,
+            long diskWriteBytes,
+            boolean diskAvailable) {}
+
+    record IoRates(
+            Long rxBytesPerSec,
+            Long txBytesPerSec,
+            boolean networkAvailable,
+            DiskActivityInfo diskActivity) {
+        static IoRates unavailable() {
+            return new IoRates(null, null, false, new DiskActivityInfo(false, null, null));
+        }
+    }
 
     public record DeviceInfo(
             String manufacturer,

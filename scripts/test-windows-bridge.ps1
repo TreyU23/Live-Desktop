@@ -30,10 +30,15 @@ try {
     if (-not $capabilities.ok -or $capabilities.result.operations -notcontains 'media.artwork') { throw 'Artwork operation missing from capability inventory.' }
     if ((Invoke-BridgeRead "unregistered.operation").ok) { throw "Unknown operation was accepted." }
     if ((Invoke-BridgeRead "bridge.health" 2).ok) { throw "Unsupported protocol was accepted." }
-    foreach ($operation in @('power.snapshot','system.staticSnapshot','process.knownApps','phoneLink.snapshot')) {
+    foreach ($operation in @('power.snapshot','system.staticSnapshot','system.ioCounters','process.knownApps','phoneLink.snapshot')) {
         $response = Invoke-BridgeRead $operation
         if (-not $response.ok) { throw "$operation failed: $($response.error.code)" }
     }
+    $io = Invoke-BridgeRead 'system.ioCounters'
+    foreach ($field in @('networkInBytes','networkOutBytes','diskReadBytes','diskWriteBytes')) {
+        if ($null -eq $io.result.$field) { throw "system.ioCounters missing $field." }
+    }
+    if ($null -eq $io.result.diskAvailable) { throw 'system.ioCounters missing diskAvailable.' }
     foreach ($provider in @('music','apple','spotify')) {
         $media = Invoke-BridgeRead 'media.snapshot' 1 @{provider=$provider}
         if (-not $media.ok -or $null -eq $media.result.title) { throw "Media snapshot contract failed for $provider." }

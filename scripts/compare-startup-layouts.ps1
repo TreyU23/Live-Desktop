@@ -30,9 +30,11 @@ foreach ($pair in 1..$Pairs) {
                 if ($ready) { break }; Start-Sleep -Milliseconds 50
             }
             if (-not $ready) { throw "Layout $layout failed. See backend/target/performance/$logPrefix.err.log" }
+            $token = [string]@($response.Headers['X-Live-Desktop-Token'])[0]
+            if ([string]::IsNullOrWhiteSpace($token)) { throw 'Local access token was not issued.' }
             $readiness = $watch.Elapsed.TotalMilliseconds
             $firstUse = [Diagnostics.Stopwatch]::StartNew()
-            Invoke-WebRequest 'http://127.0.0.1:4317/api/system' -Headers @{ 'X-Profile-Id' = 'synthetic' } -TimeoutSec 20 | Out-Null
+            Invoke-WebRequest 'http://127.0.0.1:4317/api/system' -Headers @{ 'X-Profile-Id' = 'synthetic'; 'X-Live-Desktop-Token' = $token } -TimeoutSec 20 | Out-Null
             $firstUse.Stop(); $process.Refresh()
             $results += [ordered]@{ pair = $pair; layout = $layout; aot = [bool]$Aot; readinessMs = $readiness; firstSystemMs = $firstUse.Elapsed.TotalMilliseconds; workingSetBytes = $process.WorkingSet64 }
         } finally { if (-not $process.HasExited) { Stop-Process -InputObject $process -Force; $process.WaitForExit() } }

@@ -50,8 +50,16 @@ const FALLBACK_SYSTEM = {
     memoryTotalBytes: null,
     storageUsedBytes: null,
     storageTotalBytes: null,
-    network: { name: "Unavailable", address: "Waiting for system data", connected: false },
+    network: {
+      name: "Unavailable",
+      address: "Waiting for system data",
+      connected: false,
+      rxBytesPerSec: null,
+      txBytesPerSec: null,
+      ratesAvailable: false,
+    },
     battery: { available: false, percent: null, detail: "Waiting for system data" },
+    diskActivity: { available: false, readBytesPerSec: null, writeBytesPerSec: null },
   },
   controls: CONTROL_ORDER.map((id) => ({
     id,
@@ -119,6 +127,30 @@ function emptyMusicPlayerFor(providerId) {
   };
 }
 
+const SYSTEM_SERIES_CAP = 60;
+
+function systemSeriesSample(snapshot) {
+  const resources = snapshot?.resources || {};
+  const memoryTotal = resources.memoryTotalBytes;
+  const storageTotal = resources.storageTotalBytes;
+  const memory = Number.isFinite(resources.memoryUsedBytes) && memoryTotal > 0
+    ? (resources.memoryUsedBytes / memoryTotal) * 100
+    : null;
+  const storage = Number.isFinite(resources.storageUsedBytes) && storageTotal > 0
+    ? (resources.storageUsedBytes / storageTotal) * 100
+    : null;
+  return {
+    t: snapshot?.capturedAt || new Date().toISOString(),
+    cpu: Number.isFinite(resources.cpuPercent) ? resources.cpuPercent : null,
+    memory,
+    storage,
+    netRx: resources.network?.ratesAvailable ? resources.network.rxBytesPerSec : null,
+    netTx: resources.network?.ratesAvailable ? resources.network.txBytesPerSec : null,
+    diskRead: resources.diskActivity?.available ? resources.diskActivity.readBytesPerSec : null,
+    diskWrite: resources.diskActivity?.available ? resources.diskActivity.writeBytesPerSec : null,
+  };
+}
+
 const PROFILES_KEY = "live-desktop.profiles";
 const ACTIVE_PROFILE_KEY = "live-desktop.active-profile";
 const MUSIC_CONNECTION_KEY = "live-desktop.apple-music";
@@ -156,17 +188,58 @@ function readMusicIntegration(profileId = activeProfileId()) {
   }
 }
 
-async function api(path, options = {}) {
+let localAccessTokenValue = "";
+let localAccessSettled = false;
+let localAccessTokenTask = null;
+let localAccessGeneration = 0;
+
+function resetLocalAccessToken() {
+  localAccessGeneration += 1;
+  localAccessTokenValue = "";
+  localAccessSettled = false;
+  localAccessTokenTask = null;
+}
+
+function localAccessToken() {
+  if (localAccessSettled) return Promise.resolve(localAccessTokenValue);
+  if (!localAccessTokenTask) {
+    const generation = localAccessGeneration;
+    localAccessTokenTask = fetch(`${API_BASE}/health`, { cache: "no-store" })
+      .then((response) => {
+        if (generation !== localAccessGeneration) return localAccessTokenValue;
+        const token = response.headers.get("X-Live-Desktop-Token") || "";
+        if (response.ok) {
+          localAccessTokenValue = token;
+          localAccessSettled = true;
+        }
+        return localAccessTokenValue;
+      })
+      .catch(() => localAccessTokenValue)
+      .finally(() => {
+        if (generation === localAccessGeneration) localAccessTokenTask = null;
+      });
+  }
+  return localAccessTokenTask;
+}
+
+async function api(path, options = {}, allowTokenRefresh = true) {
   const { profileId = activeProfileId(), headers, ...requestOptions } = options;
+  const method = String(requestOptions.method || "GET").toUpperCase();
+  const token = await localAccessToken();
   const response = await fetch(`${API_BASE}${path}`, {
     ...requestOptions,
     cache: "no-store",
     headers: {
-      "X-Profile-Id": profileId,
-      ...(options.body ? { "Content-Type": "application/json" } : {}),
       ...headers,
+      "X-Profile-Id": profileId,
+      ...(token ? { "X-Live-Desktop-Token": token } : {}),
+      ...(method === "POST" || method === "DELETE" ? { "Content-Type": "application/json" } : {}),
     },
   });
+  if (response.status === 403 && allowTokenRefresh) {
+    resetLocalAccessToken();
+    return api(path, options, false);
+  }
   const contentType = response.headers.get("content-type") || "";
   const payload = contentType.includes("application/json") ? await response.json() : null;
   if (!response.ok) {
@@ -180,7 +253,12 @@ const delay = (milliseconds) => new Promise((resolve) => window.setTimeout(resol
 async function waitForRestartReady() {
   for (let attempt = 0; attempt < 60; attempt += 1) {
     try {
-      const response = await fetch(`${API_BASE}/api/runtime?restart=${Date.now()}`, { cache: "no-store" });
+      resetLocalAccessToken();
+      const token = await localAccessToken();
+      const response = await fetch(`${API_BASE}/api/runtime?restart=${Date.now()}`, {
+        cache: "no-store",
+        headers: token ? { "X-Live-Desktop-Token": token } : {},
+      });
       if (response.ok) {
         const status = await response.json();
         if (status.backendOnline && status.frontendOnline) return true;
@@ -299,6 +377,7 @@ export function App() {
   const [musicMounted, setMusicMounted] = useState(false);
   useEffect(() => { if (activeView === "music") setMusicMounted(true); }, [activeView]);
   const [system, setSystem] = useState(FALLBACK_SYSTEM);
+  const [systemSeries, setSystemSeries] = useState([]);
   const [apps, setApps] = useState([]);
   const [phone, setPhone] = useState({ installed: false, running: false, connected: false, detail: "Checking Phone Link" });
   const [calendar, setCalendar] = useState(EMPTY_ICLOUD_CALENDAR);
@@ -430,6 +509,7 @@ export function App() {
     resourceStates.current = {};
     committedResources.current.clear();
     setResourceStatus({});
+    setSystemSeries([]);
     const resources = createResourceScheduler({
       read: async (path, signal) => {
         const resource = path.split("?")[0];
@@ -451,7 +531,14 @@ export function App() {
     scheduler.current = resources;
     const definitions = {
       health: { path: "/health", interval: 30000, apply: value => setHealth({ connected: true, configured: Boolean(value.openAiConfigured) }), error: () => setHealth({ connected: false, configured: false }) },
-      system: { path: "/api/system", interval: 15000, apply: setSystem },
+      system: {
+        path: "/api/system",
+        interval: 15000,
+        apply: (value) => {
+          setSystem(value);
+          setSystemSeries((current) => [...current, systemSeriesSample(value)].slice(-SYSTEM_SERIES_CAP));
+        },
+      },
       apps: { path: "/api/system/apps", interval: 60000, apply: setApps },
       phone: { path: "/api/integrations/phone-link", interval: 10000, apply: setPhone, error: message => setPhone(current => ({ ...current, detail: message })) },
       actions: { path: "/api/actions", apply: setActions },
@@ -538,6 +625,62 @@ export function App() {
         action.status === "completed"
           ? "Phone Link opened. The dashboard will stay open."
           : "Phone Link needs first-time approval. The dashboard will stay open.",
+        "success",
+      );
+    } catch (error) {
+      notify(error.message, "error");
+    } finally {
+      setPendingControl(null);
+    }
+  };
+
+  const openCalendarExternally = async () => {
+    setPendingControl("calendar");
+    try {
+      await scheduler.current?.invalidate("actions");
+      let usedWeb = false;
+      let action;
+      try {
+        action = await api("/api/integrations/icloud-calendar/open", { method: "POST" });
+      } catch (nativeError) {
+        usedWeb = true;
+        setPendingControl("calendar-web");
+        notify(`${nativeError.message} Trying iCloud on the web…`, "error");
+        action = await api("/api/integrations/icloud-calendar/open-web", { method: "POST" });
+      }
+      await scheduler.current?.invalidate("actions");
+      setActions((current) => upsertAction(current, action));
+      notify(
+        action.status === "completed"
+          ? (usedWeb
+            ? "iCloud Calendar opened externally. The dashboard will stay open."
+            : "Windows Calendar opened externally. The dashboard will stay open.")
+          : (usedWeb
+            ? "Opening iCloud Calendar externally needs first-time approval."
+            : "Opening Windows Calendar externally needs first-time approval."),
+        "success",
+      );
+    } catch (error) {
+      notify(error.message, "error");
+    } finally {
+      setPendingControl(null);
+    }
+  };
+
+  const openMusicExternally = async () => {
+    setPendingControl("music-external");
+    try {
+      await scheduler.current?.invalidate("actions");
+      const action = await api(
+        `/api/integrations/media-session/open-external?provider=${musicProviderId}`,
+        { method: "POST" },
+      );
+      await scheduler.current?.invalidate("actions");
+      setActions((current) => upsertAction(current, action));
+      notify(
+        action.status === "completed"
+          ? `${musicProvider.name} opened externally. The dashboard will stay open.`
+          : `Opening ${musicProvider.name} externally needs first-time approval.`,
         "success",
       );
     } catch (error) {
@@ -797,18 +940,18 @@ export function App() {
 
       <div className="view-region" ref={viewRegion}>
       {Object.entries(resourceStatus).some(([, value]) => value.error) ? <div className="refresh-summary" role="status"><span>Some resources could not refresh. Last available data is retained.</span>{Object.entries(resourceStatus).filter(([, value]) => value.error).map(([key]) => <button key={key} type="button" disabled={resourceStatus[key].loading} onClick={() => retry(key)}>Refresh {key}</button>)}</div> : null}
-      {activeView === "home" ? <HomeView system={system} health={health} controls={controls} pendingControl={pendingControl} onControl={queueControl} pendingCount={pendingCount} navigate={setActiveView} apps={apps}
+      {activeView === "home" ? <HomeView system={system} systemSeries={systemSeries} health={health} controls={controls} pendingControl={pendingControl} onControl={queueControl} pendingCount={pendingCount} navigate={setActiveView} apps={apps}
         states={resourceStates.current} retry={retry} onSubmit={sendMessage} busy={assistantBusy}
-        calendarProps={{ calendar, calendarRefreshing, onCalendarDateChange: date => refreshCalendar(date, false), onRefreshCalendar: date => refreshCalendar(date, true), onOpenCalendarSettings: () => setActiveView('settings') }}
+        calendarProps={{ calendar, calendarRefreshing, onCalendarDateChange: date => refreshCalendar(date, false), onRefreshCalendar: date => refreshCalendar(date, true), onOpenCalendarSettings: () => setActiveView('settings'), onOpenCalendarExternally: openCalendarExternally }}
         phoneProps={{ phone, onOpen: openPhone, onRefresh: () => refreshPhone(true), onCopy: copyPhoneName, busy: pendingControl === 'phone', refreshing: phoneRefreshing }}
-        mediaProps={{ musicProvider, musicPlayer, musicConfigured: Boolean(musicConnection.embedUrl), onOpenMusic: () => setActiveView('music'), onMusicAction: controlMusic }} /> : null}
+        mediaProps={{ musicProvider, musicPlayer, musicConfigured: Boolean(musicConnection.embedUrl), onOpenMusic: () => setActiveView('music'), onMusicAction: controlMusic, onOpenMusicExternally: openMusicExternally }} /> : null}
 
       {activeView === "system" ? boundary("system", "System", <SystemInfoView system={system} connected={health.connected} configured={health.configured} onCopy={copySystemInfo} />) : null}
 
       {activeView === "approvals" ? boundary("actions", "Approvals", <ApprovalsView actions={actions} loading={false} onApprove={(id) => updateAction(id, "approve")} onReject={(id) => updateAction(id, "reject")} />) : null}
       {activeView === "memories" ? boundary("memories", "Memories", <MemoriesView memories={memories} onCreate={createMemory} onDelete={deleteMemory} />) : null}
       {activeView === "conversations" ? <ConversationsView conversations={conversations} selected={selectedConversation} onSelect={selectConversation} onSend={sendMessage} busy={assistantBusy} profileName={activeProfile.name} configured={health.configured} pendingCount={pendingCount} /> : null}
-      {activeView === "music" ? <MusicView musicProvider={musicProvider} musicConnection={musicConnection} musicPlayer={musicPlayer} onMusicAction={controlMusic} onOpenSettings={() => setActiveView("settings")} /> : null}
+      {activeView === "music" ? <MusicView musicProvider={musicProvider} musicConnection={musicConnection} musicPlayer={musicPlayer} onMusicAction={controlMusic} onOpenMusicExternally={openMusicExternally} onOpenSettings={() => setActiveView("settings")} /> : null}
       {musicMounted && musicConnection.embedUrl ? <div className={`music-web-player music-web-player--${musicProviderId} ${activeView === "music" ? "" : "music-web-player--parked"}`} aria-hidden={activeView !== "music"}><iframe key={`${musicProviderId}:${musicConnection.embedUrl}`} title={`${musicProvider.name} web player`} src={musicConnection.embedUrl} allow={musicProviderId === "apple" ? "autoplay *; encrypted-media *; fullscreen *; clipboard-write" : "autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"} loading="eager" /></div> : null}
       {activeView === "settings" ? <SettingsView darkMode={darkMode} onDarkModeChange={setDarkMode} accentColor={accentColor} onAccentColorChange={setAccentColor} onCustomAccentColorChange={setCustomAccentColor} calendar={calendar} onConnectCalendar={connectICloudCalendar} onDisconnectCalendar={disconnectICloudCalendar} musicProviderId={musicProviderId} musicConnection={musicConnection} musicPlayer={musicPlayer} onMusicProviderChange={switchMusicProvider} onSaveMusic={saveMusicConnection} onDisconnectMusic={disconnectMusic} onRefreshMusic={() => refreshMusicPlayer(true)} onOpenMusic={() => setActiveView("music")} openAiSettings={openAiSettings} onSaveOpenAiKey={saveOpenAiKey} onDeleteOpenAiKey={deleteOpenAiKey} /> : null}
 

@@ -1,8 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { adaptResourceStatus, resourceViewState } from '../src/presentation/resourceViewState.js';
-import { formatBytes, percent, formatPercent, localIsoDate } from '../src/presentation/formatters.js';
+import { formatBytes, formatBytesPerSec, percent, formatPercent, localIsoDate } from '../src/presentation/formatters.js';
 import { actionDetails } from '../src/presentation/actionDetails.js';
+import { utilizationSeverity } from '../src/presentation/utilizationSeverity.js';
 test('readiness distinguishes first failure, successful empty data and last-known failure', () => {
   assert.equal(resourceViewState(), 'loading');
   assert.equal(resourceViewState(adaptResourceStatus({}, { error: 'Offline' })), 'error');
@@ -16,6 +17,8 @@ test('readiness distinguishes first failure, successful empty data and last-know
 test('zero and unavailable resource readings remain distinct', () => {
   assert.equal(formatBytes(0), '0 B');
   assert.equal(formatBytes(null), 'Unavailable');
+  assert.equal(formatBytesPerSec(1024), '1 KB/s');
+  assert.equal(formatBytesPerSec(null), 'Unavailable');
   assert.equal(percent(0, 1024), 0);
   assert.equal(percent(null, 1024), null);
   assert.equal(percent(4, 0), null);
@@ -23,6 +26,16 @@ test('zero and unavailable resource readings remain distinct', () => {
   assert.equal(formatPercent(null), 'Unavailable');
   assert.equal(formatPercent(0), '0%');
   assert.equal(formatPercent(200), 'Unavailable');
+});
+test('utilization severity bands mark elevated and critical values', () => {
+  assert.equal(utilizationSeverity(39), 'normal');
+  assert.equal(utilizationSeverity(74.9), 'normal');
+  assert.equal(utilizationSeverity(75), 'elevated');
+  assert.equal(utilizationSeverity(89), 'elevated');
+  assert.equal(utilizationSeverity(90), 'critical');
+  assert.equal(utilizationSeverity(91), 'critical');
+  assert.equal(utilizationSeverity(null), null);
+  assert.equal(utilizationSeverity(101), null);
 });
 test('calendar key preserves the intended local day at DST boundaries', () => {
   for (const day of [1, 2, 8]) assert.equal(localIsoDate(new Date(2026, 10, day, 12)), `2026-11-${String(day).padStart(2, '0')}`);

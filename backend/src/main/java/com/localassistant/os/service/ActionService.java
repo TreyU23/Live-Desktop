@@ -22,7 +22,9 @@ public class ActionService {
             "ms-settings:nightlight",
             "ms-settings:privacy-microphone",
             "ms-settings:batterysaver",
-            "ms-phone:");
+            "ms-phone:",
+            "outlookcal:",
+            "spotify:");
     private final StateStore store;
     private final WorkspaceService workspace;
     private final MemoryService memories;

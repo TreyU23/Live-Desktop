@@ -1,22 +1,10 @@
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import { writeFile, mkdir } from 'node:fs/promises';
-import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 process.chdir(fileURLToPath(new URL('..', import.meta.url)));
 const require = createRequire(import.meta.url);
 const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
-const baseline = process.argv.includes('--baseline');
-let baselineSource;
-if (baseline) {
-  const { transformSync } = createRequire(require.resolve('vite/package.json'))('esbuild');
-  const source = execFileSync('git', ['show', '5d7539fed256744b56b0a7201cab773a3adc530c:frontend/src/App.jsx'], { encoding: 'utf8' })
-    .replace(/import \{([^}]+)\} from "react";/, 'import React from "react"; const {$1} = React;');
-  baselineSource = transformSync(source, { loader: 'jsx', jsxFactory: 'React.createElement', jsxFragment: 'React.Fragment', define: { 'import.meta.env.VITE_API_BASE': '""' } }).code
-    .replaceAll('"react"', '"/node_modules/.vite/deps/react.js"')
-    .replaceAll('"react-icons/fi"', '"/node_modules/.vite/deps/react-icons_fi.js"')
-    .replaceAll('from "./', 'from "/src/');
-}
 const browser = await chromium.launch({ ...(process.env.PLAYWRIGHT_EXECUTABLE_PATH ? { executablePath: process.env.PLAYWRIGHT_EXECUTABLE_PATH } : { channel: 'msedge' }), headless: true });
 const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
 await page.clock.install();
@@ -31,7 +19,6 @@ let releaseCalendar;
 const calendarGate = new Promise(resolve => { releaseCalendar = resolve; });
 await page.route('**/*', async route => {
   const url = new URL(route.request().url());
-  if (baseline && url.pathname === '/src/App.jsx') return route.fulfill({ contentType: 'text/javascript', body: baselineSource });
   if (url.hostname === 'embed.music.apple.com') return route.fulfill({ contentType: 'text/html', body: '<p>Mock music player</p>' });
   if (!url.pathname.startsWith('/api/') && url.pathname !== '/health') return route.continue();
   profileHeaders.push(route.request().headers()["x-profile-id"]);
@@ -51,20 +38,21 @@ await page.route('**/*', async route => {
   try { await route.fulfill({ json: body }); } catch { /* Aborted reads during reload/teardown. */ }
 });
 try {
+  await mkdir('../backend/target/performance', { recursive: true });
   const started = Date.now();
   await page.goto((process.env.BROWSER_TEST_BASE_URL || 'http://127.0.0.1:4174') + '/?diagnostics=1');
   await page.clock.runFor(200);
   await page.waitForTimeout(1000);
   const independentlyReady = await page.getByText('Local mode', { exact: true }).count() > 0;
-  if (!baseline) assert.ok(independentlyReady, 'Core UI waited for calendar');
-  const coreCommitMs = baseline ? null : await page.evaluate(() => window.liveDesktopTimings().filter(sample => ['health','system','actions','memories','settings'].includes(sample.resource) && sample.phase === 'widget-commit').map(sample => sample.duration));
-  if (!baseline) { assert.ok(coreCommitMs.length > 0); assert.ok(Math.max(...coreCommitMs) <= 250, 'Core commit exceeded 250ms'); }
+  assert.ok(independentlyReady, 'Core UI waited for calendar');
+  const coreCommitMs = await page.evaluate(() => window.liveDesktopTimings().filter(sample => ['health','system','actions','memories','settings'].includes(sample.resource) && sample.phase === 'widget-commit').map(sample => sample.duration));
+  { assert.ok(coreCommitMs.length > 0); assert.ok(Math.max(...coreCommitMs) <= 250, 'Core commit exceeded 250ms'); }
   // Hold the optional request for a real ten seconds, not a synthetic response-only test.
   await page.waitForTimeout(Math.max(0, 10000 - (Date.now() - started)));
   releaseCalendar();
   await page.clock.runFor(500);
   await page.getByText('Local mode', { exact: true }).waitFor({ state: 'attached' });
-  if (!baseline) {
+  {
     const radio = page.getByRole('switch', { name: 'Wi-Fi: off. Request on', exact: true });
     await radio.click();
     await page.clock.runFor(50);
@@ -78,7 +66,7 @@ try {
   }
   const visibleRequests = [...counts.values()].reduce((a,b) => a+b, 0);
   assert.ok(visibleRequests > 0, 'Polling observation did not exercise timers');
-  if (!baseline) assert.ok(visibleRequests <= 160, `Five-minute request budget exceeded: ${visibleRequests}`);
+  assert.ok(visibleRequests <= 160, `Five-minute request budget exceeded: ${visibleRequests}`);
   await page.evaluate(() => {
     Object.defineProperty(document, 'hidden', { configurable: true, get: () => true });
     document.dispatchEvent(new Event('visibilitychange'));
@@ -90,7 +78,7 @@ try {
     await page.waitForTimeout(30);
   }
   const hiddenRequests = [...counts.values()].reduce((a,b) => a+b, 0);
-  if (!baseline) assert.equal(hiddenRequests, 0, 'Hidden dashboard continued polling');
+  assert.equal(hiddenRequests, 0, 'Hidden dashboard continued polling');
   await page.evaluate(() => {
     Object.defineProperty(document, 'hidden', { configurable: true, get: () => false });
     document.dispatchEvent(new Event('visibilitychange'));
@@ -101,7 +89,7 @@ try {
   await page.screenshot({ path: '../backend/target/performance/dashboard-mobile.png' });
   assert.deepEqual(errors, []);
   let iframeContinuity = null;
-  if (!baseline) {
+  {
     await page.setViewportSize({ width: 1440, height: 1000 });
     assert.equal(await page.locator('iframe').count(), 0, 'Music loaded before first visit');
     await page.getByRole('button', { name: 'Music', exact: true }).click();
@@ -126,8 +114,8 @@ try {
     assert.ok(profileHeaders.length > headerIndex, 'Switched profile made no reads');
     assert.ok(profileHeaders.slice(headerIndex).every(id => id === 'second'), 'Old profile used after switch');
   }
-  const result = { coreCommitMs, iframeContinuity, profileSwitch: !baseline, controlPendingWithinMs: baseline ? null : 50, baseline, independentlyReady, calendarDelayMs: 10000, visibleRequests, hiddenRequests, observationMs: 300000, clock: 'accelerated browser timers for polling; real delayed calendar', browser: browser.version(), errors };
+  const result = { coreCommitMs, iframeContinuity, profileSwitch: true, controlPendingWithinMs: 50, independentlyReady, calendarDelayMs: 10000, visibleRequests, hiddenRequests, observationMs: 300000, clock: 'accelerated browser timers for polling; real delayed calendar', browser: browser.version(), errors };
   await mkdir('../backend/target/performance', { recursive: true });
-  await writeFile(`../backend/target/performance/${baseline ? 'baseline' : 'candidate'}-browser.json`, JSON.stringify(result, null, 2));
+  await writeFile('../backend/target/performance/candidate-browser.json', JSON.stringify(result, null, 2));
   console.log(JSON.stringify(result));
 } finally { releaseCalendar(); releaseControl(); await browser.close(); }

@@ -2,7 +2,7 @@ package com.localassistant.os;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import java.net.URI;
+import com.localassistant.os.web.LocalAccessClients;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
@@ -35,9 +35,8 @@ class ProfileIsolationTest {
         assertThat(secondList.body()).doesNotContain(marker);
     }
 
-    private HttpRequest.Builder request(String path, String profileId) {
-        return HttpRequest.newBuilder(URI.create("http://127.0.0.1:" + port + path))
-                .header("Content-Type", "application/json")
+    private HttpRequest.Builder request(String path, String profileId) throws Exception {
+        return LocalAccessClients.request(port, path, LocalAccessClients.token(port))
                 .header("X-Profile-Id", profileId);
     }
 }

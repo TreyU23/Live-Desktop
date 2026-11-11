@@ -1,6 +1,22 @@
 export const system = {
   host: { name: 'SYNTHETIC-PC', user: 'Test profile', os: 'Windows 11', osVersion: '24H2', architecture: 'x64', javaVersion: 21 },
-  resources: { cpuPercent: 24, memoryUsedBytes: 18.6 * 2 ** 30, memoryTotalBytes: 32 * 2 ** 30, storageUsedBytes: 420 * 2 ** 30, storageTotalBytes: 1000 * 2 ** 30, network: { connected: true, name: 'Synthetic network', address: '192.0.2.10' }, battery: { available: false, percent: null, detail: 'No battery reported by Windows' } },
+  resources: {
+    cpuPercent: 24,
+    memoryUsedBytes: 29.1 * 2 ** 30,
+    memoryTotalBytes: 32 * 2 ** 30,
+    storageUsedBytes: 420 * 2 ** 30,
+    storageTotalBytes: 1000 * 2 ** 30,
+    network: {
+      connected: true,
+      name: 'Synthetic network',
+      address: '192.0.2.10',
+      rxBytesPerSec: 120_000,
+      txBytesPerSec: 45_000,
+      ratesAvailable: true,
+    },
+    battery: { available: false, percent: null, detail: 'No battery reported by Windows' },
+    diskActivity: { available: true, readBytesPerSec: 2_000_000, writeBytesPerSec: 500_000 },
+  },
   controls: ['wifi', 'bluetooth', 'focus', 'night-light', 'microphone', 'battery-saver'].map(id => ({ id, available: true, enabled: id === 'wifi', direct: ['wifi', 'bluetooth'].includes(id), detail: ['wifi', 'bluetooth'].includes(id) ? 'Synthetic radio' : 'Windows Settings' })),
   device: { manufacturer: 'Synthetic', model: 'Workstation', processorName: 'Synthetic 16-core processor', processorCores: 16, processorLogicalProcessors: 32, installedMemoryBytes: 32 * 2 ** 30, graphics: [{ name: 'Synthetic graphics', driverVersion: '1.0' }], deviceId: 'SYNTHETIC-DEVICE-ID', productId: 'SYNTHETIC-PRODUCT-ID', systemType: 'x64-based PC' },
   windows: { edition: 'Windows 11', version: '24H2', build: 'Synthetic build', architecture: 'x64', installedOn: '2026-01-15' },

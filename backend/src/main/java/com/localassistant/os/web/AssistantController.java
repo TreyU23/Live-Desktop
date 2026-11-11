@@ -9,7 +9,6 @@ import com.localassistant.os.service.ProfileCredentialStore;
 import com.localassistant.os.service.ProfileDataService;
 import com.localassistant.os.service.RuntimeService;
 import com.localassistant.os.service.ICloudCalendarService;
-import com.localassistant.os.service.WorkspaceService;
 import com.localassistant.os.service.SystemService;
 import com.localassistant.os.service.WindowsMediaSessionService;
 import com.localassistant.os.store.StateStore;
@@ -36,7 +35,6 @@ public class AssistantController {
     private final OpenAiAgent agent;
     private final ActionService actions;
     private final MemoryService memories;
-    private final WorkspaceService workspace;
     private final SystemService system;
     private final RuntimeService runtime;
     private final ICloudCalendarService iCloudCalendar;
@@ -49,7 +47,6 @@ public class AssistantController {
             OpenAiAgent agent,
             ActionService actions,
             MemoryService memories,
-            WorkspaceService workspace,
             SystemService system,
             RuntimeService runtime,
             ICloudCalendarService iCloudCalendar,
@@ -60,7 +57,6 @@ public class AssistantController {
         this.agent = agent;
         this.actions = actions;
         this.memories = memories;
-        this.workspace = workspace;
         this.system = system;
         this.runtime = runtime;
         this.iCloudCalendar = iCloudCalendar;
@@ -71,10 +67,7 @@ public class AssistantController {
 
     @GetMapping("/health")
     public Map<String, Object> health() {
-        return Map.of(
-                "status", "ok",
-                "openAiConfigured", agent.configured(),
-                "workspaceRoot", workspace.root().toString());
+        return Map.of("status", "ok", "openAiConfigured", agent.configured());
     }
 
     @GetMapping("/api/profile/settings")
@@ -275,9 +268,60 @@ public class AssistantController {
         }
     }
 
+    @PostMapping("/api/integrations/icloud-calendar/open")
+    public ResponseEntity<?> openICloudCalendar() {
+        try {
+            var action = actions.propose(
+                    "windows_open_uri",
+                    Map.of("uri", "outlookcal:"),
+                    "Open Windows Calendar externally.");
+            return ResponseEntity.status(HttpStatus.ACCEPTED).body(action);
+        } catch (Exception error) {
+            return ResponseEntity.badRequest().body(error(error));
+        }
+    }
+
+    @PostMapping("/api/integrations/icloud-calendar/open-web")
+    public ResponseEntity<?> openICloudCalendarWeb() {
+        try {
+            var action = actions.propose(
+                    "browser_open_url",
+                    Map.of("url", "https://www.icloud.com/calendar"),
+                    "Open iCloud Calendar on the web externally.");
+            return ResponseEntity.status(HttpStatus.ACCEPTED).body(action);
+        } catch (Exception error) {
+            return ResponseEntity.badRequest().body(error(error));
+        }
+    }
+
     @GetMapping("/api/integrations/media-session")
     public Object mediaSession(@RequestParam(required = false, defaultValue = "music") String provider) {
         return mediaSession.snapshot(provider);
+    }
+
+    @PostMapping("/api/integrations/media-session/open-external")
+    public ResponseEntity<?> openMusicExternally(
+            @RequestParam(required = false, defaultValue = "apple") String provider) {
+        try {
+            String normalized = provider == null ? "apple" : provider.trim().toLowerCase();
+            if ("spotify".equals(normalized)) {
+                var action = actions.propose(
+                        "windows_open_uri",
+                        Map.of("uri", "spotify:"),
+                        "Open Spotify externally.");
+                return ResponseEntity.status(HttpStatus.ACCEPTED).body(action);
+            }
+            if ("apple".equals(normalized) || "music".equals(normalized)) {
+                var action = actions.propose(
+                        "browser_open_url",
+                        Map.of("url", "https://music.apple.com/"),
+                        "Open Apple Music externally.");
+                return ResponseEntity.status(HttpStatus.ACCEPTED).body(action);
+            }
+            return ResponseEntity.badRequest().body(Map.of("error", "Unknown music provider."));
+        } catch (Exception error) {
+            return ResponseEntity.badRequest().body(error(error));
+        }
     }
 
     @GetMapping("/api/integrations/media-session/artwork/{version}")

@@ -81,6 +81,28 @@ class ActionServiceTest {
     }
 
     @Test
+    void calendarAndMusicUrisAreAllowlisted() throws Exception {
+        when(systemControls.open("windows.openUri", "outlookcal:")).thenReturn(Map.of("opened", "outlookcal:"));
+        when(systemControls.open("windows.openUri", "spotify:")).thenReturn(Map.of("opened", "spotify:"));
+
+        var calendar = actions.propose(
+                "windows_open_uri",
+                Map.of("uri", "outlookcal:"),
+                "Open Windows Calendar externally.");
+        assertThat(calendar.status()).isEqualTo("pending");
+        assertThat(actions.approve(calendar.id()).status()).isEqualTo("completed");
+        verify(systemControls).open("windows.openUri", "outlookcal:");
+
+        var music = actions.propose(
+                "windows_open_uri",
+                Map.of("uri", "spotify:"),
+                "Open Spotify externally.");
+        assertThat(music.status()).isEqualTo("pending");
+        assertThat(actions.approve(music.id()).status()).isEqualTo("completed");
+        verify(systemControls).open("windows.openUri", "spotify:");
+    }
+
+    @Test
     void directWindowsControlsDoNothingUntilApproved() throws Exception {
         when(systemControls.set("wifi", false)).thenReturn(Map.of("available", true, "enabled", false));
 

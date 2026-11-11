@@ -16,4 +16,4 @@ The same archive is distributed as `com.localassistant:live-desktop-windows-x64:
 
 ## Evidence limits
 
-Build, automated browser and packaged-runtime checks exercise application behavior and synthetic integrations. Authenticated OpenAI/iCloud/music responses, physical radio changes, Phone Link notification availability, screen readers, actual browser UI zoom, sleep/resume and independent Windows-user sessions require separate acceptance checks. See [redesign validation](redesign/implementation-validation/README.md) for historical implementation evidence.
+Build, automated browser and packaged-runtime checks exercise application behavior and synthetic integrations. Authenticated OpenAI/iCloud/music responses, physical radio changes, Phone Link notification availability, screen readers, actual browser UI zoom, sleep/resume and independent Windows-user sessions require separate acceptance checks. See [redesign validation](https://github.com/TreyU23/Live-Desktop/blob/v1.0.0/docs/redesign/implementation-validation/README.md) (removed from `main` in 1.1.0; preserved at the tag) for historical implementation evidence.
