@@ -1,3 +1,4 @@
+import { Page } from "../shell/Page.jsx";
 import { FiActivity, FiAlertCircle, FiArrowUp, FiArrowUpRight, FiBattery, FiBatteryCharging, FiBellOff, FiBluetooth, FiBookmark, FiCalendar, FiCamera, FiCheck, FiCheckCircle, FiChevronLeft, FiChevronRight, FiCircle, FiClipboard, FiCopy, FiCpu, FiExternalLink, FiGlobe, FiGrid, FiHardDrive, FiHome, FiInfo, FiLayers, FiLink2, FiLoader, FiMail, FiMessageCircle, FiMessageSquare, FiMic, FiMonitor, FiMoon, FiMusic, FiPause, FiPieChart, FiPlay, FiPlus, FiPower, FiRefreshCw, FiRotateCw, FiSearch, FiSend, FiServer, FiSettings, FiShield, FiShuffle, FiSkipBack, FiSkipForward, FiSmartphone, FiSquare, FiSun, FiUpload, FiUser, FiUsers, FiTrash2, FiVolume2, FiVolumeX, FiWifi, FiX, FiZap } from "react-icons/fi";
 const FeatherIcons = { FiActivity, FiAlertCircle, FiArrowUp, FiArrowUpRight, FiBattery, FiBatteryCharging, FiBellOff, FiBluetooth, FiBookmark, FiCalendar, FiCamera, FiCheck, FiCheckCircle, FiChevronLeft, FiChevronRight, FiCircle, FiClipboard, FiCopy, FiCpu, FiExternalLink, FiGlobe, FiGrid, FiHardDrive, FiHome, FiInfo, FiLayers, FiLink2, FiLoader, FiMail, FiMessageCircle, FiMessageSquare, FiMic, FiMonitor, FiMoon, FiMusic, FiPause, FiPieChart, FiPlay, FiPlus, FiPower, FiRefreshCw, FiRotateCw, FiSearch, FiSend, FiServer, FiSettings, FiShield, FiShuffle, FiSkipBack, FiSkipForward, FiSmartphone, FiSquare, FiSun, FiUpload, FiUser, FiUsers, FiTrash2, FiVolume2, FiVolumeX, FiWifi, FiX, FiZap };
 
@@ -28,12 +29,9 @@ export function EmptyState({ icon, title, detail, children }) {
   return <div className="empty-state"><Icon name={icon} size={28} /><h3>{title}</h3><p>{detail}</p>{children}</div>;
 }
 
-export function PageHeading({ title, detail, actions, children }) {
-  return <header className="page-heading"><div><h1 tabIndex={-1}>{title}</h1>{detail ? <p>{detail}</p> : null}</div>{children}{actions}</header>;
-}
-
+// Transitional: legacy views keep their class names inside the Astryx page frame until each view moves.
 export function ViewShell({ title, detail, actions, className = "", children }) {
-  return <main className={`view-shell ${className}`.trim()}><PageHeading title={title} detail={detail} actions={actions} />{children}</main>;
+  return <Page title={title} detail={detail} actions={actions}><div className={`view-shell ${className}`.trim()}>{children}</div></Page>;
 }
 
 export function InfoLine({ icon, label, value, healthy }) {

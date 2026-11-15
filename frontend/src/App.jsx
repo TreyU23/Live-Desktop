@@ -7,8 +7,18 @@ import { ApprovalsView } from './views/ApprovalsView.jsx';
 import { MemoriesView } from './views/MemoriesView.jsx';
 import { ConversationsView } from './views/ConversationsView.jsx';
 import { MusicView } from './views/MusicView.jsx';
-import { Sidebar } from './components/shell/Sidebar.jsx';
-import { ConfirmDialog } from './components/ui/ConfirmDialog.jsx';
+import { Navigation } from './components/shell/Navigation.jsx';
+import { ProfileMenu, ProfileDialog } from './components/shell/ProfileMenu.jsx';
+import { icons } from './components/ui/icons.js';
+import { AppShell } from '@astryxdesign/core/AppShell';
+import { AlertDialog } from '@astryxdesign/core/AlertDialog';
+import { Banner } from '@astryxdesign/core/Banner';
+import { Button } from '@astryxdesign/core/Button';
+import { Icon as AstryxIcon } from '@astryxdesign/core/Icon';
+import { HStack } from '@astryxdesign/core/Layout';
+import { StatusDot } from '@astryxdesign/core/StatusDot';
+import { Text } from '@astryxdesign/core/Text';
+import { ToastViewport, useToast } from '@astryxdesign/core/Toast';
 import { ResourceBoundary } from './components/feedback/ResourceBoundary.jsx';
 import { adaptResourceStatus } from './presentation/resourceViewState.js';
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
@@ -299,98 +309,40 @@ async function waitForRestartReady() {
 
 
 
-function LifecycleNotice({ state }) {
+// Restart/stop affect Live Desktop's own services, never Windows.
+function LifecycleBanner({ state }) {
   if (state === "idle") return null;
   const restarting = state === "restarting";
-  return (
-    <div className={`lifecycle-notice lifecycle-notice--${state} card--strong`} role="status">
-      <span className="dialog-icon"><Icon name={restarting ? "RotateCw" : "Power"} size={22} className={restarting ? "spin" : ""} /></span>
-      <div>
-        <strong>{restarting ? "Restarting Live Desktop" : "Live Desktop services are off"}</strong>
-        <span>{restarting ? "The dashboard will reconnect and reload automatically." : "Run start.cmd in the application folder to start the services again."}</span>
-      </div>
-    </div>
-  );
+  return <Banner status={restarting ? "info" : "warning"} container="section"
+    title={restarting ? "Restarting Live Desktop" : "Live Desktop services are off"}
+    description={restarting ? "The dashboard will reconnect and reload automatically." : "Run start.cmd in the application folder to start the services again."} />;
 }
 
-function ProfilePicker({ profiles, activeProfile, onProfilesChange, onSwitch, onDelete, open, setOpen }) {
-  const [name, setName] = useState(activeProfile.name);
-  const picker = useRef(null);
-  const trigger = useRef(null);
+// Shows each notify() call through Astryx's toast viewport. Rendered inside <Theme> so toasts are themed.
+function ToastBridge({ toast }) {
+  const showToast = useToast();
   useEffect(() => {
-    if (!open) return;
-    picker.current?.querySelector('.profile-menu button')?.focus();
-    picker.current?.querySelector('.profile-menu')?.scrollIntoView?.({ block: 'nearest' });
-    const close = event => {
-      if (event.type === 'keydown' && event.key === 'Escape') { setOpen(false); trigger.current?.focus(); }
-      if (event.type === 'pointerdown' && !picker.current?.contains(event.target)) setOpen(false);
-    };
-    document.addEventListener('keydown', close); document.addEventListener('pointerdown', close);
-    return () => { document.removeEventListener('keydown', close); document.removeEventListener('pointerdown', close); };
-  }, [open]);
-  const fileId = `profile-image-${activeProfile.id}`;
-
-  useEffect(() => setName(activeProfile.name), [activeProfile.id, activeProfile.name]);
-
-  const updateActive = (changes) => {
-    const next = profiles.map((profile) => profile.id === activeProfile.id ? { ...profile, ...changes } : profile);
-    onProfilesChange(next);
-  };
-
-  const uploadAvatar = (event) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-    if (!file.type.startsWith("image/")) return;
-    const reader = new FileReader();
-    reader.onload = () => updateActive({ avatar: reader.result });
-    reader.readAsDataURL(file);
-    event.target.value = "";
-  };
-
-  const createProfile = () => {
-    const id = crypto.randomUUID().replaceAll("-", "_");
-    const next = { id, name: `Profile ${profiles.length + 1}`, avatar: "/assets/user-avatar.png" };
-    onProfilesChange([...profiles, next]);
-    onSwitch(id);
-  };
-
-  return (
-    <div className="profile-picker" ref={picker}>
-      <button ref={trigger} className="profile-trigger" type="button" aria-expanded={open} onClick={() => setOpen((value) => !value)}>
-        <img src={activeProfile.avatar} alt="" /><span><strong>{activeProfile.name}</strong>{" "}<small>Switch profile</small><span className="visually-hidden">, opens the profile picker</span></span><Icon name="ChevronRight" size={14} />
-      </button>
-      {open ? (
-        <section className="profile-menu card--strong" aria-label="Local profiles">
-          <div className="profile-menu__heading"><div><strong>Profiles</strong><span>Local data organization, not authentication</span></div><button type="button" className="btn-icon btn-icon--plain" onClick={() => { setOpen(false); trigger.current?.focus(); }} aria-label="Close profiles"><Icon name="X" size={16} /></button></div>
-          <div className="group profile-list">
-            {profiles.map((profile) => <button className={profile.id === activeProfile.id ? "active" : ""} type="button" key={profile.id} onClick={() => profile.id !== activeProfile.id && onSwitch(profile.id)}><img src={profile.avatar} alt="" /><span><strong>{profile.name}</strong><small>{profile.id === activeProfile.id ? "Current profile" : "Switch profile"}</small></span>{profile.id === activeProfile.id ? <Icon name="Check" size={16} /> : null}</button>)}
-          </div>
-          <div className="profile-editor">
-            <label htmlFor="profile-name">Profile name</label>
-            <div className="field-row"><input id="profile-name" value={name} maxLength={48} onChange={(event) => setName(event.target.value)} onBlur={() => name.trim() && updateActive({ name: name.trim() })} /><label className="avatar-upload" htmlFor={fileId}><Icon name="Upload" size={15} /> Change photo</label><input className="visually-hidden" id={fileId} type="file" accept="image/*" onChange={uploadAvatar} /></div>
-          </div>
-          <div className="profile-menu__actions"><button type="button" onClick={createProfile}><Icon name="Plus" size={15} /> New profile</button><button className="text-action text-action--danger" type="button" disabled={activeProfile.id === "default" || profiles.length === 1} onClick={() => onDelete(activeProfile.id)}><Icon name="Trash2" size={14} /> Delete</button></div>
-        </section>
-      ) : null}
-    </div>
-  );
+    if (toast) showToast({ body: toast.message, type: toast.tone === "error" ? "error" : "info", uniqueID: String(toast.id) });
+  }, [toast, showToast]);
+  return null;
 }
-
-
 
 export function App() {
   const [profiles, setProfiles] = useState(readProfiles);
   const [profileId] = useState(activeProfileId);
   const [activeView, setActiveView] = useState("home");
-  const viewRegion = useRef(null);
   const sendPending = useRef(false);
   const controlPending = useRef(false);
   const [profileDelete, setProfileDelete] = useState(null);
   const [profileDeleting, setProfileDeleting] = useState(false);
   useEffect(() => {
-    const heading = viewRegion.current?.querySelector('h1');
+    // Move focus to the new view's heading and reset the scroll position of AppShell's content area.
+    const main = document.querySelector('main, [role="main"]');
+    const heading = main?.querySelector('h1');
     if (heading) { heading.tabIndex = -1; heading.focus({ preventScroll: true }); }
-    viewRegion.current?.scrollTo(0, 0);
+    let scroller = main;
+    while (scroller && scroller !== document.body && !/(auto|scroll)/.test(getComputedStyle(scroller).overflowY)) scroller = scroller.parentElement;
+    scroller?.scrollTo?.(0, 0);
   }, [activeView]);
   const [musicMounted, setMusicMounted] = useState(false);
   useEffect(() => { if (activeView === "music") setMusicMounted(true); }, [activeView]);
@@ -490,9 +442,7 @@ export function App() {
   };
 
   const notify = useCallback((message, tone = "neutral") => {
-    setToast({ message, tone });
-    window.clearTimeout(notify.timeout);
-    notify.timeout = window.setTimeout(() => setToast(null), 4200);
+    setToast({ message, tone, id: Date.now() });
   }, []);
 
   const refreshMusicPlayer = useCallback(async (announce = false) => {
@@ -949,25 +899,30 @@ export function App() {
     finally { setResourceStatus(current => ({ ...current, [key]: resourceStates.current[key] })); }
   };
   const boundary = (key, name, children) => <ResourceBoundary name={name} status={resourceStates.current[key]} onRetry={() => retry(key)}>{children}</ResourceBoundary>;
-  const headerActions = <div className="page-actions">
-    <span className="btn-pill local-status" role="status"><i className={`status-dot ${health.connected && runtime.frontendOnline ? "status-dot--good" : "status-dot--warn"}`} aria-hidden="true" /><span>{health.connected ? "Local mode · stored on this PC" : "Backend offline"}</span></span>
-    <div className="button-group lifecycle-actions" role="group" aria-label="Project lifecycle controls">
-      <button type="button" className="btn-icon" aria-label="Restart frontend and backend" title="Restart frontend and backend" onClick={() => runLifecycle("restart")} disabled={lifecycleState !== "idle"}>
-        <Icon name="RotateCw" size={18} className={lifecycleState === "restarting" ? "spin" : ""} />
-      </button>
-      <button className="btn-icon shutdown-button" type="button" aria-label="Shut down frontend and backend" title="Shut down frontend and backend" onClick={() => setShutdownOpen(true)} disabled={lifecycleState !== "idle"}>
-        <Icon name="Power" size={18} />
-      </button>
-    </div>
-  </div>;
+  const servicesOnline = health.connected && runtime.frontendOnline;
+  const headerActions = <HStack gap={2} vAlign="center" wrap="wrap">
+    <HStack gap={2} vAlign="center" role="status">
+      <StatusDot variant={servicesOnline ? "success" : "warning"} label={servicesOnline ? "Available" : "Unavailable"} />
+      <Text color="secondary">{health.connected ? "Local mode · stored on this PC" : "Backend offline"}</Text>
+    </HStack>
+    <HStack gap={2} wrap="wrap" role="group" aria-label="Live Desktop services">
+      <Button label="Restart Live Desktop" icon={<AstryxIcon icon={icons.Restart} />} isLoading={lifecycleState === "restarting"}
+        isDisabled={lifecycleState !== "idle"} onClick={() => runLifecycle("restart")} />
+      <Button label="Stop Live Desktop" variant="destructive" icon={<AstryxIcon icon={icons.Power} />}
+        isDisabled={lifecycleState !== "idle"} onClick={() => setShutdownOpen(true)} />
+    </HStack>
+  </HStack>;
+  const failedResources = Object.entries(resourceStatus).filter(([, value]) => value.error);
+  const hostName = system.host?.name && system.host.name !== FALLBACK_SYSTEM.host.name ? system.host.name : "This PC";
   return (
     <Theme theme={themes[defaultThemeSlug]} mode={appearance}>
-    <div className="desktop-shell">
-      <Sidebar activeView={activeView} onNavigate={setActiveView} pendingCount={pendingCount} hostName={system.host?.name && system.host.name !== FALLBACK_SYSTEM.host.name ? system.host.name : "This PC"} connected={health.connected}
-        profileSlot={<ProfilePicker profiles={profiles} activeProfile={activeProfile} onProfilesChange={updateProfiles} onSwitch={switchProfile} onDelete={(id) => setProfileDelete(profiles.find(profile => profile.id === id))} open={profileMenuOpen} setOpen={setProfileMenuOpen} />} />
-
-      <div className="view-region" ref={viewRegion}>
-      {Object.entries(resourceStatus).some(([, value]) => value.error) ? <div className="refresh-summary" role="status"><span>Some resources could not refresh. Last available data is retained.</span>{Object.entries(resourceStatus).filter(([, value]) => value.error).map(([key]) => <button key={key} type="button" className="chip" disabled={resourceStatus[key].loading} onClick={() => retry(key)}>Refresh {key}</button>)}</div> : null}
+    <ToastViewport position="bottomEnd" maxVisible={3}>
+    <AppShell
+      banner={<LifecycleBanner state={lifecycleState} />}
+      sideNav={<Navigation activeView={activeView} onNavigate={setActiveView} pendingCount={pendingCount} hostName={hostName} connected={health.connected}
+        footer={<ProfileMenu profiles={profiles} activeProfile={activeProfile} onSwitch={switchProfile} onManage={() => setProfileMenuOpen(true)} />} />}>
+      {failedResources.length ? <Banner status="warning" title="Some resources could not refresh" description="Last available data is retained."
+        endContent={<HStack gap={2} wrap="wrap">{failedResources.map(([key]) => <Button key={key} size="sm" label={`Refresh ${key}`} isDisabled={resourceStatus[key].loading} onClick={() => retry(key)} />)}</HStack>} /> : null}
       {activeView === "home" ? <HomeView system={system} systemSeries={systemSeries} health={health} controls={controls} pendingControl={pendingControl} onControl={queueControl} pendingCount={pendingCount} navigate={setActiveView} apps={apps} headerActions={headerActions}
         states={resourceStates.current} retry={retry} onSubmit={sendMessage} busy={assistantBusy}
         calendarProps={{ calendar, calendarRefreshing, onCalendarDateChange: date => refreshCalendar(date, false), onRefreshCalendar: date => refreshCalendar(date, true), onOpenCalendarSettings: () => setActiveView('settings'), onOpenCalendarExternally: openCalendarExternally }}
@@ -982,13 +937,17 @@ export function App() {
       {activeView === "music" ? <MusicView musicProvider={musicProvider} musicConnection={musicConnection} musicPlayer={musicPlayer} onMusicAction={controlMusic} onOpenMusicExternally={openMusicExternally} onOpenSettings={() => setActiveView("settings")} headerActions={headerActions} /> : null}
       {musicMounted && musicConnection.embedUrl ? <div className={`music-web-player music-web-player--${musicProviderId} ${activeView === "music" ? "" : "music-web-player--parked"}`} aria-hidden={activeView !== "music"}><iframe key={`${musicProviderId}:${musicConnection.embedUrl}`} title={`${musicProvider.name} web player`} src={musicConnection.embedUrl} allow={musicProviderId === "apple" ? "autoplay *; encrypted-media *; fullscreen *; clipboard-write" : "autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"} loading="eager" /></div> : null}
       {activeView === "settings" ? <SettingsView activeProfile={activeProfile} onManageProfiles={() => setProfileMenuOpen(true)} onOpenApprovals={() => setActiveView("approvals")} onRestart={() => runLifecycle("restart")} onShutdown={() => setShutdownOpen(true)} lifecycleBusy={lifecycleState !== "idle"} phone={phone} onOpenPhone={openPhone} headerActions={headerActions} reduceTransparency={reduceTransparency} onReduceTransparencyChange={setReduceTransparency} darkMode={darkMode} onDarkModeChange={(dark) => setAppearance(dark ? "dark" : "light")} accentColor={accentColor} onAccentColorChange={setAccentColor} onCustomAccentColorChange={setCustomAccentColor} calendar={calendar} onConnectCalendar={connectICloudCalendar} onDisconnectCalendar={disconnectICloudCalendar} musicProviderId={musicProviderId} musicConnection={musicConnection} musicPlayer={musicPlayer} onMusicProviderChange={switchMusicProvider} onSaveMusic={saveMusicConnection} onDisconnectMusic={disconnectMusic} onRefreshMusic={() => refreshMusicPlayer(true)} onOpenMusic={() => setActiveView("music")} openAiSettings={openAiSettings} onSaveOpenAiKey={saveOpenAiKey} onDeleteOpenAiKey={deleteOpenAiKey} /> : null}
-
-      </div>
-      {shutdownOpen ? <ConfirmDialog title="Shut down Live Desktop?" confirmLabel="Shut down both" onCancel={() => setShutdownOpen(false)} onConfirm={() => runLifecycle('shutdown')}><p>This stops Live Desktop's frontend and backend. It does not shut down Windows.</p><p>Run <code>start.cmd</code> from the application folder to start it again. This page cannot restart stopped services.</p></ConfirmDialog> : null}
-      {profileDelete ? <ConfirmDialog title={`Delete ${profileDelete.name}?`} confirmLabel="Delete profile data" busy={profileDeleting} onCancel={() => setProfileDelete(null)} onConfirm={async () => { setProfileDeleting(true); try { await deleteProfile(profileDelete.id); } finally { setProfileDeleting(false); setProfileDelete(null); } }}><p>This removes this profile's local conversations, memories, approvals, credentials and preferences. Other profiles are kept.</p></ConfirmDialog> : null}
-      <LifecycleNotice state={lifecycleState} />
-      {toast ? <div className={`toast toast--${toast.tone} card--strong`} role="status"><Icon name={toast.tone === "error" ? "CircleAlert" : "CircleCheck"} size={18} />{toast.message}<button type="button" className="btn-icon btn-icon--plain" onClick={() => setToast(null)} aria-label="Dismiss"><Icon name="X" size={16} /></button></div> : null}
-    </div>
+    </AppShell>
+    <ProfileDialog isOpen={profileMenuOpen} onOpenChange={setProfileMenuOpen} profiles={profiles} activeProfile={activeProfile} onProfilesChange={updateProfiles} onSwitch={switchProfile}
+      onDelete={(id) => { setProfileMenuOpen(false); setProfileDelete(profiles.find(profile => profile.id === id)); }} />
+    <AlertDialog isOpen={shutdownOpen} onOpenChange={setShutdownOpen} title="Stop Live Desktop?" actionLabel="Stop services"
+      description="This stops Live Desktop's frontend and backend services. It does not shut down Windows. Run start.cmd from the application folder to start them again; this page cannot restart stopped services."
+      onAction={() => { setShutdownOpen(false); runLifecycle("shutdown"); }} />
+    <AlertDialog isOpen={Boolean(profileDelete)} onOpenChange={open => { if (!open && !profileDeleting) setProfileDelete(null); }} title={`Delete ${profileDelete?.name ?? "profile"}?`} actionLabel="Delete profile data" isActionLoading={profileDeleting}
+      description="This removes this profile's local conversations, memories, approvals, credentials and preferences. Other profiles are kept."
+      onAction={async () => { setProfileDeleting(true); try { await deleteProfile(profileDelete.id); } finally { setProfileDeleting(false); setProfileDelete(null); } }} />
+    <ToastBridge toast={toast} />
+    </ToastViewport>
     </Theme>
   );
 }

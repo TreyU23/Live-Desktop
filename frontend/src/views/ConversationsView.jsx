@@ -27,7 +27,7 @@ export function ConversationsView({ conversations, selected, onSelect, onSend, b
     else setError('Message could not be sent. Your draft is preserved; try again.');
   };
   const choose = summary => { setThreadsOpen(false); onSelect(summary); };
-  return <main className="view-shell conversations-view">
+  return <div className="view-shell conversations-view">
     <div className="conversation-layout">
       <aside className="conversation-threads" aria-label="Conversation threads">
         <header className="page-heading conversation-threads__heading">
@@ -65,5 +65,5 @@ export function ConversationsView({ conversations, selected, onSelect, onSend, b
       </section>
     </div>
     {sheetOpen && pending.length ? <ApprovalSheet actions={pending} onApprove={onApprove} onReject={onReject} onClose={() => setSheetOpen(false)} returnFocus={() => composer.current} /> : null}
-  </main>;
+  </div>;
 }

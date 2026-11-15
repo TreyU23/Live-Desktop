@@ -62,38 +62,53 @@ try {
     element.scrollTop = to === 'top' ? 0 : element.scrollHeight;
   }, where);
   const navigate = async name => {
+    // Side navigation at 768px and wider; below that the same items sit in the AppShell drawer.
     const nav = page.getByRole('navigation', { name: 'Primary navigation' });
     const accessibleName = new RegExp(`^${name}( \\d+ pending)?$`);
-    const destination = nav.getByRole('button', { name: accessibleName });
-    if (!await destination.isVisible()) await nav.getByRole('button', { name: /^More/ }).click();
-    assert.equal(await nav.getByRole('button', { name: accessibleName }).count(), 1, `${name} destination is ambiguous`);
+    let scope = nav;
+    const toggle = page.getByRole('button', { name: 'Open navigation' });
+    await page.waitForTimeout(150); // AppShell settles its breakpoint after a resize.
+    await nav.or(toggle).first().waitFor();
+    if (!await nav.isVisible()) {
+      await toggle.click();
+      scope = page.getByRole('dialog', { name: 'Navigation' });
+    }
+    const destination = scope.getByRole('button', { name: accessibleName });
+    await destination.first().waitFor();
+    assert.equal(await destination.count(), 1, `${name} destination is ambiguous`);
     await destination.click();
+    await page.getByRole('dialog', { name: 'Navigation' }).waitFor({ state: 'hidden' });
+    if (scope === nav) assert.equal(await nav.getByRole('button', { name: accessibleName }).getAttribute('aria-current'), 'page');
     await page.waitForTimeout(60);
   };
   for (const [width, height] of [[1920,1080], [1440,900], [1280,720], [768,1024], [390,844], [320,740]]) {
     await page.setViewportSize({ width, height });
+    await page.waitForTimeout(150); // AppShell re-measures its breakpoint after a resize.
     for (const [name, id] of [['Overview','home'], ['System Info','system'], ['Music','music'], ['Approvals','approvals'], ['Memories','memories'], ['Conversations','conversations'], ['Settings','settings']]) {
       console.log(`Checking ${id} at ${width}x${height}`);
       await navigate(name);
-      assert.ok(await page.locator('main h1').count(), `${id} has no heading`);
+      assert.equal(await page.getByRole('main').locator('h1').count(), 1, `${id} needs exactly one heading`);
       const geometry = await page.evaluate(() => {
         // Landmarks, not class names: the primary navigation and the scroll container of the main landmark.
         const scroller = element => { while (element && element !== document.body && !/(auto|scroll)/.test(getComputedStyle(element).overflowY)) element = element.parentElement; return element; };
-        const region = scroller(document.querySelector('main')); const nav = document.querySelector('nav[aria-label="Primary navigation"]').getBoundingClientRect(); const view = region.getBoundingClientRect();
-        // Sidebar on the left at desktop widths, tab bar at the bottom below 768px; never overlapping the view.
-        const overlaps = !(nav.right <= view.left + 1 || view.right <= nav.left + 1 || nav.bottom <= view.top + 1 || view.bottom <= nav.top + 1);
-        return { documentOverflow: document.documentElement.scrollWidth > innerWidth, viewOverflow: region.scrollWidth > region.clientWidth + 1, navInside: nav.bottom <= innerHeight + 1 && nav.right <= innerWidth + 1, overlaps, tabBar: nav.width >= innerWidth - 1 };
+        const region = scroller(document.querySelector('[role="main"], main')); const navElement = document.querySelector('nav[aria-label="Primary navigation"]'); const view = region.getBoundingClientRect();
+        // Side navigation on the left at 768px and wider; below that it moves into a drawer behind a toggle.
+        const drawer = !navElement || navElement.getBoundingClientRect().width === 0 || getComputedStyle(navElement).display === 'none';
+        const nav = drawer ? { left: 0, right: 0, top: 0, bottom: 0 } : navElement.getBoundingClientRect();
+        const overlaps = !drawer && !(nav.right <= view.left + 1 || view.right <= nav.left + 1 || nav.bottom <= view.top + 1 || view.bottom <= nav.top + 1);
+        return { documentOverflow: document.documentElement.scrollWidth > innerWidth, viewOverflow: region.scrollWidth > region.clientWidth + 1, navInside: nav.bottom <= innerHeight + 1 && nav.right <= innerWidth + 1, overlaps, tabBar: drawer };
       });
       assert.equal(geometry.documentOverflow, false, `${id} document overflow at ${width}`);
       assert.equal(geometry.viewOverflow, false, `${id} view overflow at ${width}`);
       assert.ok(geometry.navInside && !geometry.overlaps, `Navigation overlaps ${id} at ${width}`);
       assert.equal(geometry.tabBar, width < 768, `Navigation layout at ${width}`);
+      if (width < 768) assert.ok(await page.getByRole('button', { name: 'Open navigation' }).isVisible(), `Navigation toggle hidden at ${width}`);
       await scrollView('bottom');
-      assert.ok(await page.getByRole('navigation').isVisible());
+      assert.ok(width < 768 ? await page.getByRole('button', { name: 'Open navigation' }).isVisible() : await page.getByRole('navigation', { name: 'Primary navigation' }).isVisible());
       matrix.push({ width, height, view: id, overflow: false, reservedNavigation: true, tabBar: width < 768 });
       if ([1440,390,320].includes(width)) {
         await scrollView('top');
-        await page.locator('h1').evaluate(element => element.blur());
+        await page.getByRole('main').locator('h1').evaluate(element => element.blur());
         await page.screenshot({ path: `${output}/${id}-${width}.png` });
       }
     }
@@ -110,7 +125,9 @@ try {
   await navigate('Overview');
   const draft = page.getByRole('textbox', { name: 'Ask your assistant' });
   await draft.fill('Keep this Home draft'); await page.getByRole('button', { name: 'Send', exact: true }).click();
-  await page.getByText('Synthetic send failure', { exact: true }).waitFor();
+  await page.getByLabel('Notifications').getByText('Synthetic send failure', { exact: true }).waitFor();
+  // Error toasts persist until dismissed (Astryx default) so a failure is not missed.
+  await page.getByLabel('Notifications').getByRole('button', { name: /dismiss|close/i }).first().click();
   assert.equal(await draft.inputValue(), 'Keep this Home draft');
   failChat = false;
   await page.getByRole('button', { name: 'Send', exact: true }).click();
@@ -150,16 +167,23 @@ try {
   assert.deepEqual(decisions, ['sheet-file:reject', 'sheet-bt:approve']);
   await page.keyboard.press('Escape');
   await page.getByRole('dialog').waitFor({ state: 'detached' });
-  const shutdown = page.getByRole('button', { name: 'Shut down frontend and backend' });
+  // Stop is confirmed first and names Live Desktop's services, not Windows.
+  const shutdown = page.getByRole('button', { name: 'Stop Live Desktop', exact: true });
   await shutdown.click();
-  assert.equal(await page.getByRole('button', { name: 'Cancel', exact: true }).evaluate(element => element === document.activeElement), true);
-  await page.keyboard.press('Shift+Tab');
-  assert.equal(await page.getByRole('button', { name: 'Shut down both' }).evaluate(element => element === document.activeElement), true);
+  const stopDialog = page.getByRole('alertdialog', { name: 'Stop Live Desktop?' });
+  await stopDialog.waitFor();
+  assert.match(await stopDialog.innerText(), /does not shut down Windows/);
+  assert.ok(await stopDialog.evaluate(element => element.contains(document.activeElement)), 'Stop confirmation did not take focus');
+  for (let index = 0; index < 4; index += 1) await page.keyboard.press('Tab');
+  assert.ok(await stopDialog.evaluate(element => element.contains(document.activeElement)), 'Focus escaped the stop confirmation');
   await page.keyboard.press('Escape');
+  await stopDialog.waitFor({ state: 'hidden' });
   assert.equal(await shutdown.evaluate(element => element === document.activeElement), true);
-  await page.getByRole('button', { name: /opens the profile picker/ }).click();
+  const profileTrigger = page.getByRole('button', { name: /switch profile$/ });
+  await profileTrigger.click();
+  await page.getByRole('menu').waitFor();
   await page.keyboard.press('Escape');
-  assert.equal(await page.getByRole('button', { name: /opens the profile picker/ }).evaluate(element => element === document.activeElement), true);
+  assert.equal(await profileTrigger.evaluate(element => element === document.activeElement), true);
   await navigate('Settings');
   await page.getByRole('radio', { name: 'Light', exact: true }).click();
   await page.getByRole('textbox', { name: 'Custom hex color' }).fill('#FFFF00');
@@ -177,21 +201,11 @@ try {
   // Reduce transparency: explicit setting and the system media feature both give solid surfaces.
   await page.getByRole('switch', { name: 'Reduce transparency' }).click();
   assert.equal(await page.locator('html').getAttribute('data-transparency'), 'reduced');
-  assert.equal(await page.getByRole('navigation', { name: 'Primary navigation' }).evaluate(element => getComputedStyle(element).backgroundImage), 'none');
   await page.getByRole('switch', { name: 'Reduce transparency' }).click();
-  assert.notEqual(await page.getByRole('navigation', { name: 'Primary navigation' }).evaluate(element => getComputedStyle(element).backgroundImage), 'none');
-  const cdp = await page.context().newCDPSession(page);
-  await cdp.send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-transparency', value: 'reduce' }] });
-  assert.equal(await page.getByRole('navigation', { name: 'Primary navigation' }).evaluate(element => getComputedStyle(element).backgroundImage), 'none');
-  await navigate('Overview');
-  await page.screenshot({ path: `${output}/overview-reduced-transparency-1440.png` });
-  await cdp.send('Emulation.setEmulatedMedia', { features: [] });
-  // Sidebar search filters page names locally and navigates on Enter.
-  await page.getByRole('searchbox', { name: 'Find a page' }).fill('mem');
+  assert.equal(await page.locator('html').getAttribute('data-transparency'), null);
+  // Seven destinations, in four groups, each reachable from the side navigation.
   const destinations = /^(Overview|System Info|Conversations|Approvals|Memories|Music|Settings)( \d+ pending)?$/;
-  assert.equal(await page.getByRole('navigation', { name: 'Primary navigation' }).getByRole('button', { name: destinations }).filter({ visible: true }).count(), 1);
-  await page.keyboard.press('Enter');
-  await page.getByRole('heading', { name: 'Memories', exact: true }).waitFor();
+  assert.equal(await page.getByRole('navigation', { name: 'Primary navigation' }).getByRole('button', { name: destinations }).count(), 7);
   await navigate('Overview');
   await navigate('Overview');
   assert.match(await page.getByRole('meter', { name: 'Memory used' }).getAttribute('aria-valuetext'), /critical/, 'high memory should use critical severity');

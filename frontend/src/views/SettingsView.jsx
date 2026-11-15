@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { Icon, PageHeading } from '../components/ui/index.jsx';
+import { Icon } from '../components/ui/index.jsx';
+import { Page } from '../components/shell/Page.jsx';
 import { formatRelativeTime } from '../presentation/formatters.js';
 import { MUSIC_PROVIDERS, normalizeMusicUrl } from '../musicProviders.js';
 import { ACCENT_PRESETS, effectiveAccentColor } from '../accentColors.js';
@@ -78,8 +79,7 @@ export function SettingsView({ activeProfile, onManageProfiles, onOpenApprovals,
   const tile = (icon, color) => <span className="tile tile--32" style={{ "--tile-color": color }} aria-hidden="true"><Icon name={icon} size={17} strokeWidth={2} /></span>;
 
   return (
-    <main className="view-shell settings-view">
-      <PageHeading title="Settings" detail="Connect services and choose how Live Desktop looks. Preferences and credentials stay local to this PC." actions={headerActions} />
+    <Page title="Settings" detail="Connect services and choose how Live Desktop looks. Preferences and credentials stay local to this PC." actions={headerActions}><div className="view-shell settings-view">
       <div className="settings-column">
         <section className="card settings-profile" aria-labelledby="settings-profile-title">
           <img src={activeProfile.avatar} alt="" />
@@ -196,6 +196,6 @@ export function SettingsView({ activeProfile, onManageProfiles, onOpenApprovals,
           </div>
         </section>
       </div>
-    </main>
+    </div></Page>
   );
 }

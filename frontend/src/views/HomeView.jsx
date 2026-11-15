@@ -8,15 +8,14 @@ import { PhonePanel } from '../components/dashboard/PhonePanel.jsx';
 import { CompactPlayer } from '../components/media/CompactPlayer.jsx';
 import { AssistantComposer } from '../components/dashboard/AssistantComposer.jsx';
 import { ResourceBoundary } from '../components/feedback/ResourceBoundary.jsx';
-import { PageHeading } from '../components/ui/index.jsx';
+import { Page } from '../components/shell/Page.jsx';
 
 // Widget grid. Each service keeps its own ResourceBoundary so loading/stale/error/retry render in its card.
 export function HomeView({ system, systemSeries = [], health, controls, pendingControl, onControl, pendingCount, navigate, apps, calendarProps, phoneProps, mediaProps, onSubmit, busy, states, retry, headerActions }) {
   const boundary = (key, name, children) => <ResourceBoundary name={name} status={states[key]} onRetry={() => retry(key)}>{children}</ResourceBoundary>;
   const ready = Boolean(states.system?.hasData);
   const today = new Date().toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' });
-  return <main className="home-view">
-    <PageHeading title="Overview" detail={today} actions={headerActions} />
+  return <Page title="Overview" detail={today} actions={headerActions}><div className="home-view">
     <ResourceBoundary name="System" status={states.system} onRetry={() => retry('system')} />
     <div className="overview-grid">
       <PerformanceCard system={system} series={systemSeries} ready={ready} onOpenSystem={() => navigate('system')} />
@@ -29,5 +28,5 @@ export function HomeView({ system, systemSeries = [], health, controls, pendingC
       <ConnectionsCard connected={health.connected} configured={health.configured} calendar={calendarProps.calendar} musicPlayer={mediaProps.musicPlayer} />
       {boundary('apps', 'Applications', <RecentApps apps={apps} />)}
     </div>
-  </main>;
+  </div></Page>;
 }

@@ -67,11 +67,11 @@ try {
   const memoryInput = page.getByRole('textbox', { name: 'Memory content' });
   await memoryInput.fill('Keep this unsaved memory');
   await page.getByRole('button', { name: 'Add memory', exact: true }).click();
-  await page.getByText('Synthetic persistence failure', { exact: true }).waitFor();
+  await page.getByLabel('Notifications').getByText('Synthetic persistence failure', { exact: true }).waitFor();
   assert.equal(await memoryInput.inputValue(), 'Keep this unsaved memory', 'Failed memory save discarded user input');
   failMemoryWrite = false;
   await page.getByRole('button', { name: 'Add memory', exact: true }).click();
-  await page.getByText('Memory saved, but the list could not refresh: Synthetic list refresh failure', { exact: true }).waitFor();
+  await page.getByLabel('Notifications').getByText('Memory saved, but the list could not refresh: Synthetic list refresh failure', { exact: true }).waitFor();
   assert.equal(await memoryInput.inputValue(), '', 'Successful memory save with failed list refresh left duplicate retry content');
   assert.deepEqual(errors, []);
   console.log('PASS: mutation-time stale poll cannot replace confirmed control; failed memory save preserves typed input');

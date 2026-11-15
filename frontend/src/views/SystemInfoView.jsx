@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { Icon, DetailRows, PageHeading } from '../components/ui/index.jsx';
+import { Icon, DetailRows } from '../components/ui/index.jsx';
+import { Page } from '../components/shell/Page.jsx';
 import { formatBytes, formatBytesPerSec, percent, formatInstalledDate, formatPercent } from '../presentation/formatters.js';
 import { ResourceBar } from '../components/instruments/ResourceBar.jsx';
 import { Sparkline } from '../components/instruments/Sparkline.jsx';
@@ -57,10 +58,9 @@ export function SystemInfoView({ system, series = [], connected, configured, onC
   ];
 
   return (
-    <main className="system-info-view">
-      <PageHeading title="About this PC" detail="Device specifications, Windows information, and live resource status reported by this PC." actions={headerActions}>
+    <Page title="About this PC" detail="Device specifications, Windows information, and live resource status reported by this PC." actions={headerActions} status={<span>
         <span className={`status-label ${connected ? "status-label--good" : "status-label--warn"}`}><Icon name={connected ? "CircleCheck" : "CircleAlert"} size={14} />{connected ? "Live Windows data" : "Backend unavailable"}</span>
-      </PageHeading>
+      </span>}><div className="system-info-view">
       <div className="segmented system-tabs" role="tablist" aria-label="System information">
         <button type="button" role="tab" id="system-tab-live" aria-selected={tab === "live"} aria-controls="system-panel" onClick={() => setTab("live")}>Live</button>
         <button type="button" role="tab" id="system-tab-specs" aria-selected={tab === "specs"} aria-controls="system-panel" onClick={() => setTab("specs")}>Specifications</button>
@@ -113,6 +113,6 @@ export function SystemInfoView({ system, series = [], connected, configured, onC
       </div>}
       </div>
       <p className="system-privacy-note inline-caption"><Icon name="ShieldCheck" size={15} /> Read locally from Windows, the Java runtime, and the workspace drive. No administrator access is requested.</p>
-    </main>
+    </div></Page>
   );
 }

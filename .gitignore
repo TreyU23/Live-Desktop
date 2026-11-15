@@ -16,3 +16,4 @@ frontend/themes/**/*.png
 frontend/themes/**/preview.html
 frontend/themes/**/sheet.html
 frontend/tests/.shot.mjs
+frontend/.tpl/

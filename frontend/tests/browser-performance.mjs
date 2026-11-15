@@ -109,10 +109,10 @@ try {
       {id:'second',name:'Second profile',avatar:'/assets/user-avatar.png'}
     ])));
     await page.reload(); await page.clock.runFor(500);
-    await page.getByRole('button', { name: /^Local user Switch profile.*opens the profile picker/  }).click();
+    await page.getByRole('button', { name: 'Local user, switch profile' }).click();
     const headerIndex = profileHeaders.length;
-    await page.getByRole('button', { name: 'Second profile Switch profile' }).click();
-    await page.getByRole('button', { name: /^Second profile Switch profile.*opens the profile picker/  }).waitFor();
+    await page.getByRole('menuitem', { name: /^Second profile/ }).click();
+    await page.getByRole('button', { name: 'Second profile, switch profile' }).waitFor();
     await page.clock.runFor(500); await page.waitForTimeout(100);
     assert.ok(profileHeaders.length > headerIndex, 'Switched profile made no reads');
     assert.ok(profileHeaders.slice(headerIndex).every(id => id === 'second'), 'Old profile used after switch');
@@ -126,7 +126,7 @@ try {
     await framePage.getByRole('meter', { name: 'CPU load' }).waitFor();
     await framePage.waitForTimeout(500);
     scrollFrames = await framePage.evaluate(() => new Promise(resolve => {
-      let region = document.querySelector('main');
+      let region = document.querySelector('[role="main"], main');
       while (region && region !== document.body && !/(auto|scroll)/.test(getComputedStyle(region).overflowY)) region = region.parentElement;
       const deltas = []; let last = performance.now(); let frame = 0;
       const step = now => {
