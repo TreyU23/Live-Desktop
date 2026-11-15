@@ -11,6 +11,8 @@ const matrix = [];
 try {
   const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
   page.on('pageerror', error => errors.push(error.message));
+  // The built app ships a Content Security Policy; any violation is a failure.
+  page.on('console', message => { if (/Content Security Policy/.test(message.text())) errors.push(message.text()); });
   let failChat = true;
   let failSystem = false;
   let holdSystem = false;

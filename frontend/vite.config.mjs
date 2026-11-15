@@ -15,6 +15,37 @@ function stripTokenForRemotePeers(proxy) {
   });
 }
 
+// Content Security Policy for the built app (decision: Phase 5 of the Astryx plan). Built themes keep
+// style-src strict: only style attributes (React style props, Astryx inline CSS variables) are allowed
+// inline. Frames are limited to the two music providers. Added at build time only, because the dev
+// server injects inline scripts for React refresh. The native host serves dist/client unchanged.
+export const kContentSecurityPolicy = [
+  "default-src 'self'",
+  "script-src 'self'",
+  // Astryx injects two kinds of static <style>: Layer's @position-try rules (popovers, menus,
+  // tooltips) and CodeBlock's syntax-token map. These are their hashes for the pinned
+  // @astryxdesign/core 0.7.16; browser-redesign.mjs fails on any CSP violation, so a version bump
+  // that changes either stylesheet shows up there.
+  "style-src 'self' 'sha256-/i2+VVt2qoVh0Ag9OWwyc9593DCZeYGAv6SliqVbheY=' 'sha256-S3X78TfYa2X+eJlpah8LnW4Dq9tZQGGwE5PSRFXzGGo=' 'sha256-0KUt1GaAbAKiIczMgRikTmhynZoYPcw+0bnDtqcsh14='",
+  "style-src-attr 'unsafe-inline'",
+  "img-src 'self' data: blob:",
+  "font-src 'self'",
+  "connect-src 'self'",
+  "frame-src https://embed.music.apple.com https://open.spotify.com",
+  "media-src 'self'",
+  "object-src 'none'",
+  "base-uri 'none'",
+  "form-action 'self'",
+].join("; ");
+
+function contentSecurityPolicy() {
+  return {
+    name: "live-desktop-csp",
+    apply: "build",
+    transformIndexHtml: () => [{ tag: "meta", attrs: { "http-equiv": "Content-Security-Policy", content: kContentSecurityPolicy }, injectTo: "head-prepend" }],
+  };
+}
+
 export default defineConfig({
   build: {
     outDir: "dist/client",
@@ -34,5 +65,5 @@ export default defineConfig({
       clientFiles: ["./src/main.jsx"],
     },
   },
-  plugins: [react()],
+  plugins: [react(), contentSecurityPolicy()],
 });

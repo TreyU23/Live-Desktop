@@ -10,7 +10,8 @@
     "test": "node --test tests/*.test.mjs",
     "test:sites": "node --test tests/sites-worker.test.mjs",
     "test:browser": "node tests/browser-performance.mjs",
-    "test:contrast": "node tests/browser-contrast.mjs"
+    "test:contrast": "node tests/browser-contrast.mjs",
+    "test:privacy": "node tests/browser-privacy.mjs"
   },
   "dependencies": {
     "@astryxdesign/core": "0.7.16",
