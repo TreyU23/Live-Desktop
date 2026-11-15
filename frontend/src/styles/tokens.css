@@ -1,34 +1,197 @@
+/* Live Desktop glass design tokens. DESIGN.md records intent; this file is the runtime authority.
+   tests/tokens.test.mjs parses these values and checks WCAG AA contrast for both themes. */
 :root {
-  font-family: 'Segoe UI Variable', 'Segoe UI', sans-serif; color-scheme: dark; color: var(--text); background: var(--page); font-synthesis: none;
-  --page: #000000; --surface: #0d1117; --surface-hover: #111923;
-  --line: #303943; --line-strong: #657586; --text: #f1f4f6; --muted: #a0adb9; --muted-2: #a0adb9;
-  --accent: #4a9aff; --accent-readable: #4a9aff; --accent-soft: #0a2038; --accent-foreground: #000000;
-  --blue: var(--accent-readable); --blue-soft: var(--accent-soft); --green: #85d9bd; --amber: #ffc56d; --red: #ff8589;
-  --primary-fill: #f1f4f6; --primary-ink: #090c10; --heading: 'Segoe UI Variable', 'Segoe UI', sans-serif; --measurement: Consolas, monospace;
-  --radius-control: 10px; --radius-surface: 14px; --gauge-track: #23303b;
-  --space-1: 4px; --space-2: 8px; --space-3: 12px; --space-4: 16px; --space-6: 24px; --space-8: 32px; --space-12: 48px;
+  color-scheme: dark;
+  font-synthesis: none;
+  --font-ui: 'SF Pro Text', -apple-system, 'Segoe UI Variable Text', 'Segoe UI Variable', 'Segoe UI', sans-serif;
+  --font-display: 'SF Pro Display', -apple-system, 'Segoe UI Variable Display', 'Segoe UI Variable', 'Segoe UI', sans-serif;
+  --measurement: Consolas, ui-monospace, monospace;
+  --heading: var(--font-display);
+
+  --page: #0B0B0C;
+  --wallpaper-blue: #121C33;
+  --wallpaper-grey: #1F1F22;
+  --glow-blue: rgba(10, 132, 255, 0.16);
+  --glow-grey: rgba(142, 142, 147, 0.10);
+  --glow-green: rgba(48, 209, 88, 0.06);
+  --wallpaper: radial-gradient(1400px 800px at 10% -10%, var(--wallpaper-blue) 0%, rgba(11, 11, 12, 0) 60%), radial-gradient(1000px 700px at 100% 100%, var(--wallpaper-grey) 0%, rgba(11, 11, 12, 0) 55%), var(--page);
+  --ambient: radial-gradient(46vw 46vw at 8% 2%, var(--glow-blue), transparent 65%), radial-gradient(40vw 40vw at 104% 48%, var(--glow-grey), transparent 65%), radial-gradient(44vw 44vw at 52% 112%, var(--glow-green), transparent 65%);
+
+  --glass-top: rgba(48, 48, 54, 0.70);
+  --glass-bottom: rgba(30, 30, 34, 0.78);
+  --glass: linear-gradient(180deg, var(--glass-top), var(--glass-bottom));
+  --glass-strong-top: rgba(50, 50, 58, 0.86);
+  --glass-strong-bottom: rgba(30, 30, 36, 0.92);
+  --glass-strong: linear-gradient(180deg, var(--glass-strong-top), var(--glass-strong-bottom));
+  --glass-blur: 28px;
+  --glass-blur-strong: 44px;
+  --hairline: rgba(255, 255, 255, 0.10);
+  --hairline-strong: rgba(255, 255, 255, 0.16);
+  --separator: rgba(255, 255, 255, 0.08);
+  --specular: inset 0 1px 0 rgba(255, 255, 255, 0.12);
+  --specular-strong: inset 0 1px 0 rgba(255, 255, 255, 0.28);
+  --elevation-1: 0 1px 1px rgba(0, 0, 0, 0.5), 0 18px 44px rgba(0, 0, 0, 0.40);
+  --elevation-2: 0 1px 1px rgba(0, 0, 0, 0.5), 0 24px 60px rgba(0, 0, 0, 0.50);
+  --elevation-3: 0 2px 2px rgba(0, 0, 0, 0.4), 0 40px 90px rgba(0, 0, 0, 0.65);
+  --well: rgba(0, 0, 0, 0.30);
+  --well-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.5);
+  --pill-top: rgba(255, 255, 255, 0.16);
+  --pill-bottom: rgba(255, 255, 255, 0.07);
+  --pill-hover-top: rgba(255, 255, 255, 0.22);
+  --pill-hover-bottom: rgba(255, 255, 255, 0.11);
+  --row-hover: rgba(255, 255, 255, 0.06);
+  --row-selected: rgba(255, 255, 255, 0.14);
+  --track: rgba(255, 255, 255, 0.09);
+  --tile-gloss: linear-gradient(180deg, rgba(255, 255, 255, 0.30) 0%, rgba(255, 255, 255, 0.04) 60%, rgba(0, 0, 0, 0.10) 100%);
+  --tile-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.35), inset 0 -1px 0 rgba(0, 0, 0, 0.25), 0 2px 4px rgba(0, 0, 0, 0.45);
+  --device-tile: linear-gradient(145deg, #3A3A40, #202024);
+  --glow-opacity: 0.35;
+
+  --text: #F5F5F7;
+  --text-secondary: #E5E5EA;
+  --muted: #98989F;
+  --green: #30D158;
+  --amber: #FF9F0A;
+  --red: #FF6961;
+  --amber-ink: #1C1C1E;
+  --amber-soft: rgba(255, 159, 10, 0.14);
+
+  /* App.jsx overwrites these from the saved per-profile accent (accentColors.js). */
+  --accent: #0A84FF;
+  --accent-readable: #3B9DFF;
+  --accent-fill: #0970D9;
+  --accent-fill-ink: #FFFFFF;
+  --accent-soft: rgba(10, 132, 255, 0.16);
+  --accent-foreground: #000000;
+  --blue: var(--accent-readable);
+
+  --radius-nav: 10px;
+  --radius-group: 16px;
+  --radius-card: 24px;
+  --radius-pill: 999px;
+
+  --space-1: 4px; --space-2: 8px; --space-3: 12px; --space-4: 16px; --space-5: 20px; --space-6: 24px; --space-8: 32px; --space-12: 48px;
+  --sidebar-width: 248px;
 }
-:root[data-theme='light'] { color-scheme: light; --page: #f5f7fa; --surface: #fff; --surface-hover: #e8eef5; --line: #bbc6d1; --line-strong: #68798c; --text: #132334; --muted: #485d71; --muted-2: #485d71; --green: #12614b; --amber: #7c4a00; --red: #b32035; --primary-fill: #132334; --primary-ink: #fff; --gauge-track: #bbc6d1; }
+
+:root[data-theme='light'] {
+  color-scheme: light;
+  --page: #F2F2F7;
+  --wallpaper-blue: #E3ECFA;
+  --wallpaper-grey: #E9E9EE;
+  --glow-blue: rgba(10, 132, 255, 0.08);
+  --glow-grey: rgba(142, 142, 147, 0.08);
+  --glow-green: rgba(48, 209, 88, 0.05);
+  --wallpaper: radial-gradient(1400px 800px at 10% -10%, var(--wallpaper-blue) 0%, rgba(242, 242, 247, 0) 60%), radial-gradient(1000px 700px at 100% 100%, var(--wallpaper-grey) 0%, rgba(242, 242, 247, 0) 55%), var(--page);
+  --glass-top: rgba(255, 255, 255, 0.72);
+  --glass-bottom: rgba(255, 255, 255, 0.58);
+  --glass-strong-top: rgba(255, 255, 255, 0.90);
+  --glass-strong-bottom: rgba(250, 250, 252, 0.84);
+  --hairline: rgba(0, 0, 0, 0.08);
+  --hairline-strong: rgba(0, 0, 0, 0.12);
+  --separator: rgba(0, 0, 0, 0.08);
+  --specular: inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  --specular-strong: inset 0 1px 0 rgba(255, 255, 255, 1);
+  --elevation-1: 0 1px 1px rgba(0, 0, 0, 0.06), 0 12px 32px rgba(0, 0, 0, 0.08);
+  --elevation-2: 0 1px 1px rgba(0, 0, 0, 0.06), 0 18px 44px rgba(0, 0, 0, 0.12);
+  --elevation-3: 0 2px 2px rgba(0, 0, 0, 0.06), 0 30px 70px rgba(0, 0, 0, 0.22);
+  --well: rgba(0, 0, 0, 0.05);
+  --well-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.08);
+  --pill-top: rgba(255, 255, 255, 0.95);
+  --pill-bottom: rgba(240, 240, 245, 0.85);
+  --pill-hover-top: rgba(255, 255, 255, 1);
+  --pill-hover-bottom: rgba(232, 232, 238, 0.95);
+  --row-hover: rgba(0, 0, 0, 0.04);
+  --row-selected: rgba(0, 0, 0, 0.08);
+  --track: rgba(0, 0, 0, 0.08);
+  --device-tile: linear-gradient(145deg, #F7F7F9, #DCDCE2);
+  --glow-opacity: 0.25;
+  --text: #1D1D1F;
+  --text-secondary: #3A3A3C;
+  --muted: #636366;
+  --green: #17733A;
+  --amber: #8A5100;
+  --red: #C01F2E;
+  --amber-ink: #1C1C1E;
+  --amber-soft: rgba(255, 159, 10, 0.16);
+}
+
+/* macOS "Reduce transparency", Windows "Transparency effects" off (Chromium 118+) and high contrast:
+   solid surfaces, no wallpaper, glow or backdrop blur. Dark mode returns to true black for OLED. */
+@media (prefers-reduced-transparency: reduce), (prefers-contrast: more) {
+  :root {
+    --page: #000000;
+    --wallpaper: #000000;
+    --ambient: none;
+    --glass: #1C1C1E;
+    --glass-strong: #1C1C1E;
+    --glass-top: #1C1C1E;
+    --glass-bottom: #1C1C1E;
+    --glass-strong-top: #1C1C1E;
+    --glass-strong-bottom: #1C1C1E;
+    --glass-blur: 0px;
+    --glass-blur-strong: 0px;
+    --hairline: rgba(255, 255, 255, 0.22);
+    --glow-opacity: 0;
+  }
+  :root[data-theme='light'] {
+    --page: #F2F2F7;
+    --wallpaper: #F2F2F7;
+    --glass: #FFFFFF;
+    --glass-strong: #FFFFFF;
+    --glass-top: #FFFFFF;
+    --glass-bottom: #FFFFFF;
+    --glass-strong-top: #FFFFFF;
+    --glass-strong-bottom: #FFFFFF;
+    --hairline: rgba(0, 0, 0, 0.22);
+    --glow-opacity: 0;
+  }
+}
+/* The same fallback chosen explicitly in Settings → Appearance → Reduce transparency. */
+:root[data-transparency='reduced'] {
+  --page: #000000;
+  --wallpaper: #000000;
+  --ambient: none;
+  --glass: #1C1C1E;
+  --glass-strong: #1C1C1E;
+  --glass-top: #1C1C1E;
+  --glass-bottom: #1C1C1E;
+  --glass-strong-top: #1C1C1E;
+  --glass-strong-bottom: #1C1C1E;
+  --glass-blur: 0px;
+  --glass-blur-strong: 0px;
+  --hairline: rgba(255, 255, 255, 0.22);
+  --glow-opacity: 0;
+}
+:root[data-transparency='reduced'][data-theme='light'] {
+  --page: #F2F2F7;
+  --wallpaper: #F2F2F7;
+  --glass: #FFFFFF;
+  --glass-strong: #FFFFFF;
+  --glass-top: #FFFFFF;
+  --glass-bottom: #FFFFFF;
+  --glass-strong-top: #FFFFFF;
+  --glass-strong-bottom: #FFFFFF;
+  --hairline: rgba(0, 0, 0, 0.22);
+  --glow-opacity: 0;
+}
+@media (prefers-reduced-motion: reduce) { :root, :root[data-theme='light'] { --glow-opacity: 0; } }
+
 * { box-sizing: border-box; }
 html, body, #root { margin: 0; width: 100%; height: 100%; min-width: 320px; }
-html { background: var(--page); scrollbar-color: var(--line-strong) var(--page); }
+html { background: var(--page); color: var(--text); font-family: var(--font-ui); scrollbar-color: var(--hairline-strong) transparent; }
 body { -webkit-font-smoothing: antialiased; font-size: 14px; line-height: 1.5; }
-::selection { background: var(--accent); color: var(--accent-foreground); }
+::selection { background: var(--accent-fill); color: var(--accent-fill-ink); }
 button, input, select, textarea { font: inherit; color: inherit; }
-input, textarea { caret-color: var(--blue); }
-button, a { -webkit-tap-highlight-color: transparent; transition: background-color 150ms, border-color 150ms, color 150ms; }
-button, .secondary-button { cursor: pointer; min-height: 44px; border: 1px solid var(--line-strong); border-radius: var(--radius-control); background: transparent; padding: 8px 12px; }
-button:hover:not(:disabled), .secondary-button:hover { background: var(--surface-hover); border-color: var(--text); }
-button:disabled { opacity: .55; cursor: not-allowed; }
+input, textarea { caret-color: var(--accent-readable); }
+button, a { -webkit-tap-highlight-color: transparent; }
+a { color: var(--accent-readable); text-underline-offset: 3px; }
 button, a, input, textarea, select, summary { scroll-margin: 24px; }
-:focus-visible { outline: 2px solid var(--blue); outline-offset: 4px; }
-input, select, textarea { min-width: 0; min-height: 44px; border: 1px solid var(--line-strong); border-radius: var(--radius-control); background: var(--page); padding: 10px 12px; }
-textarea { resize: vertical; }
-input::placeholder, textarea::placeholder { color: var(--muted); opacity: 1; }
-a { color: var(--blue); text-underline-offset: 3px; }
+:focus-visible { outline: 2px solid var(--accent-readable); outline-offset: 4px; box-shadow: 0 0 0 7px rgba(0, 0, 0, 0.55); }
+:root[data-theme='light'] :focus-visible { box-shadow: 0 0 0 7px rgba(255, 255, 255, 0.85); }
 h1, h2, h3, h4 { font-family: var(--heading); font-weight: 600; line-height: 1.25; }
-h1 { font-size: clamp(24px, 2.2vw, 30px); letter-spacing: -.02em; margin: 0; }
-h2 { font-size: 18px; margin: 0 0 12px; } h3 { font-size: 14px; margin: 0 0 12px; }
+h1 { font-size: clamp(24px, 2.2vw, 28px); font-weight: 700; letter-spacing: -0.02em; margin: 0; }
+h2 { font-size: 15px; margin: 0; } h3 { font-size: 14px; margin: 0; }
 p { margin: 8px 0 16px; } small { font-size: 12px; }
 pre, code, time, .data-value { font-family: var(--measurement); font-variant-numeric: tabular-nums; }
 pre { white-space: pre-wrap; overflow-wrap: anywhere; }
@@ -38,4 +201,5 @@ strong, p, dd { overflow-wrap: anywhere; }
 .icon { display: inline-flex; align-items: center; justify-content: center; flex: 0 0 auto; line-height: 0; } .icon svg { display: block; }
 .muted { color: var(--muted); }
 .visually-hidden { position: absolute !important; width: 1px !important; height: 1px !important; padding: 0 !important; margin: -1px !important; overflow: hidden !important; clip: rect(0,0,0,0) !important; white-space: nowrap !important; border: 0 !important; }
+.spin { animation: spin 1s linear infinite; } @keyframes spin { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; } }

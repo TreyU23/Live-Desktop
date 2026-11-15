@@ -43,12 +43,14 @@ Playwright uses Microsoft Edge; `BROWSER_TEST_BASE_URL` selects another test ser
 
 | Suite | Coverage |
 | --- | --- |
-| `browser-performance.mjs` | Ten-second Calendar delay, independent commits, request budgets, hidden polling, pending feedback, profile headers and deferred/persistent music iframe |
+| `browser-performance.mjs` | Ten-second Calendar delay, independent commits, request budgets, hidden polling, pending feedback, profile headers, deferred/persistent music iframe and an Overview scroll frame budget (median < 16.7 ms, p95 < 25 ms at 1440×900, real timers on a fresh page) |
 | `browser-mutation-races.mjs` | Reads during writes cannot overwrite confirmed results; failed memory saves preserve drafts; successful saves clear drafts despite refresh failure |
-| `browser-redesign.mjs` | Seven views at 1920/1440/1280/768/390/320 px; overflow/dock, approval scope/literal content, drafts, keyboard focus, saved appearance, loading/zero/stale/retry and expanded agenda/phone |
+| `browser-redesign.mjs` | Seven views at 1920/1440/1280/768/390/320 px; overflow and sidebar/tab-bar placement, approval scope/literal content, approval sheet (opens only for new requests, focus trap, Escape returns focus to the composer, Don’t Allow/Allow write through, no one-shot promise, literal content), drafts, keyboard focus, saved appearance, Reduce transparency (Settings switch and emulated `prefers-reduced-transparency` via CDP), sidebar search, loading/zero/stale/retry and expanded agenda/phone |
 | `runtime-smoke.mjs` | Built UI through real native host/backend; invoked by lifecycle tests |
 
-Polling windows use accelerated timers and hidden state is emulated. The 640x360 viewport approximates 200% of 1280x720; it does not test actual browser zoom. Screenshots contain synthetic readings/accounts.
+Frontend unit tests (`npm --prefix frontend run test`) include `tokens.test.mjs`, which parses `src/styles/tokens.css` and fails if any text, muted or status color drops below 4.5:1 on dark, light, overlay or reduced-transparency glass (measured at the glass's worst point over the wallpaper glow), and `accent-colors.test.mjs`, which keeps the default accent tokens equal to what `App.jsx` derives.
+
+Polling windows use accelerated timers and hidden state is emulated. The frame budget is measured in whatever browser runs the suite; headless software rendering is a stricter case than a GPU-backed Edge window. Playwright's `emulateMedia({ reducedTransparency })` is not honoured by Chromium 153, so the suite emulates the media feature through CDP. Whether the Windows **Transparency effects** switch reaches `prefers-reduced-transparency` in Edge/WebView was not verified on hardware; the Settings switch is the guaranteed path. The 640x360 viewport approximates 200% of 1280x720; it does not test actual browser zoom. Screenshots contain synthetic readings/accounts.
 
 ## Packaging
 
@@ -81,4 +83,4 @@ Production uses normal Java with extracted deployment/CDS. The `startup-aot` Mav
 
 ## Manual acceptance
 
-Automated checks do not establish authenticated OpenAI/key rotation, iCloud reconnect/recurrence, real Apple Music/Spotify audio/provider transitions, Phone Link/device availability, physical radio changes, sleep/resume, independent Windows-user isolation, screen-reader behavior or actual UI zoom. Validate those with suitable accounts/devices before claiming success. A security scan applies to its exact patch snapshot; historical scans do not approve later changes. Shipping/publishing remains a separate decision.
+An axe-core scan of all seven views in both themes at 1440 and 390 px reported no violations on 2026-11-14; it is not part of the committed suites, so rerun it after visual changes. Automated checks do not establish authenticated OpenAI/key rotation, iCloud reconnect/recurrence, real Apple Music/Spotify audio/provider transitions, Phone Link/device availability, physical radio changes, sleep/resume, independent Windows-user isolation, screen-reader behavior or actual UI zoom. Validate those with suitable accounts/devices before claiming success. A security scan applies to its exact patch snapshot; historical scans do not approve later changes. Shipping/publishing remains a separate decision.

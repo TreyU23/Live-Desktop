@@ -24,7 +24,7 @@ React/Vite calls local Java APIs; Java owns profiles/persistence/integration and
 
 ## Brand Commitments
 
-The implemented Flight Deck V2 direction is settled: preserve the true-black composition, PC instruments, left controls, right services, reserved header/dock and all seven views. Refine within this direction. [Design contract](DESIGN.md), [selected reference](docs/redesign/README.md).
+The Apple-style glass direction (selected 2026-11-14, replacing Flight Deck V2) is current: near-black wallpaper with glass cards, a floating sidebar that becomes a bottom tab bar on phones, an Overview widget grid led by the PC instruments, and all seven views. Reduced transparency (system setting or Settings switch) returns to true black with solid surfaces. Refine within this direction. [Design contract](DESIGN.md), [selected reference](docs/redesign/README.md).
 
 ## Evidence on Hand
 
@@ -36,4 +36,7 @@ Show PC state first; make action scope/availability explicit; preserve current f
 
 ## Open Decisions
 
-No redesign decision is pending. [Validation](docs/VALIDATION.md) records automated/manual boundaries. Local implementation does not authorize publication.
+- One-shot approvals: the backend treats every approval as a reusable scope (`ActionService.hasPreviousApproval`). The approval sheet therefore offers **Allow** with an explicit “also allows matching requests later” notice, not the reference's *Allow Once* switch. Adding one-shot approval is a backend policy change to decide separately.
+- Approvals carry no conversation id, so the sheet opens for requests that appear while Conversations is open rather than for “this conversation”.
+
+[Validation](docs/VALIDATION.md) records automated/manual boundaries. Local implementation does not authorize publication.

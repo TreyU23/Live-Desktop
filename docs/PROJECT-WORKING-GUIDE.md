@@ -1,6 +1,6 @@
 # Live Desktop Project Working Guide
 
-Version 1.0 | 02 November 2026
+Version 1.1 | 14 November 2026
 
 Development, design, security, validation, and release procedures.
 
@@ -11,6 +11,10 @@ A practical handoff for anyone working on Live Desktop. The guide consolidates p
 ## Scope and authority
 
 Read the current repository instructions before each task; source, scripts, and current documentation govern implemented behavior. Saved preferences identify the expected project workflow. Historical validation results are not evidence for a new change.
+
+## Changes in version 1.1
+
+Sections 7, 8, 9, 10 (gauges), 19 and 24 now describe the Apple-style glass design implemented on 14 November 2026, which replaced the Flight Deck design: near-black wallpaper with glass cards, a floating sidebar that becomes a bottom tab bar on phones, the Overview widget grid, the approval sheet, and the reduced-transparency fallback.
 
 ## Evidence status
 
@@ -24,7 +28,7 @@ This document records operating instructions. Its preparation did not run builds
 4. Inspect the checkout and define the work before editing
 5. Set up the development environment correctly
 6. Run development and production through the intended entry points
-7. Preserve the accepted Flight Deck design
+7. Preserve the accepted glass design
 8. Apply the visual details consistently
 9. Preserve responsive layout and accessibility behavior
 10. Never turn missing or illustrative information into product claims
@@ -73,7 +77,7 @@ Read these files before substantive work:
 | `frontend/AGENTS.md` | Frontend workflow, visual direction, integrations, and prototype constraints |
 | `README.md` | Setup, prerequisites, runtime behavior, configuration, and troubleshooting |
 | `PRODUCT.md` | Product purpose, commitments, constraints, and evidence boundaries |
-| `DESIGN.md` | Current Flight Deck design contract |
+| `DESIGN.md` | Current glass design contract |
 | `backend/README.md` | Backend APIs, persistence, integration lifecycle, and security boundaries |
 | `frontend/README.md` | Frontend state, refresh, integration, and build contracts |
 | `native/README.md` | Launcher, host, bridge, and credential DLL contracts |
@@ -209,31 +213,25 @@ Production startup must not build, extract, train CDS, or download dependencies.
 
 When implementing UI work, run the local server and open the preview when the environment permits. Do not hand the user server-start instructions when you can perform that work yourself.
 
-## 7. Preserve the accepted Flight Deck design
+## 7. Preserve the accepted glass design
 
-The current design direction is settled. Refine it in place.
+The Apple-style glass direction implemented on November 14, 2026 is current. Refine it in place.
 
 Preserve:
 
-- True-black canvas
-- PC overview as the primary emphasis
-- Three central PC instruments
-- Controls on the left
-- Connected services on the right
-- Reserved header and bottom dock
+- Near-black wallpaper with glass cards, and a true-black solid fallback under reduced transparency
+- PC overview first: Performance gauges lead the Overview widget grid
+- Floating glass sidebar on desktop; bottom tab bar below 768px
+- Per-view headers carrying local status and Live Desktop restart/shut down
 - All seven views
 - Local profile management
-- Frontend/backend restart and shutdown access
+- Frontend/backend restart and shutdown access (these never restart or shut down Windows)
 
 The seven views are: Overview, System Info, Conversations, Music, Approvals, Memories, Settings.
 
-The selected V2 reference informed the November 2 refinement. Earlier galleries and light explorations are superseded where they conflict with the current contract.
-
-Current reference guidance is in `docs/redesign/README.md`. `DESIGN.md` is the current contract; source/CSS governs runtime details.
+Current reference guidance is in `docs/redesign/README.md`. `DESIGN.md` is the current contract; `frontend/src/styles/tokens.css` governs runtime values. Where the generated reference differs from the contract (always-blue gauges, Inter, "Restart PC", "Allow Once"), the contract wins.
 
 Use the Product Design plugin's `get-context` skill before substantial visual work when the visual source is unclear or no longer fits the goal.
-
-When implementing a newly selected generated mock, treat it as the reference for layout, component anatomy, density, spacing, color, typography, content, and hierarchy. For the existing V2 design, the written contract already resolves differences — for example, retain true black even if the generated image looks near-black.
 
 Record durable prototype-specific design feedback, preferences, or decisions in `frontend/AGENTS.md`.
 
@@ -241,63 +239,52 @@ Record durable prototype-specific design feedback, preferences, or decisions in 
 
 | Element | Requirement |
 | --- | --- |
-| Default page background | `#000000` |
-| Surface | `#0d1117` |
-| Main text | `#f1f4f6` |
-| Default accent | `#4a9aff` |
-| Main font | Segoe UI Variable, Segoe UI, sans-serif |
+| Default page background | `#0B0B0C` with static wallpaper glow; `#000000` under reduced transparency |
+| Cards | Translucent glass gradient, 1px hairline, specular top edge; backdrop blur only on overlays |
+| Main text | `#F5F5F7` (light `#1D1D1F`) |
+| Default accent | `#0A84FF`; readable/fill variants derived in `accentColors.js` |
+| Main font | Segoe UI Variable on Windows (SF Pro only applies on a Mac); no web fonts |
 | Code and measurements | Consolas/monospace where specified |
 | Numerals | Tabular |
 | Body text | 14 px |
-| Prose/memories | 16 px |
-| Titles | 18 px |
-| Page titles | 24–30 px |
-| Controls/navigation corners | 10 px |
-| Containing surfaces/overlays | 14 px |
+| Prose/memories | 15–16 px |
+| Card titles | 15 px |
+| Page titles | 24–28 px |
+| Corners | 10 px navigation/fields, 16 px inset groups, 24 px cards, 999 px pills |
 | Standard interaction targets | At least 44 px high |
-| Focus outline | 2 px readable accent with 4 px offset |
-| Icons | Explicitly imported Feather outline icons, normally 20 px with 1.75 px stroke |
+| Focus outline | 2 px readable accent with 4 px offset plus a halo |
+| Icons | Explicitly imported Feather outline icons; fixed-color tiles in navigation |
 | Transitions | 150 ms for color/background/border |
-| Reduced motion | Disable animations/transitions |
+| Reduced motion | Disable animations/transitions and gauge glow |
 
 Additional requirements:
 
-- Preserve airy spacing.
-- Avoid turning the UI into a dense wall of bordered cards.
-- Use spacing and subtle rules to structure text rows.
-- Use mint, amber, and rose for ready, pending, and error states alongside text.
+- Compose the material classes in `components.css`; views never restyle materials.
+- Every text color must pass 4.5:1 on its glass; `frontend/tests/tokens.test.mjs` enforces this.
+- Use green, amber, and red for ready, pending, and error states alongside text; utilization severity uses the same tokens.
 - Keep semantic status colors independent of the chosen accent.
-- Preserve saved accent choices.
-- Derive readable text, focus, and fill foreground colors.
+- Preserve saved accent choices; derive readable text, focus, fill and fill-ink colors.
 - Render a saved Black accent as white in dark mode and black in light mode.
-- Do not add idle gauge animation, glow, or backdrop effects.
-- Keep status labels as text without capsule fills.
+- Never animate the wallpaper, ambient glow or gauge glow.
+- Keep status labels as text; the amber pending badge is the only filled status.
 
 ## 9. Preserve responsive layout and accessibility behavior
 
 Desktop layout:
 
-- Reserve separate rows for header, content, and dock.
-- Only content scrolls.
+- Sidebar and view region sit side by side; only the view region scrolls.
 - Maximum content width is 1760px.
-- Desktop padding is 28px.
-- Overview leads with the three center instruments.
-- System Info uses bars and specifications.
-- Task-oriented views use ruled layouts.
+- Overview is a four-column widget grid led by Performance.
+- System Info uses a Live / Specifications segmented control.
+- Conversations uses a thread list and a chat card; Settings is one 720px column of grouped rows.
 
-Below 1200px:
-
-- Services move below controls/instruments.
-- Settings becomes one column.
-
-Below 768px:
+Below 1100px Overview cards span the full width. Below 768px:
 
 - Horizontal padding becomes 16px.
 - Instruments precede controls and services.
 - Workstation artwork is hidden.
-- Dock exposes Overview, System Info, Conversations, and More.
-- More contains Music, Approvals, Memories, and Settings.
-- More includes the pending count.
+- The tab bar exposes Overview, System Info, Conversations, More and the profile avatar.
+- More contains Music, Approvals, Memories, and Settings, and shows the pending count.
 - Preserve access to all seven view IDs and lifecycle/profile controls.
 
 For short desktop viewports, shrink artwork and gauges appropriately.
@@ -306,7 +293,7 @@ Interaction requirements:
 
 - Selected navigation retains `aria-current`.
 - More exposes its expanded state and supports Escape.
-- Destructive confirmations contain keyboard focus.
+- Destructive confirmations and the approval sheet contain keyboard focus.
 - Confirmations allow cancellation and restore focus afterward.
 - Fields retain visible labels and errors.
 - Preserve drafts, complete action scopes, loading states, stale states, error states, and empty states.
@@ -317,7 +304,7 @@ Interaction requirements:
 ### Gauges
 
 - Use a shared 240-degree open-bottom arc.
-- Use four-unit, round-ended strokes and a slate track.
+- Use nine-unit, round-ended strokes and a translucent track, with a severity-tinted glow that reduced transparency/motion turns off.
 - Put labels above, values inside, and details below.
 - Accept only finite readings in the 0–100 range for percentage displays/fills.
 - Zero means zero active stroke.
@@ -612,7 +599,7 @@ node frontend/tests/browser-mutation-races.mjs
 node frontend/tests/browser-redesign.mjs
 ```
 
-Coverage includes independent resource commits during delayed calendar loading, request budgets, hidden-document polling, profile headers, deferred/persistent music iframe behavior, mutation race protection, draft preservation/clearing, all seven views, viewport widths 1920/1440/1280/768/390/320 px, overflow and dock behavior, approval scope and literal content, keyboard focus, saved appearance, and loading/zero/stale/retry/agenda/phone states.
+Coverage includes independent resource commits during delayed calendar loading, request budgets, hidden-document polling, profile headers, deferred/persistent music iframe behavior, mutation race protection, draft preservation/clearing, all seven views, viewport widths 1920/1440/1280/768/390/320 px, overflow and sidebar/tab-bar behavior, approval scope and literal content, the approval sheet, reduced transparency, the Overview scroll frame budget, keyboard focus, saved appearance, and loading/zero/stale/retry/agenda/phone states.
 
 Evidence limits:
 
@@ -720,7 +707,7 @@ Before handing work back:
 
 - Confirm the requested behavior is implemented.
 - Confirm unrelated user changes were preserved.
-- Confirm the accepted Flight Deck direction remains intact.
+- Confirm the accepted glass direction remains intact, including the reduced-transparency fallback.
 - Confirm all affected views and navigation remain accessible.
 - Confirm profile boundaries are preserved.
 - Confirm no unsupported capability is presented as working.

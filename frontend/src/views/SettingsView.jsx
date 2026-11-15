@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react';
-import { Icon } from '../components/ui/index.jsx';
+import { Icon, PageHeading } from '../components/ui/index.jsx';
 import { formatRelativeTime } from '../presentation/formatters.js';
 import { MUSIC_PROVIDERS, normalizeMusicUrl } from '../musicProviders.js';
 import { ACCENT_PRESETS, effectiveAccentColor } from '../accentColors.js';
-export function SettingsView({ darkMode, onDarkModeChange, accentColor, onAccentColorChange, onCustomAccentColorChange, calendar, onConnectCalendar, onDisconnectCalendar, musicProviderId, musicConnection, musicPlayer, onMusicProviderChange, onSaveMusic, onDisconnectMusic, onRefreshMusic, onOpenMusic, openAiSettings, onSaveOpenAiKey, onDeleteOpenAiKey }) {
+export function SettingsView({ activeProfile, onManageProfiles, onOpenApprovals, onRestart, onShutdown, lifecycleBusy, phone, onOpenPhone, headerActions, reduceTransparency, onReduceTransparencyChange, darkMode, onDarkModeChange, accentColor, onAccentColorChange, onCustomAccentColorChange, calendar, onConnectCalendar, onDisconnectCalendar, musicProviderId, musicConnection, musicPlayer, onMusicProviderChange, onSaveMusic, onDisconnectMusic, onRefreshMusic, onOpenMusic, openAiSettings, onSaveOpenAiKey, onDeleteOpenAiKey }) {
   const musicProvider = MUSIC_PROVIDERS[musicProviderId];
   const [musicUrl, setMusicUrl] = useState(musicConnection.sourceUrl || "");
   const [error, setError] = useState("");
@@ -16,6 +16,7 @@ export function SettingsView({ darkMode, onDarkModeChange, accentColor, onAccent
   const [openAiError, setOpenAiError] = useState("");
   const [customAccent, setCustomAccent] = useState(accentColor);
   const [accentError, setAccentError] = useState("");
+  const [calendarFormOpen, setCalendarFormOpen] = useState(false);
 
   useEffect(() => {
     setMusicUrl(musicConnection.sourceUrl || "");
@@ -66,97 +67,135 @@ export function SettingsView({ darkMode, onDarkModeChange, accentColor, onAccent
     finally { setCalendarBusy(false); }
   };
 
+  const saveOpenAi = async (event) => {
+    event.preventDefault(); setOpenAiBusy(true); setOpenAiError("");
+    try { await onSaveOpenAiKey(openAiKey); setOpenAiKey(""); } catch (keyError) { setOpenAiError(keyError.message); } finally { setOpenAiBusy(false); }
+  };
+  const applyCustomAccent = (event) => {
+    event.preventDefault();
+    try { const normalized = onCustomAccentColorChange(customAccent); setCustomAccent(normalized); setAccentError(""); } catch (colorError) { setAccentError(colorError.message); }
+  };
+  const tile = (icon, color) => <span className="tile tile--32" style={{ "--tile-color": color }} aria-hidden="true"><Icon name={icon} size={17} strokeWidth={2} /></span>;
+
   return (
     <main className="view-shell settings-view">
-      <header className="page-heading"><div><h1>Settings</h1><p>Connect services and choose how Live Desktop looks. Preferences and credentials stay local to this PC.</p></div></header>
-      <div className="settings-grid">
-        <section className="settings-card settings-card--credentials" aria-labelledby="openai-key-title">
-          <div className="settings-card__icon"><Icon name="Bot" size={20} /></div>
-          <div className="settings-card__content">
-            <div className="settings-title-row"><div><h2 id="openai-key-title">OpenAI API key</h2><p>This key belongs only to the current local profile and is protected with Windows data protection.</p></div><span className={`connection-pill ${openAiSettings.openAiConfigured ? "connection-pill--on" : ""}`}>{openAiSettings.openAiConfigured ? "Key configured" : "Not connected"}</span></div>
-            <form className="profile-key-form" onSubmit={async (event) => { event.preventDefault(); setOpenAiBusy(true); setOpenAiError(""); try { await onSaveOpenAiKey(openAiKey); setOpenAiKey(""); } catch (keyError) { setOpenAiError(keyError.message); } finally { setOpenAiBusy(false); } }}>
-              <label htmlFor="openai-api-key">API key</label><div><input id="openai-api-key" type="password" value={openAiKey} onChange={(event) => setOpenAiKey(event.target.value)} autoComplete="off" placeholder={openAiSettings.profileApiKey ? "Profile key saved" : "sk-..."} required /><button className="primary-button" type="submit" disabled={openAiBusy}>{openAiBusy ? "Saving…" : openAiSettings.profileApiKey ? "Replace key" : "Save key"}</button>{openAiSettings.profileApiKey ? <button className="secondary-button" type="button" disabled={openAiBusy} onClick={removeOpenAiKey}>Remove</button> : null}</div>
-              <small>The key is never returned to the browser after saving.</small>{openAiError ? <p className="form-error" role="alert">{openAiError}</p> : null}
-            </form>
-          </div>
+      <PageHeading title="Settings" detail="Connect services and choose how Live Desktop looks. Preferences and credentials stay local to this PC." actions={headerActions} />
+      <div className="settings-column">
+        <section className="card settings-profile" aria-labelledby="settings-profile-title">
+          <img src={activeProfile.avatar} alt="" />
+          <div><h2 id="settings-profile-title">{activeProfile.name}</h2><span className="muted">Profile stored on this PC · Not a sign-in</span></div>
+          <button type="button" onClick={onManageProfiles}>Manage Profiles…</button>
         </section>
-        <section className="settings-card settings-card--appearance" aria-labelledby="appearance-title">
-          <div className="settings-card__icon"><Icon name={darkMode ? "Moon" : "Sun"} size={20} /></div>
-          <div className="settings-card__content">
-            <h2 id="appearance-title">Appearance</h2>
-            <p>Dark mode uses the completely black background selected for this dashboard.</p>
-            <fieldset className="accent-settings">
-              <legend>Accent color</legend>
-              <div className="accent-presets">
-                {ACCENT_PRESETS.map((preset) => (
-                  <button className={accentColor === preset.color ? "active" : ""} data-color={preset.id} key={preset.id} type="button" aria-label={`Use ${preset.label} accent`} aria-pressed={accentColor === preset.color} onClick={() => onAccentColorChange(preset.color)}>
-                    <span style={{ backgroundColor: effectiveAccentColor(preset.color, darkMode) }} />{preset.label}{accentColor === preset.color ? <Icon name="Check" size={14} /> : null}
+
+        <section className="settings-section" aria-labelledby="appearance-title">
+          <h2 id="appearance-title" className="settings-section__title">Appearance</h2>
+          <div className="group">
+            <div className="settings-row settings-row--stack">
+              <span className="settings-row__label">{tile(darkMode ? "Moon" : "Sun", "#5E5CE6")}<span>Theme<small>Saved for this profile</small></span></span>
+              <div className="theme-swatches" role="radiogroup" aria-label="Theme">
+                {[{ id: "light", label: "Light", dark: false }, { id: "dark", label: "Dark", dark: true }].map(option => (
+                  <button key={option.id} type="button" role="radio" aria-checked={darkMode === option.dark} className={`theme-swatch theme-swatch--${option.id}`} onClick={() => onDarkModeChange(option.dark)}>
+                    <span className="theme-swatch__preview" aria-hidden="true"><i /><i /></span><span>{option.label}</span>
                   </button>
                 ))}
               </div>
-              <form className="custom-accent-form" onSubmit={(event) => { event.preventDefault(); try { const normalized = onCustomAccentColorChange(customAccent); setCustomAccent(normalized); setAccentError(""); } catch (colorError) { setAccentError(colorError.message); } }}>
+            </div>
+            <div className="settings-row">
+              <span className="settings-row__label">{tile("Layers3", "#636366")}<span id="reduce-transparency-label">Reduce transparency<small>Solid surfaces without glass, glow or wallpaper. Also follows the system setting.</small></span></span>
+              <button type="button" className="switch" role="switch" aria-checked={reduceTransparency} aria-labelledby="reduce-transparency-label" onClick={() => onReduceTransparencyChange(!reduceTransparency)}><span className="switch__track" /></button>
+            </div>
+            <div className="settings-row settings-row--stack">
+              <span className="settings-row__label">{tile("Sparkles", "#0A84FF")}<span>Accent color<small>Buttons, links, selection and focus rings</small></span></span>
+              <div className="accent-presets" role="group" aria-label="Accent presets">
+                {ACCENT_PRESETS.map((preset) => (
+                  <button className={`accent-swatch ${accentColor === preset.color ? "active" : ""}`} data-color={preset.id} key={preset.id} type="button" aria-label={`Use ${preset.label} accent`} aria-pressed={accentColor === preset.color} title={preset.label} onClick={() => onAccentColorChange(preset.color)}>
+                    <span style={{ backgroundColor: effectiveAccentColor(preset.color, darkMode) }}>{accentColor === preset.color ? <Icon name="Check" size={14} strokeWidth={3} /> : null}</span>
+                  </button>
+                ))}
+              </div>
+              <form className="custom-accent-form" onSubmit={applyCustomAccent}>
                 <label htmlFor="custom-accent-color">Custom hex color</label>
-                <div><span className="custom-accent-preview" style={{ backgroundColor: effectiveAccentColor(/^#[0-9a-f]{6}$/i.test(customAccent) ? customAccent : accentColor, darkMode) }} /><input id="custom-accent-color" value={customAccent} onChange={(event) => { setCustomAccent(event.target.value); setAccentError(""); }} placeholder="#1685FF" spellCheck="false" autoComplete="off" /><button className="secondary-button" type="submit">Apply</button></div>
-                {accentError ? <p className="form-error" role="alert">{accentError}</p> : <small>Enter a 3- or 6-digit hex code.</small>}
+                <div className="field-row"><span className="custom-accent-preview" aria-hidden="true" style={{ backgroundColor: effectiveAccentColor(/^#[0-9a-f]{6}$/i.test(customAccent) ? customAccent : accentColor, darkMode) }} /><input id="custom-accent-color" value={customAccent} onChange={(event) => { setCustomAccent(event.target.value); setAccentError(""); }} placeholder="#0A84FF" spellCheck="false" autoComplete="off" /><button type="submit">Apply</button></div>
+                {accentError ? <p className="form-error" role="alert">{accentError}</p> : <small className="form-hint">Enter a 3- or 6-digit hex code. Text and focus colors are adjusted automatically to stay readable.</small>}
               </form>
-            </fieldset>
-          </div>
-          <button className={`toggle settings-toggle ${darkMode ? "toggle--on" : ""}`} type="button" role="switch" aria-checked={darkMode} aria-label="Dark mode" onClick={() => onDarkModeChange(!darkMode)}><span className="toggle__thumb" /></button>
-        </section>
-
-        <section className="settings-card settings-card--calendar" aria-labelledby="icloud-calendar-title">
-          <div className="settings-card__icon settings-card__icon--icloud"><Icon name="CalendarDays" size={21} /></div>
-          <div className="settings-card__content">
-            <div className="settings-title-row"><div><h2 id="icloud-calendar-title">iCloud Calendar</h2><p>Sync your Apple calendars into the dashboard’s existing day view.</p></div><span className={`connection-pill ${calendar.connected ? "connection-pill--on" : ""}`}>{calendar.connected ? "Connected" : "Not connected"}</span></div>
-            {calendar.connected ? (
-              <div className="connected-account-row"><div><strong>{calendar.email}</strong><span>{calendar.detail} · Last refreshed {formatRelativeTime(calendar.capturedAt)}</span></div><button className="secondary-button" type="button" disabled={calendarBusy} onClick={disconnectCalendar}>Disconnect</button></div>
-            ) : (
-              <form className="icloud-connect-form" onSubmit={connectCalendar}>
-                <label htmlFor="icloud-email">Apple Account email</label>
-                <input id="icloud-email" type="email" value={calendarEmail} onChange={(event) => { setCalendarEmail(event.target.value); setCalendarError(""); }} autoComplete="username" placeholder="you@icloud.com" required />
-                <label htmlFor="icloud-app-password">App-specific password</label>
-                <input id="icloud-app-password" type="password" value={calendarPassword} onChange={(event) => { setCalendarPassword(event.target.value); setCalendarError(""); }} autoComplete="new-password" placeholder="xxxx-xxxx-xxxx-xxxx" required />
-                <div className="icloud-form-actions"><button className="primary-button" type="submit" disabled={calendarBusy}>{calendarBusy ? "Connecting…" : "Connect iCloud Calendar"}</button><a href="https://account.apple.com/account/manage" target="_blank" rel="noreferrer">Create an app-specific password <Icon name="ExternalLink" size={13} /></a></div>
-                <small>Use an app-specific password from Apple—never enter your regular Apple Account password. It is encrypted with Windows data protection and stays on this PC.</small>
-                {calendarError ? <p className="form-error" role="alert">{calendarError}</p> : null}
-              </form>
-            )}
-            {calendar.connected && calendarError ? <p className="form-error" role="alert">{calendarError}</p> : null}
+            </div>
           </div>
         </section>
 
-        <section className="settings-card settings-card--music" aria-labelledby="music-account-title">
-          <div className={`settings-card__icon settings-card__icon--music settings-card__icon--${musicProviderId}`}><img src={musicProvider.icon} alt="" /></div>
-          <div className="settings-card__content">
-            <div className="settings-title-row"><div><h2 id="music-account-title">Music service</h2><p>Choose which web player powers the existing dashboard widget and full Music view.</p></div><span className="connection-pill connection-pill--on">No developer credentials</span></div>
+        <section className="settings-section" aria-labelledby="assistant-title">
+          <h2 id="assistant-title" className="settings-section__title">Assistant</h2>
+          <div className="group">
+            <div className="settings-row settings-row--stack" aria-labelledby="openai-key-title">
+              <span className="settings-row__label">{tile("Bot", "#30A14E")}<span id="openai-key-title">OpenAI API key<small>Only this local profile uses it. Protected with Windows data protection.</small></span><span className={`connection-pill ${openAiSettings.openAiConfigured ? "connection-pill--on" : ""}`}>{openAiSettings.openAiConfigured ? "Key configured" : "Not set"}</span></span>
+              <form className="profile-key-form" onSubmit={saveOpenAi}>
+                <label className="visually-hidden" htmlFor="openai-api-key">API key</label>
+                <div className="field-row"><input id="openai-api-key" type="password" value={openAiKey} onChange={(event) => setOpenAiKey(event.target.value)} autoComplete="off" placeholder={openAiSettings.profileApiKey ? "Profile key saved" : "sk-..."} required /><button className="btn-primary" type="submit" disabled={openAiBusy}>{openAiBusy ? "Saving…" : openAiSettings.profileApiKey ? "Replace key" : "Save key"}</button>{openAiSettings.profileApiKey ? <button type="button" className="btn-danger" disabled={openAiBusy} onClick={removeOpenAiKey}>Remove</button> : null}</div>
+                <small className="form-hint">The key is never returned to the browser after saving.</small>{openAiError ? <p className="form-error" role="alert">{openAiError}</p> : null}
+              </form>
+            </div>
+            <div className="settings-row">
+              <span className="settings-row__label">{tile("Shield", "#C66A00")}<span>Remembered approvals<small>Approving an action also allows matching requests later.</small></span></span>
+              <button type="button" className="text-action" onClick={onOpenApprovals}>Review <Icon name="ChevronRight" size={14} /></button>
+            </div>
+          </div>
+        </section>
 
-            <div className="music-provider-picker" role="radiogroup" aria-label="Music service">
-              {Object.values(MUSIC_PROVIDERS).map((provider) => (
-                <button key={provider.id} className={provider.id === musicProviderId ? "active" : ""} type="button" role="radio" aria-checked={provider.id === musicProviderId} onClick={() => onMusicProviderChange(provider.id)}>
-                  <img src={provider.icon} alt="" /><span><strong>{provider.name}</strong><small>{provider.id === musicProviderId ? "Used by widgets" : "Switch service"}</small></span>{provider.id === musicProviderId ? <Icon name="Check" size={16} /> : null}
-                </button>
-              ))}
+        <section className="settings-section" aria-labelledby="connections-title">
+          <h2 id="connections-title" className="settings-section__title">Connections</h2>
+          <div className="group">
+            <div className="settings-row settings-row--stack" aria-labelledby="icloud-calendar-title">
+              <span className="settings-row__label">{tile("CalendarDays", "#E0284A")}<span id="icloud-calendar-title">iCloud Calendar<small>{calendar.connected ? [calendar.email, calendar.detail, `Last refreshed ${formatRelativeTime(calendar.capturedAt)}`].filter(Boolean).join(" · ") : "Sync your Apple calendars into the Overview day view."}</small></span>
+                {calendar.connected ? <button type="button" disabled={calendarBusy} onClick={disconnectCalendar}>Disconnect</button> : <button type="button" aria-expanded={calendarFormOpen} aria-controls="icloud-connect-form" onClick={() => setCalendarFormOpen(open => !open)}>{calendarFormOpen ? "Cancel" : "Connect…"}</button>}
+              </span>
+              {!calendar.connected && calendarFormOpen ? (
+                <form id="icloud-connect-form" className="icloud-connect-form" onSubmit={connectCalendar}>
+                  <div className="field"><label htmlFor="icloud-email">Apple Account email</label><input id="icloud-email" type="email" value={calendarEmail} onChange={(event) => { setCalendarEmail(event.target.value); setCalendarError(""); }} autoComplete="username" placeholder="you@icloud.com" required /></div>
+                  <div className="field"><label htmlFor="icloud-app-password">App-specific password</label><input id="icloud-app-password" type="password" value={calendarPassword} onChange={(event) => { setCalendarPassword(event.target.value); setCalendarError(""); }} autoComplete="new-password" placeholder="xxxx-xxxx-xxxx-xxxx" required /></div>
+                  <div className="field-row"><button className="btn-primary" type="submit" disabled={calendarBusy}>{calendarBusy ? "Connecting…" : "Connect iCloud Calendar"}</button><a className="text-action" href="https://account.apple.com/account/manage" target="_blank" rel="noreferrer">Create an app-specific password <Icon name="ExternalLink" size={13} /></a></div>
+                  <small className="form-hint">Use an app-specific password from Apple—never your regular Apple Account password. It is encrypted with Windows data protection and stays on this PC.</small>
+                  {calendarError ? <p className="form-error" role="alert">{calendarError}</p> : null}
+                </form>
+              ) : null}
+              {calendar.connected && calendarError ? <p className="form-error" role="alert">{calendarError}</p> : null}
             </div>
 
-            <div className="music-auth-row">
-              <div><strong>Local Windows media session</strong><span>{musicPlayer.available ? `${musicPlayer.title} · ${musicPlayer.detail}` : musicPlayer.detail}</span></div>
-              <button type="button" className="secondary-button" onClick={onRefreshMusic}><Icon name="RefreshCw" size={15} /> Refresh status</button>
+            <div className="settings-row settings-row--stack" aria-labelledby="music-account-title">
+              <span className="settings-row__label"><span className="tile tile--32 tile--device" aria-hidden="true"><img src={musicProvider.icon} alt="" /></span><span id="music-account-title">Music service<small>Powers the Now Playing card and the Music view. No developer credentials required.</small></span></span>
+              <div className="segmented music-provider-picker" role="radiogroup" aria-label="Music service">
+                {Object.values(MUSIC_PROVIDERS).map((provider) => (
+                  <button key={provider.id} type="button" role="radio" aria-checked={provider.id === musicProviderId} onClick={() => onMusicProviderChange(provider.id)}>
+                    <img src={provider.icon} alt="" />{provider.name}
+                  </button>
+                ))}
+              </div>
+              <div className="music-auth-row">
+                <span><strong>Windows media session</strong><small className="form-hint">{musicPlayer.available ? `${musicPlayer.title} · ${musicPlayer.detail}` : musicPlayer.detail}</small></span>
+                <button type="button" onClick={onRefreshMusic}><Icon name="RefreshCw" size={15} /> Refresh status</button>
+              </div>
+              <form className="music-link-form" onSubmit={saveMusic}>
+                <label htmlFor="music-service-url">{musicProvider.linkLabel}</label>
+                <div className="field-row"><input id="music-service-url" type="url" value={musicUrl} onChange={(event) => setMusicUrl(event.target.value)} placeholder={musicProvider.placeholder} required /><button type="submit">Connect link</button></div>
+                <small className="form-hint">Sign in only inside {musicProvider.name}’s player. In {musicProvider.name}, choose Share, copy the link, and paste it here. Start a track once; Live Desktop then reads the song and sends playback commands locally through Windows.</small>
+                {error ? <p className="form-error" role="alert">{error}</p> : null}
+              </form>
+              <div className="field-row connected-actions"><button className="btn-primary" type="button" onClick={onOpenMusic}><Icon name="Music2" size={16} /> Open full player</button><a className="btn-pill" href={musicProvider.externalUrl} target="_blank" rel="noreferrer"><Icon name="ExternalLink" size={15} /> Open {musicProvider.name} externally</a>{musicConnection.embedUrl ? <button className="text-action text-action--danger" type="button" onClick={onDisconnectMusic}>Disconnect {musicProvider.contentLabel}</button> : null}</div>
             </div>
 
-            <div className="free-integration-note"><Icon name="CircleCheck" size={18} /><div><strong>No developer credentials required</strong><span>Sign in only inside {musicProvider.name}’s player. Live Desktop reads the active song and sends playback commands locally through Windows.</span></div></div>
+            <div className="settings-row">
+              <span className="settings-row__label">{tile("Smartphone", "#636366")}<span>Phone Link<small>{phone?.installed ? phone.detail || "Installed" : "Phone Link setup available"}</small></span></span>
+              <button type="button" onClick={onOpenPhone} disabled={!phone?.installed}>Open externally <Icon name="ExternalLink" size={14} /></button>
+            </div>
+          </div>
+        </section>
 
-            <form className="music-link-form" onSubmit={saveMusic}>
-              <label htmlFor="music-service-url">{musicProvider.linkLabel}</label>
-              <div><input id="music-service-url" type="url" value={musicUrl} onChange={(event) => setMusicUrl(event.target.value)} placeholder={musicProvider.placeholder} required /><button className="primary-button" type="submit">Connect link</button></div>
-              <small>In {musicProvider.name}, choose Share, copy the link, and paste it here. Open the full player and start a track once; the dashboard controls will then follow that Windows media session.</small>
-              {error ? <p className="form-error" role="alert">{error}</p> : null}
-            </form>
-
-            <div className="connected-actions"><button className="primary-button" type="button" onClick={onOpenMusic}><Icon name="Music2" size={16} /> Open full player</button><a className="secondary-button" href={musicProvider.externalUrl} target="_blank" rel="noreferrer"><Icon name="ExternalLink" size={15} /> Open {musicProvider.name} externally</a>{musicConnection.embedUrl ? <button className="text-action text-action--danger" type="button" onClick={onDisconnectMusic}>Disconnect {musicProvider.contentLabel}</button> : null}</div>
+        <section className="settings-section" aria-labelledby="power-title">
+          <h2 id="power-title" className="settings-section__title">Live Desktop services</h2>
+          <div className="group">
+            <div className="settings-row"><span className="settings-row__label">{tile("RotateCw", "#636366")}<span>Restart Live Desktop<small>Restarts the frontend and backend. Windows keeps running.</small></span></span><button type="button" onClick={onRestart} disabled={lifecycleBusy}>Restart</button></div>
+            <div className="settings-row"><span className="settings-row__label">{tile("Power", "#C8202F")}<span>Shut down Live Desktop<small>Stops the frontend and backend. It does not shut down Windows.</small></span></span><button type="button" className="btn-danger" onClick={onShutdown} disabled={lifecycleBusy}>Shut Down…</button></div>
           </div>
         </section>
       </div>
     </main>
   );
 }
-

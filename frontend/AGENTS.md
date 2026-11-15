@@ -8,6 +8,12 @@ When implementing from a selected generated mock, treat that image as the source
 
 ## Current visual direction
 
+- Apple-style glass shell implemented November 14, 2026 and authorized by the user (all five contract changes in the migration plan accepted; glass is the only shell, no `VITE_SHELL` flag). It supersedes the Flight Deck bullets below wherever they conflict: near-black `#0B0B0C` wallpaper with glass cards instead of true black; floating sidebar (bottom tab bar below 768px) instead of top bar and dock; restart/shut down live in each view's header and in Settings; radii 10/16/24/999px; severity-tinted gauge glow (off under reduced transparency/motion). Reduced transparency (system or Settings switch) restores true black and solid surfaces. Backdrop blur only on overlays. See `../DESIGN.md`.
+- Approval sheet says **Allow** plus a reusable-scope notice; do not add “Allow Once” until the backend supports one-shot approvals.
+
+Flight Deck history (superseded where it conflicts with the glass direction):
+
+
 - V2 refinement authorized November 2, 2026: preserve Flight Deck composition, use Segoe UI Variable, 10px controls, 14px containing surfaces, consistent outline icons, 240-degree open-bottom gauges with actual percentage fills, and a modest graphite workstation illustration. Keep true-black canvas; artwork is generic rather than detected hardware.
 - Utilization severity on gauges/bars reuses mint/amber/rose (`<75` / `75–89` / `≥90`). Overview keeps ephemeral ~15-minute sparklines from the App system series buffer (cap 60) plus network/disk activity rates from `/api/system`. Calendar/music empty states expose approval-gated external open actions; label leaves as external.
 

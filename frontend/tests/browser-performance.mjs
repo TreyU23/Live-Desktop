@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import { writeFile, mkdir } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
+import { mockDashboard } from './redesign-fixture.mjs';
 process.chdir(fileURLToPath(new URL('..', import.meta.url)));
 const require = createRequire(import.meta.url);
 const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
@@ -21,7 +22,9 @@ await page.route('**/*', async route => {
   const url = new URL(route.request().url());
   if (url.hostname === 'embed.music.apple.com') return route.fulfill({ contentType: 'text/html', body: '<p>Mock music player</p>' });
   if (!url.pathname.startsWith('/api/') && url.pathname !== '/health') return route.continue();
-  profileHeaders.push(route.request().headers()["x-profile-id"]);
+  // The launch-token bootstrap (/health with no profile header, App.jsx localAccessToken) is not profile-scoped by design.
+  const profileHeader = route.request().headers()["x-profile-id"];
+  if (!(url.pathname === '/health' && profileHeader === undefined)) profileHeaders.push(profileHeader);
   counts.set(url.pathname, (counts.get(url.pathname) || 0) + 1);
   let body = [];
   if (url.pathname === '/api/system/controls/wifi') { await controlGate; body = {id:'synthetic',status:'pending',summary:'Synthetic Wi-Fi approval',arguments:{control:'wifi',enabled:true}}; }
@@ -43,7 +46,7 @@ try {
   await page.goto((process.env.BROWSER_TEST_BASE_URL || 'http://127.0.0.1:4174') + '/?diagnostics=1');
   await page.clock.runFor(200);
   await page.waitForTimeout(1000);
-  const independentlyReady = await page.getByText('Local mode', { exact: true }).count() > 0;
+  const independentlyReady = await page.getByText('Local mode · stored on this PC', { exact: true }).count() > 0;
   assert.ok(independentlyReady, 'Core UI waited for calendar');
   const coreCommitMs = await page.evaluate(() => window.liveDesktopTimings().filter(sample => ['health','system','actions','memories','settings'].includes(sample.resource) && sample.phase === 'widget-commit').map(sample => sample.duration));
   { assert.ok(coreCommitMs.length > 0); assert.ok(Math.max(...coreCommitMs) <= 250, 'Core commit exceeded 250ms'); }
@@ -51,7 +54,7 @@ try {
   await page.waitForTimeout(Math.max(0, 10000 - (Date.now() - started)));
   releaseCalendar();
   await page.clock.runFor(500);
-  await page.getByText('Local mode', { exact: true }).waitFor({ state: 'attached' });
+  await page.getByText('Local mode · stored on this PC', { exact: true }).waitFor({ state: 'attached' });
   {
     const radio = page.getByRole('switch', { name: 'Wi-Fi: off. Request on', exact: true });
     await radio.click();
@@ -106,15 +109,38 @@ try {
       {id:'second',name:'Second profile',avatar:'/assets/user-avatar.png'}
     ])));
     await page.reload(); await page.clock.runFor(500);
-    await page.getByRole('button', { name: 'Open profile picker for Local user' }).click();
+    await page.getByRole('button', { name: /^Local user Switch profile.*opens the profile picker/  }).click();
     const headerIndex = profileHeaders.length;
     await page.getByRole('button', { name: 'Second profile Switch profile' }).click();
-    await page.getByRole('button', { name: 'Open profile picker for Second profile' }).waitFor();
+    await page.getByRole('button', { name: /^Second profile Switch profile.*opens the profile picker/  }).waitFor();
     await page.clock.runFor(500); await page.waitForTimeout(100);
     assert.ok(profileHeaders.length > headerIndex, 'Switched profile made no reads');
     assert.ok(profileHeaders.slice(headerIndex).every(id => id === 'second'), 'Old profile used after switch');
   }
-  const result = { coreCommitMs, iframeContinuity, profileSwitch: true, controlPendingWithinMs: 50, independentlyReady, calendarDelayMs: 10000, visibleRequests, hiddenRequests, observationMs: 300000, clock: 'accelerated browser timers for polling; real delayed calendar', browser: browser.version(), errors };
+  // Scroll frame budget for the glass Overview (fresh page: the fake clock above would distort rAF).
+  let scrollFrames;
+  {
+    const framePage = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+    await mockDashboard(framePage);
+    await framePage.goto(process.env.BROWSER_TEST_BASE_URL || 'http://127.0.0.1:4174');
+    await framePage.locator('.gauge-value strong').first().waitFor();
+    await framePage.waitForTimeout(500);
+    scrollFrames = await framePage.evaluate(() => new Promise(resolve => {
+      const region = document.querySelector('.view-region');
+      const deltas = []; let last = performance.now(); let frame = 0;
+      const step = now => {
+        deltas.push(now - last); last = now; frame += 1;
+        region.scrollTop = (frame % 60) * Math.max(1, (region.scrollHeight - region.clientHeight) / 60);
+        if (frame < 180) requestAnimationFrame(step);
+        else { const sorted = deltas.slice(5).sort((a, b) => a - b); resolve({ frames: sorted.length, medianMs: sorted[Math.floor(sorted.length / 2)], p95Ms: sorted[Math.floor(sorted.length * 0.95)] }); }
+      };
+      requestAnimationFrame(step);
+    }));
+    await framePage.close();
+    assert.ok(scrollFrames.medianMs < 17, `Overview scroll median frame ${scrollFrames.medianMs.toFixed(1)}ms exceeds 16.7ms`);
+    assert.ok(scrollFrames.p95Ms < 25, `Overview scroll p95 frame ${scrollFrames.p95Ms.toFixed(1)}ms`);
+  }
+  const result = { coreCommitMs, scrollFrames, iframeContinuity, profileSwitch: true, controlPendingWithinMs: 50, independentlyReady, calendarDelayMs: 10000, visibleRequests, hiddenRequests, observationMs: 300000, clock: 'accelerated browser timers for polling; real delayed calendar', browser: browser.version(), errors };
   await mkdir('../backend/target/performance', { recursive: true });
   await writeFile('../backend/target/performance/candidate-browser.json', JSON.stringify(result, null, 2));
   console.log(JSON.stringify(result));

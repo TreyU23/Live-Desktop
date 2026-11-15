@@ -26,12 +26,12 @@ export function RecentApps({ apps }) {
   const displayApps = apps.map(app => ({ ...app, age: app.running ? "Running" : "Installed" }));
   const visibleApps = showAll ? displayApps : displayApps.slice(0, 4);
   return (
-    <section className="activity-column" aria-labelledby="activity-title">
-      <div className="column-title-row">
-        <h3 id="activity-title">Recent activity</h3>
-        <button type="button" className="text-action" onClick={() => setShowAll((value) => !value)}>{showAll ? "Compact" : "View all"}</button>
+    <section className="card overview-card overview-card--apps activity-column" aria-labelledby="activity-title">
+      <div className="card-header">
+        <h2 id="activity-title">Recent activity</h2>
+        <span className="card-header__meta">Running and installed apps reported by Windows</span>
       </div>
-      <div className="app-list">
+      <div className="group app-list">
         {!visibleApps.length ? <p className="app-inline-detail">No supported running apps detected.</p> : null}
         {visibleApps.map((app) => (
           <div className={`app-row-wrap ${selectedId === app.id ? "app-row-wrap--selected" : ""}`} key={app.id}>
@@ -47,9 +47,9 @@ export function RecentApps({ apps }) {
           </div>
         ))}
       </div>
-      <button className="text-action show-more" type="button" onClick={() => setShowAll((value) => !value)}>
+      {displayApps.length > 4 ? <button className="text-action show-more card-footer" type="button" aria-expanded={showAll} onClick={() => setShowAll((value) => !value)}>
         {showAll ? "Show less" : "Show more"} <Icon name={showAll ? "ChevronLeft" : "ChevronRight"} size={15} />
-      </button>
+      </button> : null}
     </section>
   );
 }

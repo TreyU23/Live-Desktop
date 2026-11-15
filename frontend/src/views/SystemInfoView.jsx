@@ -1,7 +1,13 @@
-import { Icon, DetailRows } from '../components/ui/index.jsx';
-import { formatBytes, percent, formatInstalledDate, formatPercent } from '../presentation/formatters.js';
+import { useState } from 'react';
+import { Icon, DetailRows, PageHeading } from '../components/ui/index.jsx';
+import { formatBytes, formatBytesPerSec, percent, formatInstalledDate, formatPercent } from '../presentation/formatters.js';
 import { ResourceBar } from '../components/instruments/ResourceBar.jsx';
-export function SystemInfoView({ system, connected, configured, onCopy }) {
+import { Sparkline } from '../components/instruments/Sparkline.jsx';
+import { utilizationSeverity } from '../presentation/utilizationSeverity.js';
+export function SystemInfoView({ system, series = [], connected, configured, onCopy, headerActions }) {
+  const [tab, setTab] = useState('live');
+  const [showIds, setShowIds] = useState(false);
+  const seriesValues = key => series.map(sample => sample[key]);
   const resources = system.resources;
   const device = system.device || {};
   const windows = system.windows || {};
@@ -21,8 +27,8 @@ export function SystemInfoView({ system, connected, configured, onCopy }) {
     { label: "Installed RAM", value: formatBytes(device.installedMemoryBytes || resources.memoryTotalBytes) },
     { label: "Graphics", value: graphics.map((item) => item.name).join(", ") },
     { label: "System type", value: device.systemType },
-    { label: "Device ID", value: device.deviceId },
-    { label: "Product ID", value: device.productId },
+    { label: "Device ID", value: showIds ? device.deviceId : "Hidden" },
+    { label: "Product ID", value: showIds ? device.productId : "Hidden" },
   ];
   const windowsRows = [
     { label: "Edition", value: windows.edition },
@@ -41,42 +47,72 @@ export function SystemInfoView({ system, connected, configured, onCopy }) {
     { label: "Last refreshed", value: system.capturedAt ? new Date(system.capturedAt).toLocaleString() : "Not yet received" },
   ];
 
+  const network = resources.network || {};
+  const disk = resources.diskActivity || {};
+  const summaryRows = [
+    { label: "Processor", value: device.processorName },
+    { label: "Memory", value: formatBytes(device.installedMemoryBytes || resources.memoryTotalBytes) },
+    { label: "Graphics", value: graphics[0].name },
+    { label: "Storage", value: formatBytes(resources.storageTotalBytes, 0) },
+  ];
+
   return (
     <main className="system-info-view">
-      <header className="system-info-heading">
-        <div><h1>About this PC</h1><p>Device specifications, Windows information, and live resource status reported by this PC.</p></div>
+      <PageHeading title="About this PC" detail="Device specifications, Windows information, and live resource status reported by this PC." actions={headerActions}>
         <span className={`status-label ${connected ? "status-label--good" : "status-label--warn"}`}><Icon name={connected ? "CircleCheck" : "CircleAlert"} size={14} />{connected ? "Live Windows data" : "Backend unavailable"}</span>
-      </header>
-
-      <section className="system-resource-bars" aria-label="Current resource utilization">
-        <ResourceBar label="CPU" value={resources.cpuPercent} detail="Current utilization" />
-        <ResourceBar label="Memory" value={memoryPercent} detail={`${formatBytes(resources.memoryUsedBytes)} / ${formatBytes(resources.memoryTotalBytes)}`} />
-        <ResourceBar label="Storage" value={storagePercent} detail={`${formatBytes(resources.storageUsedBytes)} / ${formatBytes(resources.storageTotalBytes)}`} />
-      </section>
-      <section className="system-summary-grid" aria-label="Resource summary">
-        <article><Icon name="Cpu" size={18} /><span>Processor</span><strong>{device.processorName}</strong><small>{formatPercent(resources.cpuPercent)} in use · {processorDetail}</small></article>
-        <article><Icon name="MemoryStick" size={18} /><span>Installed RAM</span><strong>{formatBytes(device.installedMemoryBytes || resources.memoryTotalBytes)}</strong><small>{formatBytes(resources.memoryUsedBytes)} in use · {formatPercent(memoryPercent)}</small></article>
-        <article><Icon name="Monitor" size={18} /><span>Graphics</span><strong>{graphics[0].name}</strong><small>{graphics[0].driverVersion !== "Unavailable" ? `Driver ${graphics[0].driverVersion}` : "Driver information unavailable"}</small></article>
-        <article><Icon name="HardDrive" size={18} /><span>Storage</span><strong>{formatBytes(resources.storageTotalBytes, 0)}</strong><small>{formatBytes(resources.storageUsedBytes)} used · {formatPercent(storagePercent)}</small></article>
-      </section>
-
-      <section className="system-identity-bar"><div><strong>{system.host.name}</strong><span>{device.manufacturer} {device.model}</span></div><button className="secondary-button" type="button" onClick={onCopy}><Icon name="Copy" size={15} /> Copy system info</button></section>
-
-      <div className="system-spec-grid">
-        <section className="system-spec-panel" aria-labelledby="device-info-title">
-          <header><span className="system-spec-icon"><Icon name="Info" size={18} /></span><div><h2 id="device-info-title">Device specifications</h2><p>Hardware and identifiers exposed by Windows.</p></div></header>
+      </PageHeading>
+      <div className="segmented system-tabs" role="tablist" aria-label="System information">
+        <button type="button" role="tab" id="system-tab-live" aria-selected={tab === "live"} aria-controls="system-panel" onClick={() => setTab("live")}>Live</button>
+        <button type="button" role="tab" id="system-tab-specs" aria-selected={tab === "specs"} aria-controls="system-panel" onClick={() => setTab("specs")}>Specifications</button>
+      </div>
+      <div id="system-panel" role="tabpanel" aria-labelledby={tab === "live" ? "system-tab-live" : "system-tab-specs"}>
+      {tab === "live" ? <div className="system-live-grid">
+        <section className="card system-identity-card" aria-labelledby="system-identity-title">
+          <img className="pc-illustration" src="/assets/workstation-v2.png" width="1536" height="1024" alt="Illustrative graphite workstation, not a detected hardware model" />
+          <div><h2 id="system-identity-title">{system.host.name}</h2><span className="muted">{[device.manufacturer, device.model].filter(value => value && value !== "Unavailable").join(" ") || "Model unavailable"} · {windows.edition || system.host.os}</span></div>
+          <dl className="group">{summaryRows.map(row => <div key={row.label}><dt>{row.label}</dt><dd title={String(row.value)}>{row.value}</dd></div>)}</dl>
+          <button className="btn-pill" type="button" onClick={onCopy}><Icon name="Copy" size={15} /> Copy specifications</button>
+        </section>
+        <div className="system-live-column">
+          <section className="card" aria-labelledby="system-resources-title">
+            <h2 id="system-resources-title">Resources</h2>
+            <div className="system-resource-bars" aria-label="Current resource utilization">
+              <div><ResourceBar label="CPU" value={resources.cpuPercent} detail={`Current utilization · ${processorDetail}`} /><Sparkline values={seriesValues("cpu")} label="CPU trend" severity={utilizationSeverity(resources.cpuPercent)} /></div>
+              <div><ResourceBar label="Memory" value={memoryPercent} detail={`${formatBytes(resources.memoryUsedBytes)} / ${formatBytes(resources.memoryTotalBytes)}`} /><Sparkline values={seriesValues("memory")} label="Memory trend" severity={utilizationSeverity(memoryPercent)} /></div>
+              <div><ResourceBar label="Storage" value={storagePercent} detail={`${formatBytes(resources.storageUsedBytes)} / ${formatBytes(resources.storageTotalBytes)}`} /><Sparkline values={seriesValues("storage")} label="Storage trend" severity={utilizationSeverity(storagePercent)} /></div>
+            </div>
+          </section>
+          <div className="stat-tiles">
+            <section className="card stat-tile" aria-labelledby="network-stat-title">
+              <h2 id="network-stat-title"><Icon name="Network" size={16} /> Network</h2>
+              <strong className="data-value">{network.ratesAvailable ? `↓ ${formatBytesPerSec(network.rxBytesPerSec)} · ↑ ${formatBytesPerSec(network.txBytesPerSec)}` : "Rates unavailable"}</strong>
+              <span className="muted">{network.connected ? `${network.name} · ${network.address}` : "Offline"}</span>
+              <div className="stat-tile__sparks" aria-hidden="true"><Sparkline values={seriesValues("netRx")} label="Network download trend" /><Sparkline values={seriesValues("netTx")} label="Network upload trend" /></div>
+            </section>
+            <section className="card stat-tile" aria-labelledby="disk-stat-title">
+              <h2 id="disk-stat-title"><Icon name="HardDrive" size={16} /> Disk activity</h2>
+              <strong className="data-value">{disk.available ? `Read ${formatBytesPerSec(disk.readBytesPerSec)} · Write ${formatBytesPerSec(disk.writeBytesPerSec)}` : "Activity unavailable"}</strong>
+              <span className="muted">{formatPercent(storagePercent)} of {formatBytes(resources.storageTotalBytes, 0)} used</span>
+              <div className="stat-tile__sparks" aria-hidden="true"><Sparkline values={seriesValues("diskRead")} label="Disk read trend" /><Sparkline values={seriesValues("diskWrite")} label="Disk write trend" /></div>
+            </section>
+          </div>
+        </div>
+      </div> : <div className="system-spec-grid">
+        <section className="card system-spec-panel" aria-labelledby="device-info-title">
+          <header className="card-header"><div><h2 id="device-info-title">Device specifications</h2><p className="muted">Hardware and identifiers exposed by Windows.</p></div><button type="button" className="text-action" aria-pressed={showIds} onClick={() => setShowIds(value => !value)}>{showIds ? "Hide IDs" : "Show IDs"}</button></header>
           <DetailRows rows={deviceRows} />
         </section>
-        <section className="system-spec-panel" aria-labelledby="windows-info-title">
-          <header><span className="system-spec-icon"><Icon name="PanelsTopLeft" size={18} /></span><div><h2 id="windows-info-title">Windows specifications</h2><p>Installed Windows edition, version, and build.</p></div></header>
+        <section className="card system-spec-panel" aria-labelledby="windows-info-title">
+          <header className="card-header"><div><h2 id="windows-info-title">Windows specifications</h2><p className="muted">Installed Windows edition, version, and build.</p></div></header>
           <DetailRows rows={windowsRows} />
         </section>
-        <section className="system-spec-panel system-spec-panel--wide" aria-labelledby="live-info-title">
-          <header><span className="system-spec-icon"><Icon name="Activity" size={18} /></span><div><h2 id="live-info-title">Live system status</h2><p>The same local status shown on the Home dashboard, collected in one place.</p></div></header>
+        <section className="card system-spec-panel system-spec-panel--wide" aria-labelledby="live-info-title">
+          <header className="card-header"><div><h2 id="live-info-title">Live system status</h2><p className="muted">The same local status shown on Overview, collected in one place.</p></div></header>
           <DetailRows rows={liveRows} />
         </section>
+      </div>}
       </div>
-      <p className="system-privacy-note"><Icon name="ShieldCheck" size={15} /> Read locally from Windows, the Java runtime, and the workspace drive. No administrator access is requested.</p>
+      <p className="system-privacy-note inline-caption"><Icon name="ShieldCheck" size={15} /> Read locally from Windows, the Java runtime, and the workspace drive. No administrator access is requested.</p>
     </main>
   );
 }

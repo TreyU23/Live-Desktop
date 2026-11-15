@@ -1,8 +1,8 @@
-import { FiActivity, FiAlertCircle, FiBattery, FiBatteryCharging, FiBellOff, FiBluetooth, FiBookmark, FiCalendar, FiCamera, FiCheck, FiCheckCircle, FiChevronLeft, FiChevronRight, FiCircle, FiClipboard, FiCopy, FiCpu, FiExternalLink, FiGlobe, FiGrid, FiHardDrive, FiHome, FiInfo, FiLayers, FiLink2, FiLoader, FiMail, FiMessageCircle, FiMessageSquare, FiMic, FiMonitor, FiMoon, FiMusic, FiPause, FiPieChart, FiPlay, FiPlus, FiPower, FiRefreshCw, FiRotateCw, FiSearch, FiSend, FiServer, FiSettings, FiShield, FiShuffle, FiSkipBack, FiSkipForward, FiSmartphone, FiSquare, FiSun, FiUpload, FiUser, FiUsers, FiTrash2, FiVolume2, FiVolumeX, FiWifi, FiX, FiZap } from "react-icons/fi";
-const FeatherIcons = { FiActivity, FiAlertCircle, FiBattery, FiBatteryCharging, FiBellOff, FiBluetooth, FiBookmark, FiCalendar, FiCamera, FiCheck, FiCheckCircle, FiChevronLeft, FiChevronRight, FiCircle, FiClipboard, FiCopy, FiCpu, FiExternalLink, FiGlobe, FiGrid, FiHardDrive, FiHome, FiInfo, FiLayers, FiLink2, FiLoader, FiMail, FiMessageCircle, FiMessageSquare, FiMic, FiMonitor, FiMoon, FiMusic, FiPause, FiPieChart, FiPlay, FiPlus, FiPower, FiRefreshCw, FiRotateCw, FiSearch, FiSend, FiServer, FiSettings, FiShield, FiShuffle, FiSkipBack, FiSkipForward, FiSmartphone, FiSquare, FiSun, FiUpload, FiUser, FiUsers, FiTrash2, FiVolume2, FiVolumeX, FiWifi, FiX, FiZap };
+import { FiActivity, FiAlertCircle, FiArrowUp, FiArrowUpRight, FiBattery, FiBatteryCharging, FiBellOff, FiBluetooth, FiBookmark, FiCalendar, FiCamera, FiCheck, FiCheckCircle, FiChevronLeft, FiChevronRight, FiCircle, FiClipboard, FiCopy, FiCpu, FiExternalLink, FiGlobe, FiGrid, FiHardDrive, FiHome, FiInfo, FiLayers, FiLink2, FiLoader, FiMail, FiMessageCircle, FiMessageSquare, FiMic, FiMonitor, FiMoon, FiMusic, FiPause, FiPieChart, FiPlay, FiPlus, FiPower, FiRefreshCw, FiRotateCw, FiSearch, FiSend, FiServer, FiSettings, FiShield, FiShuffle, FiSkipBack, FiSkipForward, FiSmartphone, FiSquare, FiSun, FiUpload, FiUser, FiUsers, FiTrash2, FiVolume2, FiVolumeX, FiWifi, FiX, FiZap } from "react-icons/fi";
+const FeatherIcons = { FiActivity, FiAlertCircle, FiArrowUp, FiArrowUpRight, FiBattery, FiBatteryCharging, FiBellOff, FiBluetooth, FiBookmark, FiCalendar, FiCamera, FiCheck, FiCheckCircle, FiChevronLeft, FiChevronRight, FiCircle, FiClipboard, FiCopy, FiCpu, FiExternalLink, FiGlobe, FiGrid, FiHardDrive, FiHome, FiInfo, FiLayers, FiLink2, FiLoader, FiMail, FiMessageCircle, FiMessageSquare, FiMic, FiMonitor, FiMoon, FiMusic, FiPause, FiPieChart, FiPlay, FiPlus, FiPower, FiRefreshCw, FiRotateCw, FiSearch, FiSend, FiServer, FiSettings, FiShield, FiShuffle, FiSkipBack, FiSkipForward, FiSmartphone, FiSquare, FiSun, FiUpload, FiUser, FiUsers, FiTrash2, FiVolume2, FiVolumeX, FiWifi, FiX, FiZap };
 
 const ICON_COMPONENTS = {
-  Activity: "FiActivity", AppWindow: "FiSquare", BatteryCharging: "FiBatteryCharging",
+  Activity: "FiActivity", ArrowUp: "FiArrowUp", ArrowUpRight: "FiArrowUpRight", AppWindow: "FiSquare", BatteryCharging: "FiBatteryCharging",
   BatteryMedium: "FiBattery", BellOff: "FiBellOff", Bluetooth: "FiBluetooth", Bookmark: "FiBookmark",
   Bot: "FiCpu", CalendarDays: "FiCalendar", Camera: "FiCamera", Check: "FiCheck",
   ChevronLeft: "FiChevronLeft", ChevronRight: "FiChevronRight", Chrome: "FiGlobe", Circle: "FiCircle",
@@ -16,7 +16,7 @@ const ICON_COMPONENTS = {
   Send: "FiSend", Settings: "FiSettings", Sheet: "FiGrid", Shield: "FiShield", ShieldCheck: "FiShield",
   Shuffle: "FiShuffle", SkipBack: "FiSkipBack", SkipForward: "FiSkipForward", Smartphone: "FiSmartphone",
   Sparkles: "FiZap", Sun: "FiSun", Trash2: "FiTrash2", Upload: "FiUpload", User: "FiUser", UsersRound: "FiUsers", Volume2: "FiVolume2", VolumeX: "FiVolumeX",
-  Wifi: "FiWifi", X: "FiX",
+  Wifi: "FiWifi", X: "FiX", Zap: "FiZap",
 };
 
 export function Icon({ name, size = 20, strokeWidth = 1.75, className = "" }) {
@@ -24,36 +24,32 @@ export function Icon({ name, size = 20, strokeWidth = 1.75, className = "" }) {
   return <span className={`icon ${className}`} aria-hidden="true"><Component size={size} strokeWidth={strokeWidth} /></span>;
 }
 
-export function AppLogo({ small = false }) {
-  return (
-    <span className={`app-logo ${small ? "app-logo--small" : ""}`} aria-hidden="true">
-      <Icon name="Sparkles" size={small ? 18 : 22} strokeWidth={2.2} />
-    </span>
-  );
+export function EmptyState({ icon, title, detail, children }) {
+  return <div className="empty-state"><Icon name={icon} size={28} /><h3>{title}</h3><p>{detail}</p>{children}</div>;
 }
 
-export function EmptyState({ icon, title, detail }) {
-  return <div className="empty-state"><Icon name={icon} size={28} /><h3>{title}</h3><p>{detail}</p></div>;
+export function PageHeading({ title, detail, actions, children }) {
+  return <header className="page-heading"><div><h1 tabIndex={-1}>{title}</h1>{detail ? <p>{detail}</p> : null}</div>{children}{actions}</header>;
 }
 
-export function ViewShell({ title, detail, children }) {
-  return <main className="view-shell"><header className="page-heading"><div><h1 tabIndex={-1}>{title}</h1><p>{detail}</p></div></header>{children}</main>;
+export function ViewShell({ title, detail, actions, className = "", children }) {
+  return <main className={`view-shell ${className}`.trim()}><PageHeading title={title} detail={detail} actions={actions} />{children}</main>;
 }
 
 export function InfoLine({ icon, label, value, healthy }) {
   return (
     <div className="info-line">
-      <Icon name={icon} size={19} />
-      <strong>{label}</strong>
-      <span title={value}>{value}</span>
-      {healthy !== undefined ? <i className={`status-dot ${healthy ? "status-dot--good" : "status-dot--warn"}`} /> : null}
+      {icon ? <Icon name={icon} size={16} className="muted" /> : null}
+      <span className="group__label">{label}</span>
+      <span className="group__value group__value--end" title={value}>{value}</span>
+      {healthy !== undefined ? <i className={`status-dot ${healthy ? "status-dot--good" : "status-dot--warn"}`} aria-hidden="true" /> : null}
     </div>
   );
 }
 
 export function DetailRows({ rows }) {
   return (
-    <dl className="system-detail-list">
+    <dl className="group system-detail-list">
       {rows.map((row) => (
         <div key={row.label}>
           <dt>{row.label}</dt>

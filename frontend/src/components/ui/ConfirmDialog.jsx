@@ -16,8 +16,8 @@ export function ConfirmDialog({ title, children, confirmLabel, onCancel, onConfi
     if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
     else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
   };
-  return <dialog className="confirm-dialog" ref={dialog} aria-labelledby="confirmation-title" onKeyDown={trapFocus} onCancel={event => { event.preventDefault(); if (!busy) onCancel(); }}>
+  return <dialog className="confirm-dialog card--strong" ref={dialog} aria-labelledby="confirmation-title" onKeyDown={trapFocus} onCancel={event => { event.preventDefault(); if (!busy) onCancel(); }}>
     <h2 id="confirmation-title">{title}</h2><div className="confirmation-content">{children}</div>
-    <div className="dialog-actions"><button type="button" onClick={onCancel} disabled={busy}>Cancel</button><button className="danger-button" type="button" onClick={onConfirm} disabled={busy}>{busy ? 'Submitting…' : confirmLabel}</button></div>
+    <div className="dialog-actions"><button type="button" onClick={onCancel} disabled={busy}>Cancel</button><button className="btn-destructive" type="button" onClick={onConfirm} disabled={busy}>{busy ? 'Submitting…' : confirmLabel}</button></div>
   </dialog>;
 }

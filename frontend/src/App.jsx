@@ -1,4 +1,4 @@
-import { Icon, AppLogo } from './components/ui/index.jsx';
+import { Icon } from './components/ui/index.jsx';
 import { formatBytes, localIsoDate, localDateAtOffset } from './presentation/formatters.js';
 import { SystemInfoView } from './views/SystemInfoView.jsx';
 import { SettingsView } from './views/SettingsView.jsx';
@@ -7,7 +7,7 @@ import { ApprovalsView } from './views/ApprovalsView.jsx';
 import { MemoriesView } from './views/MemoriesView.jsx';
 import { ConversationsView } from './views/ConversationsView.jsx';
 import { MusicView } from './views/MusicView.jsx';
-import { NavigationDock } from './components/shell/NavigationDock.jsx';
+import { Sidebar } from './components/shell/Sidebar.jsx';
 import { ConfirmDialog } from './components/ui/ConfirmDialog.jsx';
 import { ResourceBoundary } from './components/feedback/ResourceBoundary.jsx';
 import { adaptResourceStatus } from './presentation/resourceViewState.js';
@@ -17,7 +17,7 @@ import {
   MUSIC_PROVIDERS,
   migrateMusicIntegration,
 } from "./musicProviders.js";
-import { readableAccentColor, accentForegroundColor, accentSoftColor, effectiveAccentColor, normalizeHexColor, readAccentColor } from "./accentColors.js";
+import { readableAccentColor, accentForegroundColor, accentSoftColor, accentFillColor, accentFillForeground, effectiveAccentColor, normalizeHexColor, readAccentColor } from "./accentColors.js";
 import { applyCompletedControlAction, upsertAction } from "./systemControls.js";
 import { createResourceScheduler } from "./resourceScheduler.js";
 import { recordTiming } from "./performanceDiagnostics.js";
@@ -155,6 +155,7 @@ const PROFILES_KEY = "live-desktop.profiles";
 const ACTIVE_PROFILE_KEY = "live-desktop.active-profile";
 const MUSIC_CONNECTION_KEY = "live-desktop.apple-music";
 const THEME_KEY = "live-desktop.theme";
+const TRANSPARENCY_KEY = "live-desktop.reduce-transparency";
 const ACCENT_COLOR_KEY = "live-desktop.accent-color";
 const DEFAULT_PROFILE = { id: "default", name: "Local user", avatar: "/assets/user-avatar.png" };
 
@@ -285,7 +286,7 @@ function LifecycleNotice({ state }) {
   if (state === "idle") return null;
   const restarting = state === "restarting";
   return (
-    <div className={`lifecycle-notice lifecycle-notice--${state}`} role="status">
+    <div className={`lifecycle-notice lifecycle-notice--${state} card--strong`} role="status">
       <span className="dialog-icon"><Icon name={restarting ? "RotateCw" : "Power"} size={22} className={restarting ? "spin" : ""} /></span>
       <div>
         <strong>{restarting ? "Restarting Live Desktop" : "Live Desktop services are off"}</strong>
@@ -295,14 +296,14 @@ function LifecycleNotice({ state }) {
   );
 }
 
-function ProfilePicker({ profiles, activeProfile, onProfilesChange, onSwitch, onDelete }) {
-  const [open, setOpen] = useState(false);
+function ProfilePicker({ profiles, activeProfile, onProfilesChange, onSwitch, onDelete, open, setOpen }) {
   const [name, setName] = useState(activeProfile.name);
   const picker = useRef(null);
   const trigger = useRef(null);
   useEffect(() => {
     if (!open) return;
     picker.current?.querySelector('.profile-menu button')?.focus();
+    picker.current?.querySelector('.profile-menu')?.scrollIntoView?.({ block: 'nearest' });
     const close = event => {
       if (event.type === 'keydown' && event.key === 'Escape') { setOpen(false); trigger.current?.focus(); }
       if (event.type === 'pointerdown' && !picker.current?.contains(event.target)) setOpen(false);
@@ -338,20 +339,20 @@ function ProfilePicker({ profiles, activeProfile, onProfilesChange, onSwitch, on
 
   return (
     <div className="profile-picker" ref={picker}>
-      <button ref={trigger} className="profile-trigger" type="button" aria-label={`Open profile picker for ${activeProfile.name}`} aria-expanded={open} onClick={() => setOpen((value) => !value)}>
-        <img src={activeProfile.avatar} alt="" /><span><strong>{activeProfile.name}</strong><small>Local profile</small></span><Icon name="ChevronRight" size={14} />
+      <button ref={trigger} className="profile-trigger" type="button" aria-expanded={open} onClick={() => setOpen((value) => !value)}>
+        <img src={activeProfile.avatar} alt="" /><span><strong>{activeProfile.name}</strong>{" "}<small>Switch profile</small><span className="visually-hidden">, opens the profile picker</span></span><Icon name="ChevronRight" size={14} />
       </button>
       {open ? (
-        <section className="profile-menu" aria-label="Local profiles">
-          <div className="profile-menu__heading"><div><strong>Profiles</strong><span>Local data organization, not authentication</span></div><button type="button" onClick={() => { setOpen(false); trigger.current?.focus(); }} aria-label="Close profiles"><Icon name="X" size={16} /></button></div>
-          <div className="profile-list">
+        <section className="profile-menu card--strong" aria-label="Local profiles">
+          <div className="profile-menu__heading"><div><strong>Profiles</strong><span>Local data organization, not authentication</span></div><button type="button" className="btn-icon btn-icon--plain" onClick={() => { setOpen(false); trigger.current?.focus(); }} aria-label="Close profiles"><Icon name="X" size={16} /></button></div>
+          <div className="group profile-list">
             {profiles.map((profile) => <button className={profile.id === activeProfile.id ? "active" : ""} type="button" key={profile.id} onClick={() => profile.id !== activeProfile.id && onSwitch(profile.id)}><img src={profile.avatar} alt="" /><span><strong>{profile.name}</strong><small>{profile.id === activeProfile.id ? "Current profile" : "Switch profile"}</small></span>{profile.id === activeProfile.id ? <Icon name="Check" size={16} /> : null}</button>)}
           </div>
           <div className="profile-editor">
             <label htmlFor="profile-name">Profile name</label>
-            <div><input id="profile-name" value={name} maxLength={48} onChange={(event) => setName(event.target.value)} onBlur={() => name.trim() && updateActive({ name: name.trim() })} /><label className="avatar-upload" htmlFor={fileId}><Icon name="Upload" size={15} /> Change photo</label><input className="visually-hidden" id={fileId} type="file" accept="image/*" onChange={uploadAvatar} /></div>
+            <div className="field-row"><input id="profile-name" value={name} maxLength={48} onChange={(event) => setName(event.target.value)} onBlur={() => name.trim() && updateActive({ name: name.trim() })} /><label className="avatar-upload" htmlFor={fileId}><Icon name="Upload" size={15} /> Change photo</label><input className="visually-hidden" id={fileId} type="file" accept="image/*" onChange={uploadAvatar} /></div>
           </div>
-          <div className="profile-menu__actions"><button className="secondary-button" type="button" onClick={createProfile}><Icon name="Plus" size={15} /> New profile</button><button className="text-action text-action--danger" type="button" disabled={activeProfile.id === "default" || profiles.length === 1} onClick={() => onDelete(activeProfile.id)}><Icon name="Trash2" size={14} /> Delete</button></div>
+          <div className="profile-menu__actions"><button type="button" onClick={createProfile}><Icon name="Plus" size={15} /> New profile</button><button className="text-action text-action--danger" type="button" disabled={activeProfile.id === "default" || profiles.length === 1} onClick={() => onDelete(activeProfile.id)}><Icon name="Trash2" size={14} /> Delete</button></div>
         </section>
       ) : null}
     </div>
@@ -393,8 +394,10 @@ export function App() {
   const [assistantBusy, setAssistantBusy] = useState(false);
   const [lifecycleState, setLifecycleState] = useState("idle");
   const [shutdownOpen, setShutdownOpen] = useState(false);
+  const [profileMenuOpen, setProfileMenuOpen] = useState(false);
   const [toast, setToast] = useState(null);
   const [darkMode, setDarkMode] = useState(() => (window.localStorage.getItem(profileStorageKey(THEME_KEY, profileId)) || (profileId === "default" ? window.localStorage.getItem(THEME_KEY) : null)) !== "light");
+  const [reduceTransparency, setReduceTransparency] = useState(() => window.localStorage.getItem(profileStorageKey(TRANSPARENCY_KEY, profileId)) === "true");
   const [accentColor, setAccentColor] = useState(() => readAccentColor(window.localStorage, profileStorageKey(ACCENT_COLOR_KEY, profileId)));
   const [musicIntegration, setMusicIntegration] = useState(() => readMusicIntegration(profileId));
   const musicProviderId = musicIntegration.provider;
@@ -419,11 +422,19 @@ export function App() {
   }, [darkMode, profileId]);
 
   useEffect(() => {
+    if (reduceTransparency) document.documentElement.dataset.transparency = "reduced";
+    else delete document.documentElement.dataset.transparency;
+    window.localStorage.setItem(profileStorageKey(TRANSPARENCY_KEY, profileId), String(reduceTransparency));
+  }, [reduceTransparency, profileId]);
+
+  useEffect(() => {
     const appliedAccent = effectiveAccentColor(accentColor, darkMode);
     document.documentElement.style.setProperty("--accent", appliedAccent);
     document.documentElement.style.setProperty("--accent-readable", readableAccentColor(appliedAccent, darkMode));
     document.documentElement.style.setProperty("--accent-soft", accentSoftColor(appliedAccent));
     document.documentElement.style.setProperty("--accent-foreground", accentForegroundColor(appliedAccent));
+    document.documentElement.style.setProperty("--accent-fill", accentFillColor(appliedAccent));
+    document.documentElement.style.setProperty("--accent-fill-ink", accentFillForeground(appliedAccent));
     window.localStorage.setItem(profileStorageKey(ACCENT_COLOR_KEY, profileId), accentColor);
   }, [accentColor, darkMode, profileId]);
 
@@ -452,7 +463,7 @@ export function App() {
     if (id === "default" || profiles.length === 1) return;
     try {
       await api("/api/profile/data", { method: "DELETE", profileId: id });
-      for (const base of [MUSIC_CONNECTION_KEY, THEME_KEY, ACCENT_COLOR_KEY]) window.localStorage.removeItem(profileStorageKey(base, id));
+      for (const base of [MUSIC_CONNECTION_KEY, THEME_KEY, ACCENT_COLOR_KEY, TRANSPARENCY_KEY]) window.localStorage.removeItem(profileStorageKey(base, id));
       const next = profiles.filter((profile) => profile.id !== id);
       updateProfiles(next);
       switchProfile(next[0].id);
@@ -919,48 +930,44 @@ export function App() {
     finally { setResourceStatus(current => ({ ...current, [key]: resourceStates.current[key] })); }
   };
   const boundary = (key, name, children) => <ResourceBoundary name={name} status={resourceStates.current[key]} onRetry={() => retry(key)}>{children}</ResourceBoundary>;
+  const headerActions = <div className="page-actions">
+    <span className="btn-pill local-status" role="status"><i className={`status-dot ${health.connected && runtime.frontendOnline ? "status-dot--good" : "status-dot--warn"}`} aria-hidden="true" /><span>{health.connected ? "Local mode · stored on this PC" : "Backend offline"}</span></span>
+    <div className="button-group lifecycle-actions" role="group" aria-label="Project lifecycle controls">
+      <button type="button" className="btn-icon" aria-label="Restart frontend and backend" title="Restart frontend and backend" onClick={() => runLifecycle("restart")} disabled={lifecycleState !== "idle"}>
+        <Icon name="RotateCw" size={18} className={lifecycleState === "restarting" ? "spin" : ""} />
+      </button>
+      <button className="btn-icon shutdown-button" type="button" aria-label="Shut down frontend and backend" title="Shut down frontend and backend" onClick={() => setShutdownOpen(true)} disabled={lifecycleState !== "idle"}>
+        <Icon name="Power" size={18} />
+      </button>
+    </div>
+  </div>;
   return (
     <div className="desktop-shell">
-      <header className="topbar">
-        <button className="brand" type="button" onClick={() => setActiveView("home")}><AppLogo /><span><strong>Live Desktop</strong><small>PC overview & local assistant</small></span></button>
-        <div className="topbar-actions">
-          <span className="local-status"><i className={health.connected && runtime.frontendOnline ? "" : "offline"} /><strong>{health.connected ? "Local mode" : "Backend offline"}</strong><small>{health.connected ? "Profiles stored on this PC" : "Backend is offline"}</small></span>
-          <div className="lifecycle-actions" aria-label="Project lifecycle controls">
-            <button type="button" aria-label="Restart frontend and backend" title="Restart frontend and backend" onClick={() => runLifecycle("restart")} disabled={lifecycleState !== "idle"}>
-              <Icon name="RotateCw" size={18} className={lifecycleState === "restarting" ? "spin" : ""} />
-            </button>
-            <button className="shutdown-button" type="button" aria-label="Shut down frontend and backend" title="Shut down frontend and backend" onClick={() => setShutdownOpen(true)} disabled={lifecycleState !== "idle"}>
-              <Icon name="Power" size={18} />
-            </button>
-          </div>
-          <button type="button" className={`settings-button ${activeView === "settings" ? "active" : ""}`} aria-label="Open Settings" onClick={() => setActiveView("settings")}><Icon name="Settings" size={20} /><span>Settings</span></button>
-          <ProfilePicker profiles={profiles} activeProfile={activeProfile} onProfilesChange={updateProfiles} onSwitch={switchProfile} onDelete={(id) => setProfileDelete(profiles.find(profile => profile.id === id))} />
-        </div>
-      </header>
+      <Sidebar activeView={activeView} onNavigate={setActiveView} pendingCount={pendingCount} hostName={system.host?.name && system.host.name !== FALLBACK_SYSTEM.host.name ? system.host.name : "This PC"} connected={health.connected}
+        profileSlot={<ProfilePicker profiles={profiles} activeProfile={activeProfile} onProfilesChange={updateProfiles} onSwitch={switchProfile} onDelete={(id) => setProfileDelete(profiles.find(profile => profile.id === id))} open={profileMenuOpen} setOpen={setProfileMenuOpen} />} />
 
       <div className="view-region" ref={viewRegion}>
-      {Object.entries(resourceStatus).some(([, value]) => value.error) ? <div className="refresh-summary" role="status"><span>Some resources could not refresh. Last available data is retained.</span>{Object.entries(resourceStatus).filter(([, value]) => value.error).map(([key]) => <button key={key} type="button" disabled={resourceStatus[key].loading} onClick={() => retry(key)}>Refresh {key}</button>)}</div> : null}
-      {activeView === "home" ? <HomeView system={system} systemSeries={systemSeries} health={health} controls={controls} pendingControl={pendingControl} onControl={queueControl} pendingCount={pendingCount} navigate={setActiveView} apps={apps}
+      {Object.entries(resourceStatus).some(([, value]) => value.error) ? <div className="refresh-summary" role="status"><span>Some resources could not refresh. Last available data is retained.</span>{Object.entries(resourceStatus).filter(([, value]) => value.error).map(([key]) => <button key={key} type="button" className="chip" disabled={resourceStatus[key].loading} onClick={() => retry(key)}>Refresh {key}</button>)}</div> : null}
+      {activeView === "home" ? <HomeView system={system} systemSeries={systemSeries} health={health} controls={controls} pendingControl={pendingControl} onControl={queueControl} pendingCount={pendingCount} navigate={setActiveView} apps={apps} headerActions={headerActions}
         states={resourceStates.current} retry={retry} onSubmit={sendMessage} busy={assistantBusy}
         calendarProps={{ calendar, calendarRefreshing, onCalendarDateChange: date => refreshCalendar(date, false), onRefreshCalendar: date => refreshCalendar(date, true), onOpenCalendarSettings: () => setActiveView('settings'), onOpenCalendarExternally: openCalendarExternally }}
         phoneProps={{ phone, onOpen: openPhone, onRefresh: () => refreshPhone(true), onCopy: copyPhoneName, busy: pendingControl === 'phone', refreshing: phoneRefreshing }}
         mediaProps={{ musicProvider, musicPlayer, musicConfigured: Boolean(musicConnection.embedUrl), onOpenMusic: () => setActiveView('music'), onMusicAction: controlMusic, onOpenMusicExternally: openMusicExternally }} /> : null}
 
-      {activeView === "system" ? boundary("system", "System", <SystemInfoView system={system} connected={health.connected} configured={health.configured} onCopy={copySystemInfo} />) : null}
+      {activeView === "system" ? boundary("system", "System", <SystemInfoView system={system} series={systemSeries} connected={health.connected} configured={health.configured} onCopy={copySystemInfo} headerActions={headerActions} />) : null}
 
-      {activeView === "approvals" ? boundary("actions", "Approvals", <ApprovalsView actions={actions} loading={false} onApprove={(id) => updateAction(id, "approve")} onReject={(id) => updateAction(id, "reject")} />) : null}
-      {activeView === "memories" ? boundary("memories", "Memories", <MemoriesView memories={memories} onCreate={createMemory} onDelete={deleteMemory} />) : null}
-      {activeView === "conversations" ? <ConversationsView conversations={conversations} selected={selectedConversation} onSelect={selectConversation} onSend={sendMessage} busy={assistantBusy} profileName={activeProfile.name} configured={health.configured} pendingCount={pendingCount} /> : null}
-      {activeView === "music" ? <MusicView musicProvider={musicProvider} musicConnection={musicConnection} musicPlayer={musicPlayer} onMusicAction={controlMusic} onOpenMusicExternally={openMusicExternally} onOpenSettings={() => setActiveView("settings")} /> : null}
+      {activeView === "approvals" ? boundary("actions", "Approvals", <ApprovalsView actions={actions} onApprove={(id) => updateAction(id, "approve")} onReject={(id) => updateAction(id, "reject")} headerActions={headerActions} />) : null}
+      {activeView === "memories" ? boundary("memories", "Memories", <MemoriesView memories={memories} onCreate={createMemory} onDelete={deleteMemory} headerActions={headerActions} />) : null}
+      {activeView === "conversations" ? <ConversationsView conversations={conversations} selected={selectedConversation} onSelect={selectConversation} onSend={sendMessage} busy={assistantBusy} profileName={activeProfile.name} configured={health.configured} actions={actions} onApprove={(id) => updateAction(id, "approve")} onReject={(id) => updateAction(id, "reject")} headerActions={headerActions} /> : null}
+      {activeView === "music" ? <MusicView musicProvider={musicProvider} musicConnection={musicConnection} musicPlayer={musicPlayer} onMusicAction={controlMusic} onOpenMusicExternally={openMusicExternally} onOpenSettings={() => setActiveView("settings")} headerActions={headerActions} /> : null}
       {musicMounted && musicConnection.embedUrl ? <div className={`music-web-player music-web-player--${musicProviderId} ${activeView === "music" ? "" : "music-web-player--parked"}`} aria-hidden={activeView !== "music"}><iframe key={`${musicProviderId}:${musicConnection.embedUrl}`} title={`${musicProvider.name} web player`} src={musicConnection.embedUrl} allow={musicProviderId === "apple" ? "autoplay *; encrypted-media *; fullscreen *; clipboard-write" : "autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"} loading="eager" /></div> : null}
-      {activeView === "settings" ? <SettingsView darkMode={darkMode} onDarkModeChange={setDarkMode} accentColor={accentColor} onAccentColorChange={setAccentColor} onCustomAccentColorChange={setCustomAccentColor} calendar={calendar} onConnectCalendar={connectICloudCalendar} onDisconnectCalendar={disconnectICloudCalendar} musicProviderId={musicProviderId} musicConnection={musicConnection} musicPlayer={musicPlayer} onMusicProviderChange={switchMusicProvider} onSaveMusic={saveMusicConnection} onDisconnectMusic={disconnectMusic} onRefreshMusic={() => refreshMusicPlayer(true)} onOpenMusic={() => setActiveView("music")} openAiSettings={openAiSettings} onSaveOpenAiKey={saveOpenAiKey} onDeleteOpenAiKey={deleteOpenAiKey} /> : null}
+      {activeView === "settings" ? <SettingsView activeProfile={activeProfile} onManageProfiles={() => setProfileMenuOpen(true)} onOpenApprovals={() => setActiveView("approvals")} onRestart={() => runLifecycle("restart")} onShutdown={() => setShutdownOpen(true)} lifecycleBusy={lifecycleState !== "idle"} phone={phone} onOpenPhone={openPhone} headerActions={headerActions} reduceTransparency={reduceTransparency} onReduceTransparencyChange={setReduceTransparency} darkMode={darkMode} onDarkModeChange={setDarkMode} accentColor={accentColor} onAccentColorChange={setAccentColor} onCustomAccentColorChange={setCustomAccentColor} calendar={calendar} onConnectCalendar={connectICloudCalendar} onDisconnectCalendar={disconnectICloudCalendar} musicProviderId={musicProviderId} musicConnection={musicConnection} musicPlayer={musicPlayer} onMusicProviderChange={switchMusicProvider} onSaveMusic={saveMusicConnection} onDisconnectMusic={disconnectMusic} onRefreshMusic={() => refreshMusicPlayer(true)} onOpenMusic={() => setActiveView("music")} openAiSettings={openAiSettings} onSaveOpenAiKey={saveOpenAiKey} onDeleteOpenAiKey={deleteOpenAiKey} /> : null}
 
       </div>
-      <NavigationDock activeView={activeView} onNavigate={setActiveView} pendingCount={pendingCount} />
       {shutdownOpen ? <ConfirmDialog title="Shut down Live Desktop?" confirmLabel="Shut down both" onCancel={() => setShutdownOpen(false)} onConfirm={() => runLifecycle('shutdown')}><p>This stops Live Desktop's frontend and backend. It does not shut down Windows.</p><p>Run <code>start.cmd</code> from the application folder to start it again. This page cannot restart stopped services.</p></ConfirmDialog> : null}
       {profileDelete ? <ConfirmDialog title={`Delete ${profileDelete.name}?`} confirmLabel="Delete profile data" busy={profileDeleting} onCancel={() => setProfileDelete(null)} onConfirm={async () => { setProfileDeleting(true); try { await deleteProfile(profileDelete.id); } finally { setProfileDeleting(false); setProfileDelete(null); } }}><p>This removes this profile's local conversations, memories, approvals, credentials and preferences. Other profiles are kept.</p></ConfirmDialog> : null}
       <LifecycleNotice state={lifecycleState} />
-      {toast ? <div className={`toast toast--${toast.tone}`} role="status"><Icon name={toast.tone === "error" ? "CircleAlert" : "CircleCheck"} size={18} />{toast.message}<button type="button" onClick={() => setToast(null)} aria-label="Dismiss"><Icon name="X" size={16} /></button></div> : null}
+      {toast ? <div className={`toast toast--${toast.tone} card--strong`} role="status"><Icon name={toast.tone === "error" ? "CircleAlert" : "CircleCheck"} size={18} />{toast.message}<button type="button" className="btn-icon btn-icon--plain" onClick={() => setToast(null)} aria-label="Dismiss"><Icon name="X" size={16} /></button></div> : null}
     </div>
   );
 }

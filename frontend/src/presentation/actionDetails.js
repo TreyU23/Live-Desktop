@@ -1,5 +1,23 @@
 // Descriptions only: approval matching and execution remain exclusively in Java.
 export function actionDetails(action) {
+  const details = describe(action);
+  return { ...details, how: howItRuns(action) };
+}
+
+// Plain-language execution path for the approval sheet. Settings launches never claim to change a setting.
+function howItRuns(action) {
+  const args = action.arguments || {};
+  switch (action.kind) {
+    case 'windows_set_control': return 'Direct change by Live Desktop';
+    case 'windows_open_uri': return String(args.uri || '').toLowerCase().startsWith('ms-settings:') ? 'Opens Windows Settings — Live Desktop doesn’t change the setting' : 'Opens a Windows app externally';
+    case 'browser_open_url': return 'Opens your default browser externally';
+    case 'workspace_write_file': return 'Writes a file in the workspace folder';
+    case 'remember': return 'Saves a memory in this local profile';
+    default: return 'Unknown';
+  }
+}
+
+function describe(action) {
   const args = action.arguments || {};
   switch (action.kind) {
     case 'windows_set_control': return { title: 'Change a device control', target: args.control, operation: args.enabled ? 'Turn on' : 'Turn off', scope: `Future changes to ${args.control}, both on and off, for this local profile.` };

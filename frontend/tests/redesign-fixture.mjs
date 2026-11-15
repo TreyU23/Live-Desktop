@@ -30,6 +30,10 @@ export const actions = [
   { id: 'unknown', kind: 'future_kind', arguments: { content: 'Unknown action' }, reason: 'Unsupported action', status: 'rejected' },
 ].map(action => ({ ...action, createdAt: '2026-11-01T14:00:00Z' }));
 
+// A request that appears while Conversations is open (approval-sheet cases).
+export const sheetAction = { id: 'sheet-bt', kind: 'windows_set_control', arguments: { control: 'bluetooth', enabled: false }, reason: 'Turn off Bluetooth for focus time', status: 'pending', createdAt: '2026-11-01T14:05:00Z' };
+export const sheetFileAction = { id: 'sheet-file', kind: 'workspace_write_file', arguments: { path: 'notes/sheet.txt', content: '<img src=x onerror=alert(1)>Literal' }, reason: 'Save a sheet note', status: 'pending', createdAt: '2026-11-01T14:06:00Z' };
+
 export async function mockDashboard(page, overrides = {}) {
   await page.route('**/*', async route => {
     const url = new URL(route.request().url());

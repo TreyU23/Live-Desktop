@@ -1,6 +1,6 @@
 # Frontend
 
-React 19/Vite 6 renders seven Flight Deck views. `App.jsx` owns APIs, profiles and mutations; `src/views/` and `src/components/` own presentation. Styles split into tokens, shell, components and views. [Root setup/accounts](../README.md), [design contract](../DESIGN.md).
+React 19/Vite 6 renders seven views in the glass shell. `App.jsx` owns APIs, profiles and mutations; `src/views/` and `src/components/` own presentation. Styles split into `tokens.css` (palette, materials, light/reduced-transparency variants), `shell.css` (wallpaper, sidebar/tab bar, page header, profile menu), `components.css` (material classes and instruments) and `views.css` (layouts only). [Root setup/accounts](../README.md), [design contract](../DESIGN.md).
 
 ## Development and build
 
@@ -35,6 +35,6 @@ Hidden documents pause routine reads; visibility restoration triggers deduplicat
 
 The selected music embed mounts on first Music visit and persists across navigation; provider switches replace it. Metadata comes from Windows sessions. Phone artwork reflects available platform metadata. Calendar/phone details expand within Overview. Unsupported controls say Open Settings; direct radio state uses confirmed results. Voice input/calendar editing are not implemented.
 
-Header, scrolling content and dock use separate rows. Below 768 px, More contains Music, Approvals, Memories and Settings. Saved theme/accent preferences are profile scoped; readable accents preserve contrast. Shutdown/profile deletion confirmations contain keyboard focus, support Escape and restore focus. Generic workstation art does not identify detected hardware.
+A floating sidebar and the scrolling view region sit side by side; each view renders its own header with the shared local-status and restart/shut-down actions. Below 768 px the sidebar becomes a bottom tab bar whose More menu contains Music, Approvals, Memories and Settings. The sidebar search filters page names on the client only. Saved theme, accent and Reduce transparency preferences are profile scoped; `accentColors.js` derives readable text, fill and fill-ink colors so any accent keeps 4.5:1. Views compose the material classes in `components.css` (`.card`, `.card--strong`, `.group`, `.btn-pill`, `.btn-primary`, `.btn-icon`, `.segmented`, `.pill-input`, `.tile`, `.control-tile`, `.launcher-tile`, `.switch`) and never restyle materials. Backdrop blur is reserved for overlays (`.card--strong`). A pending action that appears while Conversations is open raises the approval sheet; the Approvals view keeps the full queue and history. Shutdown/profile deletion confirmations contain keyboard focus, support Escape and restore focus. Generic workstation art does not identify detected hardware.
 
 [Validation commands/limits](../docs/VALIDATION.md) cover browser rendering, polling, mutation races, production smoke and diagnostics. Synthetic browser evidence goes under ignored `backend/target/`.
