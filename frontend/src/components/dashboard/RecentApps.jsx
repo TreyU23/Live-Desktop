@@ -1,55 +1,26 @@
 import { useState } from 'react';
-import { Icon } from '../ui/index.jsx';
-const APP_ICON_ASSETS = { code: '/assets/app-vscode.svg', figma: '/assets/app-figma.svg' };
-function BrandIcon({ app }) {
-  if (APP_ICON_ASSETS[app.icon]) {
-    return <img className="brand-icon" src={APP_ICON_ASSETS[app.icon]} alt="" />;
-  }
-  const names = {
-    edge: "Globe2",
-    chrome: "Chrome",
-    excel: "Sheet",
-    powerpoint: "Presentation",
-    "apple-music": "Music2",
-    slack: "MessageSquareMore",
-    teams: "UsersRound",
-  };
-  return (
-    <span className={`brand-icon brand-icon--${app.icon || app.id}`}>
-      <Icon name={names[app.icon] || "AppWindow"} size={20} />
-    </span>
-  );
-}
+import { Button } from '@astryxdesign/core/Button';
+import { HStack, VStack } from '@astryxdesign/core/Layout';
+import { StatusDot } from '@astryxdesign/core/StatusDot';
+import { Table } from '@astryxdesign/core/Table';
+import { Text } from '@astryxdesign/core/Text';
+import { SectionHeader } from './SectionHeader.jsx';
+
+const kCollapsed = 4;
+
+// Running and installed apps reported by Windows. Windows gives no "last used" time, so none is shown.
 export function RecentApps({ apps }) {
   const [showAll, setShowAll] = useState(false);
-  const [selectedId, setSelectedId] = useState(null);
-  const displayApps = apps.map(app => ({ ...app, age: app.running ? "Running" : "Installed" }));
-  const visibleApps = showAll ? displayApps : displayApps.slice(0, 4);
-  return (
-    <section className="card overview-card overview-card--apps activity-column" aria-labelledby="activity-title">
-      <div className="card-header">
-        <h2 id="activity-title">Recent activity</h2>
-        <span className="card-header__meta">Running and installed apps reported by Windows</span>
-      </div>
-      <div className="group app-list">
-        {!visibleApps.length ? <p className="app-inline-detail">No supported running apps detected.</p> : null}
-        {visibleApps.map((app) => (
-          <div className={`app-row-wrap ${selectedId === app.id ? "app-row-wrap--selected" : ""}`} key={app.id}>
-            <button className="app-row" type="button" aria-expanded={selectedId === app.id} onClick={() => setSelectedId((value) => value === app.id ? null : app.id)}>
-              <BrandIcon app={app} />
-              <span>
-                <strong>{app.name}</strong>
-                <small>{app.detail}</small>
-              </span>
-              <time>{app.age}</time>
-            </button>
-            {selectedId === app.id ? <p className="app-inline-detail"><Icon name="Activity" size={14} /> {app.running ? 'Detected from the live Windows process list.' : 'Installed application reported by Windows; not currently running.'}</p> : null}
-          </div>
-        ))}
-      </div>
-      {displayApps.length > 4 ? <button className="text-action show-more card-footer" type="button" aria-expanded={showAll} onClick={() => setShowAll((value) => !value)}>
-        {showAll ? "Show less" : "Show more"} <Icon name={showAll ? "ChevronLeft" : "ChevronRight"} size={15} />
-      </button> : null}
-    </section>
-  );
+  const visible = showAll ? apps : apps.slice(0, kCollapsed);
+  const columns = [
+    { key: 'name', header: 'App', renderCell: app => <VStack gap={0}><Text>{app.name}</Text>{app.detail ? <Text type="supporting">{app.detail}</Text> : null}</VStack> },
+    { key: 'running', header: 'Status', renderCell: app => <HStack gap={2} vAlign="center"><StatusDot variant={app.running ? 'success' : 'neutral'} label={app.running ? 'Running' : 'Installed'} /><Text>{app.running ? 'Running' : 'Installed'}</Text></HStack> },
+  ];
+  return <VStack as="section" gap={2} aria-labelledby="activity-title">
+    <SectionHeader id="activity-title" title="Recent activity"><Text type="supporting">Reported by Windows</Text></SectionHeader>
+    {apps.length
+      ? <Table data={visible} columns={columns} idKey="id" density="compact" verticalAlign="middle" />
+      : <Text type="supporting">No supported running apps detected.</Text>}
+    {apps.length > kCollapsed ? <HStack><Button label={showAll ? 'Show less' : `Show all ${apps.length}`} variant="ghost" size="sm" aria-expanded={showAll} onClick={() => setShowAll(value => !value)} /></HStack> : null}
+  </VStack>;
 }

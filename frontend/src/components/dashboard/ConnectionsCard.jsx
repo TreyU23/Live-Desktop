@@ -1,14 +1,22 @@
+import { HStack, VStack } from '@astryxdesign/core/Layout';
+import { StatusDot } from '@astryxdesign/core/StatusDot';
+import { Table } from '@astryxdesign/core/Table';
+import { Text } from '@astryxdesign/core/Text';
+import { SectionHeader } from './SectionHeader.jsx';
+
 export function ConnectionsCard({ connected, configured, calendar, musicPlayer }) {
   const rows = [
-    { name: 'Local API', state: connected ? 'Available' : 'Unavailable', tone: connected ? 'good' : 'error' },
-    { name: 'iCloud', state: calendar.connected ? calendar.status === 'error' ? 'Sync error' : 'Connected' : 'Not connected', tone: calendar.connected ? calendar.status === 'error' ? 'warn' : 'good' : null },
-    { name: 'OpenAI key', state: configured ? 'Configured' : 'Not set', tone: configured ? 'good' : 'warn' },
-    { name: 'Music', state: musicPlayer.available ? musicPlayer.playing ? 'Playing' : 'Session available' : 'Idle', tone: musicPlayer.available ? 'good' : null },
+    { id: 'api', service: 'Local API', state: connected ? 'Available' : 'Unavailable', tone: connected ? 'success' : 'error' },
+    { id: 'icloud', service: 'iCloud Calendar', state: calendar.connected ? calendar.status === 'error' ? 'Sync error' : 'Connected' : 'Not connected', tone: calendar.connected ? calendar.status === 'error' ? 'warning' : 'success' : 'neutral' },
+    { id: 'openai', service: 'OpenAI key', state: configured ? 'Configured' : 'Not set', tone: configured ? 'success' : 'warning' },
+    { id: 'music', service: 'Music', state: musicPlayer.available ? musicPlayer.playing ? 'Playing' : 'Session available' : 'Idle', tone: musicPlayer.available ? 'success' : 'neutral' },
   ];
-  return <section className="card overview-card overview-card--connections" aria-labelledby="connections-title">
-    <h2 id="connections-title">Connections</h2>
-    <div className="group group--plain">
-      {rows.map(row => <div key={row.name}><i className={`status-dot ${row.tone ? `status-dot--${row.tone}` : ''}`} aria-hidden="true" /><span className="group__value">{row.name}</span><span className="muted">{row.state}</span></div>)}
-    </div>
-  </section>;
+  const columns = [
+    { key: 'service', header: 'Service' },
+    { key: 'state', header: 'State', renderCell: row => <HStack gap={2} vAlign="center"><StatusDot variant={row.tone} label={row.state} /><Text>{row.state}</Text></HStack> },
+  ];
+  return <VStack as="section" gap={2} aria-labelledby="connections-title">
+    <SectionHeader id="connections-title" title="Connections" />
+    <Table data={rows} columns={columns} idKey="id" density="compact" verticalAlign="middle" />
+  </VStack>;
 }

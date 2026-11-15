@@ -7,6 +7,7 @@ import { ApprovalsView } from './views/ApprovalsView.jsx';
 import { MemoriesView } from './views/MemoriesView.jsx';
 import { ConversationsView } from './views/ConversationsView.jsx';
 import { MusicView } from './views/MusicView.jsx';
+import { MusicFrame } from './components/media/MusicFrame.jsx';
 import { Navigation } from './components/shell/Navigation.jsx';
 import { ProfileMenu, ProfileDialog } from './components/shell/ProfileMenu.jsx';
 import { icons } from './components/ui/icons.js';
@@ -15,7 +16,7 @@ import { AlertDialog } from '@astryxdesign/core/AlertDialog';
 import { Banner } from '@astryxdesign/core/Banner';
 import { Button } from '@astryxdesign/core/Button';
 import { Icon as AstryxIcon } from '@astryxdesign/core/Icon';
-import { HStack } from '@astryxdesign/core/Layout';
+import { HStack, VStack } from '@astryxdesign/core/Layout';
 import { StatusDot } from '@astryxdesign/core/StatusDot';
 import { Text } from '@astryxdesign/core/Text';
 import { ToastViewport, useToast } from '@astryxdesign/core/Toast';
@@ -922,20 +923,24 @@ export function App() {
         footer={<ProfileMenu profiles={profiles} activeProfile={activeProfile} onSwitch={switchProfile} onManage={() => setProfileMenuOpen(true)} />} />}>
       {failedResources.length ? <Banner status="warning" title="Some resources could not refresh" description="Last available data is retained."
         endContent={<HStack gap={2} wrap="wrap">{failedResources.map(([key]) => <Button key={key} size="sm" label={`Refresh ${key}`} isDisabled={resourceStatus[key].loading} onClick={() => retry(key)} />)}</HStack>} /> : null}
-      {activeView === "home" ? <HomeView system={system} systemSeries={systemSeries} health={health} controls={controls} pendingControl={pendingControl} onControl={queueControl} pendingCount={pendingCount} navigate={setActiveView} apps={apps} headerActions={headerActions}
-        states={resourceStates.current} retry={retry} onSubmit={sendMessage} busy={assistantBusy}
-        calendarProps={{ calendar, calendarRefreshing, onCalendarDateChange: date => refreshCalendar(date, false), onRefreshCalendar: date => refreshCalendar(date, true), onOpenCalendarSettings: () => setActiveView('settings'), onOpenCalendarExternally: openCalendarExternally }}
-        phoneProps={{ phone, onOpen: openPhone, onRefresh: () => refreshPhone(true), onCopy: copyPhoneName, busy: pendingControl === 'phone', refreshing: phoneRefreshing }}
-        mediaProps={{ musicProvider, musicPlayer, musicConfigured: Boolean(musicConnection.embedUrl), onOpenMusic: () => setActiveView('music'), onMusicAction: controlMusic, onOpenMusicExternally: openMusicExternally }} /> : null}
+      {/* One column for every view plus the parked provider frame: its auto height lets each Page
+          size to its content, so the Music frame sits right under the Music view. */}
+      <VStack gap={0}>
+        {activeView === "home" ? <HomeView system={system} systemSeries={systemSeries} health={health} controls={controls} pendingControl={pendingControl} onControl={queueControl} pendingCount={pendingCount} navigate={setActiveView} apps={apps} headerActions={headerActions}
+          states={resourceStates.current} retry={retry} onSubmit={sendMessage} busy={assistantBusy}
+          calendarProps={{ calendar, calendarRefreshing, onCalendarDateChange: date => refreshCalendar(date, false), onRefreshCalendar: date => refreshCalendar(date, true), onOpenCalendarSettings: () => setActiveView('settings'), onOpenCalendarExternally: openCalendarExternally }}
+          phoneProps={{ phone, onOpen: openPhone, onRefresh: () => refreshPhone(true), onCopy: copyPhoneName, busy: pendingControl === 'phone', refreshing: phoneRefreshing }}
+          mediaProps={{ musicProvider, musicPlayer, musicConfigured: Boolean(musicConnection.embedUrl), onOpenMusic: () => setActiveView('music'), onMusicAction: controlMusic, onOpenMusicExternally: openMusicExternally }} /> : null}
 
-      {activeView === "system" ? boundary("system", "System", <SystemInfoView system={system} series={systemSeries} connected={health.connected} configured={health.configured} onCopy={copySystemInfo} headerActions={headerActions} />) : null}
+        {activeView === "system" ? boundary("system", "System", <SystemInfoView system={system} series={systemSeries} connected={health.connected} configured={health.configured} onCopy={copySystemInfo} headerActions={headerActions} />) : null}
 
-      {activeView === "approvals" ? boundary("actions", "Approvals", <ApprovalsView actions={actions} onApprove={(id) => updateAction(id, "approve")} onReject={(id) => updateAction(id, "reject")} headerActions={headerActions} />) : null}
-      {activeView === "memories" ? boundary("memories", "Memories", <MemoriesView memories={memories} onCreate={createMemory} onDelete={deleteMemory} headerActions={headerActions} />) : null}
-      {activeView === "conversations" ? <ConversationsView conversations={conversations} selected={selectedConversation} onSelect={selectConversation} onSend={sendMessage} busy={assistantBusy} profileName={activeProfile.name} configured={health.configured} actions={actions} onApprove={(id) => updateAction(id, "approve")} onReject={(id) => updateAction(id, "reject")} headerActions={headerActions} /> : null}
-      {activeView === "music" ? <MusicView musicProvider={musicProvider} musicConnection={musicConnection} musicPlayer={musicPlayer} onMusicAction={controlMusic} onOpenMusicExternally={openMusicExternally} onOpenSettings={() => setActiveView("settings")} headerActions={headerActions} /> : null}
-      {musicMounted && musicConnection.embedUrl ? <div className={`music-web-player music-web-player--${musicProviderId} ${activeView === "music" ? "" : "music-web-player--parked"}`} aria-hidden={activeView !== "music"}><iframe key={`${musicProviderId}:${musicConnection.embedUrl}`} title={`${musicProvider.name} web player`} src={musicConnection.embedUrl} allow={musicProviderId === "apple" ? "autoplay *; encrypted-media *; fullscreen *; clipboard-write" : "autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"} loading="eager" /></div> : null}
-      {activeView === "settings" ? <SettingsView activeProfile={activeProfile} onManageProfiles={() => setProfileMenuOpen(true)} onOpenApprovals={() => setActiveView("approvals")} onRestart={() => runLifecycle("restart")} onShutdown={() => setShutdownOpen(true)} lifecycleBusy={lifecycleState !== "idle"} phone={phone} onOpenPhone={openPhone} headerActions={headerActions} reduceTransparency={reduceTransparency} onReduceTransparencyChange={setReduceTransparency} appearance={appearance} onAppearanceChange={setAppearance} accentId={accent.id} onAccentChange={setAccentId} calendar={calendar} onConnectCalendar={connectICloudCalendar} onDisconnectCalendar={disconnectICloudCalendar} musicProviderId={musicProviderId} musicConnection={musicConnection} musicPlayer={musicPlayer} onMusicProviderChange={switchMusicProvider} onSaveMusic={saveMusicConnection} onDisconnectMusic={disconnectMusic} onRefreshMusic={() => refreshMusicPlayer(true)} onOpenMusic={() => setActiveView("music")} openAiSettings={openAiSettings} onSaveOpenAiKey={saveOpenAiKey} onDeleteOpenAiKey={deleteOpenAiKey} /> : null}
+        {activeView === "approvals" ? boundary("actions", "Approvals", <ApprovalsView actions={actions} onApprove={(id) => updateAction(id, "approve")} onReject={(id) => updateAction(id, "reject")} headerActions={headerActions} />) : null}
+        {activeView === "memories" ? boundary("memories", "Memories", <MemoriesView memories={memories} onCreate={createMemory} onDelete={deleteMemory} headerActions={headerActions} />) : null}
+        {activeView === "conversations" ? <ConversationsView conversations={conversations} selected={selectedConversation} onSelect={selectConversation} onSend={sendMessage} busy={assistantBusy} profileName={activeProfile.name} configured={health.configured} actions={actions} onApprove={(id) => updateAction(id, "approve")} onReject={(id) => updateAction(id, "reject")} headerActions={headerActions} /> : null}
+        {activeView === "music" ? <MusicView musicProvider={musicProvider} musicProviderId={musicProviderId} onMusicProviderChange={switchMusicProvider} musicConnection={musicConnection} musicPlayer={musicPlayer} onMusicAction={controlMusic} onOpenMusicExternally={openMusicExternally} onOpenSettings={() => setActiveView("settings")} headerActions={headerActions} /> : null}
+        {musicMounted && musicConnection.embedUrl ? <MusicFrame providerId={musicProviderId} provider={musicProvider} embedUrl={musicConnection.embedUrl} isActive={activeView === "music"} /> : null}
+        {activeView === "settings" ? <SettingsView activeProfile={activeProfile} onManageProfiles={() => setProfileMenuOpen(true)} onOpenApprovals={() => setActiveView("approvals")} onRestart={() => runLifecycle("restart")} onShutdown={() => setShutdownOpen(true)} lifecycleBusy={lifecycleState !== "idle"} phone={phone} onOpenPhone={openPhone} headerActions={headerActions} reduceTransparency={reduceTransparency} onReduceTransparencyChange={setReduceTransparency} appearance={appearance} onAppearanceChange={setAppearance} accentId={accent.id} onAccentChange={setAccentId} calendar={calendar} onConnectCalendar={connectICloudCalendar} onDisconnectCalendar={disconnectICloudCalendar} musicProviderId={musicProviderId} musicConnection={musicConnection} musicPlayer={musicPlayer} onMusicProviderChange={switchMusicProvider} onSaveMusic={saveMusicConnection} onDisconnectMusic={disconnectMusic} onRefreshMusic={() => refreshMusicPlayer(true)} onOpenMusic={() => setActiveView("music")} openAiSettings={openAiSettings} onSaveOpenAiKey={saveOpenAiKey} onDeleteOpenAiKey={deleteOpenAiKey} /> : null}
+      </VStack>
     </AppShell>
     <ProfileDialog isOpen={profileMenuOpen} onOpenChange={setProfileMenuOpen} profiles={profiles} activeProfile={activeProfile} onProfilesChange={updateProfiles} onSwitch={switchProfile}
       onDelete={(id) => { setProfileMenuOpen(false); setProfileDelete(profiles.find(profile => profile.id === id)); }} />

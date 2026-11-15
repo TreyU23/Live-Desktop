@@ -1,23 +1,29 @@
-import { Icon } from '../ui/index.jsx';
+import { Button } from '@astryxdesign/core/Button';
+import { HStack, VStack } from '@astryxdesign/core/Layout';
+import { MetadataList, MetadataListItem } from '@astryxdesign/core/MetadataList';
+import { StatusDot } from '@astryxdesign/core/StatusDot';
+import { Text } from '@astryxdesign/core/Text';
+import { SectionHeader } from './SectionHeader.jsx';
 import { formatBytesPerSec } from '../../presentation/formatters.js';
 
-// Identity comes from Windows; the device tile is a generic glyph, never a detected model.
+// Identity comes from Windows; nothing here claims a detected hardware model.
 export function PcCard({ system, ready, onOpenSystem }) {
   const r = system.resources;
+  const waiting = 'Waiting for system data';
   const networkRates = ready && r.network?.ratesAvailable;
   const diskRates = ready && r.diskActivity?.available;
-  const waiting = 'Waiting for system data';
-  return <section className="card overview-card overview-card--pc" aria-labelledby="pc-title">
-    <div className="identity-row">
-      <span className="tile tile--48 tile--device" aria-hidden="true"><Icon name="Monitor" size={26} strokeWidth={1.7} /></span>
-      <div><h2 id="pc-title">{ready ? system.host.name : 'This PC'}</h2><span className="muted">{ready ? `${system.host.os} · ${system.host.architecture}` : 'System information unavailable'}</span></div>
-    </div>
-    <div className="group group--plain" aria-label="Network and disk activity">
-      <div><Icon name="Globe2" size={16} className="muted" /><span className="group__value">Network</span><span className={ready && r.network?.connected ? 'status-label--good' : 'muted'}>{ready ? r.network?.connected ? 'Connected' : 'Offline' : 'Unavailable'}</span></div>
-      <div><Icon name="Activity" size={16} className="muted" /><span className="group__value">Network throughput</span><span className="data-value">{networkRates ? `↓ ${formatBytesPerSec(r.network.rxBytesPerSec)} · ↑ ${formatBytesPerSec(r.network.txBytesPerSec)}` : ready ? 'Rates unavailable' : waiting}</span></div>
-      <div><Icon name="HardDrive" size={16} className="muted" /><span className="group__value">Disk activity</span><span className="data-value">{diskRates ? `R ${formatBytesPerSec(r.diskActivity.readBytesPerSec)} · W ${formatBytesPerSec(r.diskActivity.writeBytesPerSec)}` : ready ? 'Activity unavailable' : waiting}</span></div>
-      <div><Icon name="BatteryMedium" size={16} className="muted" /><span className="group__value">Battery</span><span className={ready && r.battery?.available ? '' : 'muted'}>{ready && r.battery?.available && r.battery.percent != null ? `${r.battery.percent}%` : 'Not reported'}</span></div>
-    </div>
-    <button type="button" className="text-action card-footer" onClick={onOpenSystem}>About this PC <Icon name="ChevronRight" size={14} /></button>
-  </section>;
+  const online = ready && r.network?.connected;
+  return <VStack as="section" gap={2} aria-labelledby="pc-title">
+    <SectionHeader id="pc-title" title="This PC"><Button label="System Info" variant="ghost" size="sm" onClick={onOpenSystem} /></SectionHeader>
+    <MetadataList>
+      <MetadataListItem label="Name">{ready ? system.host.name : 'Unavailable'}</MetadataListItem>
+      <MetadataListItem label="Windows">{ready ? [system.windows?.edition || system.host.os, system.host.architecture].filter(Boolean).join(', ') : waiting}</MetadataListItem>
+      <MetadataListItem label="Network">{ready
+        ? <HStack gap={2} vAlign="center"><StatusDot variant={online ? 'success' : 'warning'} label={online ? 'Connected' : 'Offline'} /><Text>{online ? `${r.network.name || 'Network'} connected` : 'Offline'}</Text></HStack>
+        : 'Unavailable'}</MetadataListItem>
+      <MetadataListItem label="Throughput">{networkRates ? `${formatBytesPerSec(r.network.rxBytesPerSec)} down, ${formatBytesPerSec(r.network.txBytesPerSec)} up` : ready ? 'Rates unavailable' : waiting}</MetadataListItem>
+      <MetadataListItem label="Disk activity">{diskRates ? `${formatBytesPerSec(r.diskActivity.readBytesPerSec)} read, ${formatBytesPerSec(r.diskActivity.writeBytesPerSec)} write` : ready ? 'Activity unavailable' : waiting}</MetadataListItem>
+      <MetadataListItem label="Battery">{ready && r.battery?.available && r.battery.percent != null ? `${r.battery.percent}%` : 'Not reported'}</MetadataListItem>
+    </MetadataList>
+  </VStack>;
 }

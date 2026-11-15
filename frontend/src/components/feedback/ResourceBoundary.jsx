@@ -1,14 +1,24 @@
+import { Banner } from '@astryxdesign/core/Banner';
+import { Button } from '@astryxdesign/core/Button';
+import { HStack, VStack } from '@astryxdesign/core/Layout';
+import { Spinner } from '@astryxdesign/core/Spinner';
+import { Text } from '@astryxdesign/core/Text';
 import { resourceViewState } from '../../presentation/resourceViewState.js';
+
+// Loading, stale and error states for one service, rendered where that service's content goes.
+// A plain wrapper, not a landmark. Stale data stays visible under the error.
 export function ResourceBoundary({ name, status, onRetry, children }) {
   const state = resourceViewState(status);
-  // A plain wrapper, not a landmark: views inside it render their own <main>.
-  return <div className={`resource-boundary resource-boundary--${state}`} data-resource={name}>
-    {status?.manual && status.loading && status.hasData ? <p className="resource-feedback" role="status">Refreshing {name.toLowerCase()}…</p> : null}
-    {state !== 'ready' ? <div className="resource-feedback" role={status?.error ? 'status' : undefined}>
-      <span>{state === 'loading' ? `Waiting for ${name.toLowerCase()} data` : `${name}: ${status.error}`}
-        {state === 'stale' ? ` · Last updated ${new Date(status.lastSuccessAt).toLocaleTimeString()}` : ''}</span>
-      {status?.error ? <button type="button" onClick={onRetry} disabled={status.loading}>Retry {name.toLowerCase()}</button> : null}
-    </div> : null}
-    {(state === 'ready' || state === 'stale') ? children : null}
-  </div>;
+  const retry = status?.error
+    ? <Button label={`Retry ${name.toLowerCase()}`} size="sm" isDisabled={status.loading} onClick={onRetry} />
+    : undefined;
+  return <VStack gap={3} data-resource={name}>
+    {status?.manual && status.loading && status.hasData ? <Text type="supporting" role="status">Refreshing {name.toLowerCase()}…</Text> : null}
+    {state === 'loading' && !status?.error ? <HStack gap={2} vAlign="center"><Spinner size="sm" aria-hidden="true" /><Text type="supporting">Waiting for {name.toLowerCase()} data</Text></HStack> : null}
+    {state === 'error' || state === 'stale' ? <Banner status={state === 'error' ? 'error' : 'warning'} role="status"
+      title={`${name}: ${status.error}`}
+      description={state === 'stale' ? `Last updated ${new Date(status.lastSuccessAt).toLocaleTimeString()}` : undefined}
+      endContent={retry} /> : null}
+    {state === 'ready' || state === 'stale' ? children : null}
+  </VStack>;
 }
