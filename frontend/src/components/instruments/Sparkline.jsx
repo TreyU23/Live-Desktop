@@ -1,9 +1,10 @@
 // Bespoke SVG instrument (the sanctioned exception to "no raw elements"): Astryx has no sparkline.
-// Colors come only from theme tokens; it has no stylesheet of its own.
+// Colors come only from theme tokens (the icon-* severity tokens, which keep 3:1 on cards in
+// light mode where plain --color-warning does not); it has no stylesheet of its own.
 const kStroke = {
-  normal: 'var(--color-success)',
-  elevated: 'var(--color-warning)',
-  critical: 'var(--color-error)',
+  normal: 'var(--color-icon-success)',
+  elevated: 'var(--color-icon-warning)',
+  critical: 'var(--color-icon-error)',
 };
 const kWidth = 120;
 const kHeight = 28;

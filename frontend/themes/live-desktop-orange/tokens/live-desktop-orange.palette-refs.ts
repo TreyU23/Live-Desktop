@@ -4,8 +4,8 @@
 // prettier-ignore
 export const liveDesktopOrangePaletteRefs = {
   accent: {
-    light: {40: '#944401', 55: '#c36710', 60: '#d57113', 85: '#ffc7a1'},
-    dark: {30: '#733100', 60: '#d57113', 80: '#ffb37e'},
+    light: {40: '#954303', 55: '#c4650f', 85: '#ffc7a3'},
+    dark: {30: '#742f00', 55: '#c4650f', 80: '#ffb380'},
   },
   black: '#000000',
 };

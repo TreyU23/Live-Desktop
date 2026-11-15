@@ -30,6 +30,12 @@ export function ConversationsView({ conversations, selected, onSelect, onSend, b
   const [value, setValue] = useState('');
   const [error, setError] = useState('');
   const [sheetOpen, setSheetOpen] = useState(false);
+  const chatArea = useRef(null);
+  // Closing the approval dialog returns focus to the composer so the draft can be continued.
+  const closeSheet = () => {
+    setSheetOpen(false);
+    window.setTimeout(() => chatArea.current?.querySelector('[contenteditable="true"], textarea')?.focus(), 0);
+  };
   const pending = actions.filter(action => action.status === 'pending');
   // Actions carry no conversation id, so the dialog opens by itself only for requests that appear
   // while this view is open (for example after sending a message). Older ones wait behind "Review".
@@ -45,8 +51,9 @@ export function ConversationsView({ conversations, selected, onSelect, onSend, b
     const draft = text ?? value;
     if (busy || !draft.trim()) return;
     setError('');
+    // ChatComposer clears itself on submit; a failed send puts the draft back unless something new was typed.
     if (await onSend(draft.trim(), selected?.id ?? null)) setValue(current => current === draft ? '' : current);
-    else setError('Message could not be sent. Your draft is preserved; try again.');
+    else { setValue(current => current.trim() ? current : draft); setError('Message could not be sent. Your draft is preserved; try again.'); }
   };
   const choose = summary => onSelect(summary);
   const messages = selected?.messages || [];
@@ -71,7 +78,7 @@ export function ConversationsView({ conversations, selected, onSelect, onSend, b
     ? <Button label={`Review ${pending.length === 1 ? 'request' : 'requests'}`} endContent={<Badge label={String(pending.length)} />} onClick={() => setSheetOpen(true)} />
     : null;
 
-  const chat = <VStack gap={4}>
+  const chat = <VStack gap={4} ref={chatArea}>
     <HStack gap={3} vAlign="center" wrap="wrap">
       <StackItem size="fill">
         {isWide ? <Heading level={2}>{selected?.title || 'New conversation'}</Heading>
@@ -83,7 +90,7 @@ export function ConversationsView({ conversations, selected, onSelect, onSend, b
     </HStack>
     {!configured ? <Banner status="warning" title="OpenAI key not set" description="Add it in Settings to send messages. History is stored on this PC; assistant requests and context are sent to OpenAI." /> : null}
     <ChatLayout scrollButton={null}
-      emptyState={<EmptyState title="Start a conversation" description="Ask about your files, system, or current work. Anything that changes your PC asks for approval first." />}
+      emptyState={<EmptyState headingLevel={2} title="Start a conversation" description="Ask about your files, system, or current work. Anything that changes your PC asks for approval first." />}
       composer={<VStack gap={2}>
         <ChatComposer value={value} onChange={setValue} onSubmit={submit} placeholder="Message Live Desktop" isDisabled={busy} elevation="none"
           status={error ? { type: 'error', message: error } : undefined} />
@@ -100,6 +107,6 @@ export function ConversationsView({ conversations, selected, onSelect, onSend, b
   return <Page title="Conversations" detail={`Ask about this PC or request a change. ${profileName} · stored on this PC.`} actions={headerActions}
     start={isWide ? <LayoutPanel width={300} hasDivider padding={6} label="Conversation threads">{threads}</LayoutPanel> : undefined}>
     {chat}
-    {sheetOpen && pending.length ? <ApprovalSheet actions={pending} onApprove={onApprove} onReject={onReject} onClose={() => setSheetOpen(false)} /> : null}
+    {pending.length ? <ApprovalSheet isOpen={sheetOpen} actions={pending} onApprove={onApprove} onReject={onReject} onClose={closeSheet} /> : null}
   </Page>;
 }

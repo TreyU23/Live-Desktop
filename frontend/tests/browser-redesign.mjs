@@ -115,13 +115,17 @@ try {
   }
   await page.setViewportSize({ width: 1440, height: 900 });
   await navigate('Approvals');
-  assert.match(await page.getByRole('article', { name: 'Selected action details' }).innerText(), /both on and off/);
-  await page.getByRole('button', { name: /Save a local note/ }).click();
-  assert.match(await page.getByLabel('Action content', { exact: true }).innerText(), /<script>Text only<\/script>/);
-  assert.equal(await page.getByLabel('Action content', { exact: true }).locator('script').count(), 0);
+  // Pending rows decide inline; the expanded row holds operation, target, reusable scope and content.
+  await page.getByRole('button', { name: 'Expand Turn off Wi-Fi' }).click();
+  assert.match(await page.getByLabel('Details for Turn off Wi-Fi').innerText(), /both on and off/);
+  await page.getByRole('button', { name: 'Expand Save a local note' }).click();
+  const noteContent = page.getByLabel('Details for Save a local note').getByLabel('Action content', { exact: true });
+  assert.match(await noteContent.innerText(), /<script>Text only<\/script>/);
+  assert.equal(await noteContent.locator('script').count(), 0);
+  assert.equal(await page.getByRole('button', { name: 'Allow Once' }).count(), 0, 'No one-shot approval is offered');
   await page.getByRole('button', { name: 'History', exact: true }).click();
-  await page.getByRole('button', { name: /Unsupported action/ }).click();
-  assert.match(await page.getByRole('article', { name: 'Selected action details' }).innerText(), /cannot describe/);
+  await page.getByRole('button', { name: 'Expand Unsupported action' }).click();
+  assert.match(await page.getByLabel('Details for Unsupported action').innerText(), /cannot describe/);
   await navigate('Overview');
   const draft = page.getByRole('textbox', { name: 'Ask your assistant' });
   await draft.fill('Keep this Home draft'); await page.getByRole('button', { name: 'Send', exact: true }).click();
@@ -134,15 +138,15 @@ try {
   await page.getByRole('heading', { name: 'Conversations', exact: true }).waitFor();
   await page.getByRole('heading', { name: 'Synthetic conversation', exact: true }).waitFor();
   failChat = true;
-  const chat = page.getByRole('textbox', { name: 'Message your assistant' });
+  const chat = page.getByRole('textbox', { name: 'Message input' });
   await chat.fill('Keep this conversation draft'); await page.getByRole('button', { name: 'Send', exact: true }).click();
-  await page.getByText('Message could not be sent. Your draft is preserved; try again.').waitFor();
-  assert.equal(await chat.inputValue(), 'Keep this conversation draft');
+  await page.getByText('Message could not be sent. Your draft is preserved; try again.', { exact: true }).waitFor();
+  assert.equal((await chat.innerText()).trim(), 'Keep this conversation draft');
   // Approval sheet: pre-existing requests do not interrupt; a request that appears while the view is open does.
   assert.equal(await page.getByRole('dialog').count(), 0, 'Older pending requests opened the sheet');
   extraActions = [sheetFileAction, sheetAction];
   await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
-  const sheet = page.getByRole('dialog', { name: 'Write a workspace file?' });
+  const sheet = page.getByRole('dialog', { name: 'Allow Live Desktop to save a sheet note?' });
   await sheet.waitFor();
   assert.match(await sheet.innerText(), /1 of 5/);
   assert.match(await sheet.innerText(), /Allowing also allows matching requests later/);
@@ -155,15 +159,15 @@ try {
   await page.keyboard.press('Escape');
   await sheet.waitFor({ state: 'detached' });
   assert.equal(await chat.evaluate(element => element === document.activeElement), true, 'Focus did not return to the composer');
-  assert.equal(await chat.inputValue(), 'Keep this conversation draft', 'Sheet lost the draft');
+  assert.equal((await chat.innerText()).trim(), 'Keep this conversation draft', 'Sheet lost the draft');
   await page.getByRole('button', { name: /Review requests/ }).click();
   await sheet.waitFor();
   await sheet.getByRole('button', { name: 'Don’t Allow' }).click();
-  await page.getByRole('dialog', { name: 'Change a device control?' }).waitFor();
+  await page.getByRole('dialog', { name: 'Allow Live Desktop to turn off Bluetooth for focus time?' }).waitFor();
   assert.deepEqual(decisions, ['sheet-file:reject']);
   await page.screenshot({ path: `${output}/approval-sheet-1440.png` });
   await page.getByRole('dialog').getByRole('button', { name: 'Allow', exact: true }).click();
-  await page.getByRole('dialog').getByText('Turn off Wi-Fi', { exact: true }).waitFor();
+  await page.getByRole('dialog', { name: 'Allow Live Desktop to turn off Wi-Fi?' }).waitFor();
   assert.deepEqual(decisions, ['sheet-file:reject', 'sheet-bt:approve']);
   await page.keyboard.press('Escape');
   await page.getByRole('dialog').waitFor({ state: 'detached' });
@@ -210,10 +214,8 @@ try {
   await page.getByRole('radio', { name: 'System', exact: true }).click();
   assert.equal(await page.evaluate(() => localStorage.getItem('live-desktop.theme.default')), 'system');
   await page.getByRole('radio', { name: 'Dark', exact: true }).click();
-  // Reduce transparency: explicit setting and the system media feature both give solid surfaces.
-  await page.getByRole('switch', { name: 'Reduce transparency' }).click();
-  assert.equal(await page.locator('html').getAttribute('data-transparency'), 'reduced');
-  await page.getByRole('switch', { name: 'Reduce transparency' }).click();
+  // Reduce transparency went with the glass shell: no switch, no html attribute.
+  assert.equal(await page.getByRole('switch', { name: 'Reduce transparency' }).count(), 0);
   assert.equal(await page.locator('html').getAttribute('data-transparency'), null);
   // Seven destinations, in four groups, each reachable from the side navigation.
   const destinations = /^(Overview|System Info|Conversations|Approvals|Memories|Music|Settings)( \d+ pending)?$/;
@@ -222,11 +224,10 @@ try {
   await navigate('Overview');
   assert.match(await page.getByRole('meter', { name: 'Memory used' }).getAttribute('aria-valuetext'), /critical/, 'high memory should use critical severity');
   assert.ok(await page.getByRole('button', { name: /Open Apple Music externally/ }).isVisible(), 'music empty state should offer an external open action');
-  assert.ok(await page.getByText('Network throughput').isVisible());
-  assert.ok(await page.getByText('Disk activity').isVisible());
-  await page.getByRole('button', { name: 'Open day view' }).click();
-  await page.getByRole('heading', { name: 'All-day events' }).waitFor();
-  await page.getByRole('button', { name: 'Phone details', exact: true }).click();
+  assert.ok(await page.getByText('Throughput', { exact: true }).isVisible());
+  assert.ok(await page.getByText('Disk activity', { exact: true }).isVisible());
+  // Calendar keeps all-day events first; Phone's external open is labelled as external.
+  await page.getByText('Synthetic all-day event').waitFor();
   await page.getByRole('button', { name: 'Open Phone Link externally' }).waitFor();
   await page.screenshot({ path: `${output}/expanded-panels.png` });
   emptyCalendar = true;
@@ -255,5 +256,5 @@ try {
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
   assert.deepEqual(errors, []);
   await writeFile(`${output}/browser-redesign.json`, JSON.stringify({ passed: true, browser: browser.version(), matrix, errors, synthetic: true, simulatedZoom: '640x360 CSS viewport approximates 200% of 1280x720; not browser UI zoom' }, null, 2));
-  console.log(`PASS: ${matrix.length} view/viewport combinations; scope, draft, dialog, approval sheet, appearance, reduced transparency, search, loading, retry and panel checks.`);
+  console.log(`PASS: ${matrix.length} view/viewport combinations; scope, draft, dialog, approval dialog, appearance, search, loading, retry and panel checks.`);
 } finally { await browser.close(); }

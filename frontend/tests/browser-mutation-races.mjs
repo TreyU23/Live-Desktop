@@ -64,15 +64,20 @@ try {
   await page.clock.runFor(100);
   assert.equal(await page.getByRole('switch', { name: 'Wi-Fi: on. Request off', exact: true }).count(), 1, 'Late pre-confirmation read replaced confirmed control state');
   await page.getByRole('button', { name: 'Memories', exact: true }).click();
-  const memoryInput = page.getByRole('textbox', { name: 'Memory content' });
-  await memoryInput.fill('Keep this unsaved memory');
+  // Adding a memory happens in a form dialog opened from the Memories toolbar.
   await page.getByRole('button', { name: 'Add memory', exact: true }).click();
+  const memoryDialog = page.getByRole('dialog', { name: 'Add a memory' });
+  const memoryInput = memoryDialog.getByRole('textbox', { name: 'Memory content' });
+  await memoryInput.fill('Keep this unsaved memory');
+  await memoryDialog.getByRole('button', { name: 'Add memory', exact: true }).click();
   await page.getByLabel('Notifications').getByText('Synthetic persistence failure', { exact: true }).waitFor();
   assert.equal(await memoryInput.inputValue(), 'Keep this unsaved memory', 'Failed memory save discarded user input');
   failMemoryWrite = false;
-  await page.getByRole('button', { name: 'Add memory', exact: true }).click();
+  await memoryDialog.getByRole('button', { name: 'Add memory', exact: true }).click();
   await page.getByLabel('Notifications').getByText('Memory saved, but the list could not refresh: Synthetic list refresh failure', { exact: true }).waitFor();
-  assert.equal(await memoryInput.inputValue(), '', 'Successful memory save with failed list refresh left duplicate retry content');
+  await memoryDialog.waitFor({ state: 'hidden' });
+  await page.getByRole('button', { name: 'Add memory', exact: true }).click();
+  assert.equal(await memoryDialog.getByRole('textbox', { name: 'Memory content' }).inputValue(), '', 'Successful memory save with failed list refresh left duplicate retry content');
   assert.deepEqual(errors, []);
   console.log('PASS: mutation-time stale poll cannot replace confirmed control; failed memory save preserves typed input');
 } finally { mutation.release(); staleRead.release(); await browser.close(); }

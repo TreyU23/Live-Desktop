@@ -18,7 +18,7 @@ export function Page({ title, detail, actions, status, children, padding = 6, co
             {status}
           </VStack>
         </StackItem>
-        {actions ? <StackItem size="static">{actions}</StackItem> : null}
+        {actions && isWide ? <StackItem size="static">{actions}</StackItem> : actions}
       </HStack>
     </LayoutHeader>}
     content={<LayoutContent padding={padding}>{children}</LayoutContent>} />;

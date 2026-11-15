@@ -2,9 +2,10 @@ import { utilizationSeverity } from '../../presentation/utilizationSeverity.js';
 
 // Bespoke SVG instrument (the sanctioned exception to "no raw elements"): Astryx has no gauge.
 // A 240° open-bottom arc with a truthful fill: empty at 0, full at 100, no fill and an em dash
-// when the reading is missing. Colors come only from theme tokens; it has no stylesheet.
+// when the reading is missing. Colors come only from theme tokens (icon-* severity tokens, which
+// keep 3:1 on cards in light mode); it has no stylesheet.
 const kArc = 'M 16.70 85.00 A 50 50 0 1 1 103.30 85.00';
-const kStroke = { normal: 'var(--color-success)', elevated: 'var(--color-warning)', critical: 'var(--color-error)' };
+const kStroke = { normal: 'var(--color-icon-success)', elevated: 'var(--color-icon-warning)', critical: 'var(--color-icon-error)' };
 
 export function ResourceGauge({ label, value, size = 148 }) {
   const available = Number.isFinite(value) && value >= 0 && value <= 100;

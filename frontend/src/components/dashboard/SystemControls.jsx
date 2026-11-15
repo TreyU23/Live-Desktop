@@ -28,7 +28,7 @@ export function SystemControls({ controls, pendingControl, onControl }) {
               <Text type="supporting">{pendingControl === control.id ? 'Waiting for approval…' : !control.available ? 'Unavailable' : `${control.enabled ? 'On' : 'Off'} · changes need approval`}</Text>
             </VStack>
           </StackItem>
-          <Switch label={`${control.label}: request ${control.enabled ? 'off' : 'on'}`} isLabelHidden value={Boolean(control.enabled)}
+          <Switch label={!control.available ? `${control.label}: unavailable` : `${control.label}: ${control.enabled ? 'on' : 'off'}. Request ${control.enabled ? 'off' : 'on'}`} isLabelHidden value={Boolean(control.enabled)}
             isLoading={pendingControl === control.id} isDisabled={!control.available || busy} onChange={() => onControl(control.id)} />
         </HStack>
         {index < direct.length - 1 ? <Divider /> : null}

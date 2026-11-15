@@ -9,7 +9,6 @@ import { Link } from '@astryxdesign/core/Link';
 import { List, ListItem } from '@astryxdesign/core/List';
 import { SegmentedControl, SegmentedControlItem } from '@astryxdesign/core/SegmentedControl';
 import { StatusDot } from '@astryxdesign/core/StatusDot';
-import { Switch } from '@astryxdesign/core/Switch';
 import { Text } from '@astryxdesign/core/Text';
 import { TextInput } from '@astryxdesign/core/TextInput';
 import { useMediaQuery } from '@astryxdesign/core/hooks';
@@ -32,7 +31,7 @@ function StateLabel({ tone, children }) {
   return <HStack gap={2} vAlign="center"><StatusDot variant={tone} label={String(children)} /><Text type="supporting">{children}</Text></HStack>;
 }
 
-export function SettingsView({ activeProfile, onManageProfiles, onOpenApprovals, onRestart, onShutdown, lifecycleBusy, phone, onOpenPhone, headerActions, reduceTransparency, onReduceTransparencyChange, appearance, onAppearanceChange, accentId, onAccentChange, calendar, onConnectCalendar, onDisconnectCalendar, musicProviderId, musicConnection, musicPlayer, onMusicProviderChange, onSaveMusic, onDisconnectMusic, onRefreshMusic, onOpenMusic, openAiSettings, onSaveOpenAiKey, onDeleteOpenAiKey }) {
+export function SettingsView({ activeProfile, onManageProfiles, onOpenApprovals, onRestart, onShutdown, lifecycleBusy, phone, onOpenPhone, headerActions, appearance, onAppearanceChange, accentId, onAccentChange, calendar, onConnectCalendar, onDisconnectCalendar, musicProviderId, musicConnection, musicPlayer, onMusicProviderChange, onSaveMusic, onDisconnectMusic, onRefreshMusic, onOpenMusic, openAiSettings, onSaveOpenAiKey, onDeleteOpenAiKey }) {
   const isWide = useMediaQuery('(min-width: 1024px)');
   const musicProvider = MUSIC_PROVIDERS[musicProviderId];
   const [musicUrl, setMusicUrl] = useState(musicConnection.sourceUrl || '');
@@ -96,9 +95,6 @@ export function SettingsView({ activeProfile, onManageProfiles, onOpenApprovals,
           <SegmentedControlItem value="dark" label="Dark" icon={<Icon icon={icons.Moon} />} />
           <SegmentedControlItem value="system" label="System" icon={<Icon icon={icons.Monitor} />} />
         </SegmentedControl>
-      </SettingRow>
-      <SettingRow title="Reduce transparency" description="Solid surfaces on views that still use the glass styles.">
-        <Switch label="Reduce transparency" isLabelHidden value={reduceTransparency} onChange={onReduceTransparencyChange} />
       </SettingRow>
       <SettingRow isLast title="Accent" description="Neutral is the theme default. Other accents are applied through the theme.">
         <SegmentedControl label="Accent" value={accentId} onChange={onAccentChange}>

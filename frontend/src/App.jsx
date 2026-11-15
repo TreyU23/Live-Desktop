@@ -1,4 +1,3 @@
-import { Icon } from './components/ui/index.jsx';
 import { formatBytes, localIsoDate, localDateAtOffset } from './presentation/formatters.js';
 import { SystemInfoView } from './views/SystemInfoView.jsx';
 import { SettingsView } from './views/SettingsView.jsx';
@@ -30,7 +29,7 @@ import {
   MUSIC_PROVIDERS,
   migrateMusicIntegration,
 } from "./musicProviders.js";
-import { readableAccentColor, accentForegroundColor, accentSoftColor, accentFillColor, accentFillForeground, accentPreset, readAccentPreset } from "./accentColors.js";
+import { accentPreset, readAccentPreset } from "./accentColors.js";
 import { applyCompletedControlAction, upsertAction } from "./systemControls.js";
 import { createResourceScheduler } from "./resourceScheduler.js";
 import { recordTiming } from "./performanceDiagnostics.js";
@@ -336,11 +335,13 @@ export function App() {
   const controlPending = useRef(false);
   const [profileDelete, setProfileDelete] = useState(null);
   const [profileDeleting, setProfileDeleting] = useState(false);
-  const viewChanged = useRef(false);
+  const shownView = useRef("home");
   useEffect(() => {
     // Move focus to the new view's heading and reset the scroll position of AppShell's content area.
     // Not on first load: focus stays at the top of the document there.
-    if (!viewChanged.current) { viewChanged.current = true; return; }
+    // Compares views rather than counting runs, so StrictMode's double effect in development is a no-op.
+    if (shownView.current === activeView) return;
+    shownView.current = activeView;
     const main = document.querySelector('main, [role="main"]');
     const heading = main?.querySelector('h1');
     if (heading) { heading.tabIndex = -1; heading.focus({ preventScroll: true }); }
@@ -372,7 +373,6 @@ export function App() {
   const [appearance, setAppearance] = useState(() => readAppearance(profileId));
   const systemDark = useSyncExternalStore(subscribeColorScheme, prefersDark);
   const darkMode = appearance === "dark" || (appearance === "system" && systemDark);
-  const [reduceTransparency, setReduceTransparency] = useState(() => window.localStorage.getItem(profileStorageKey(TRANSPARENCY_KEY, profileId)) === "true");
   const [accentId, setAccentId] = useState(() => readAccentPreset(window.localStorage, profileStorageKey(ACCENT_COLOR_KEY, profileId)));
   const accent = accentPreset(accentId);
   const [musicIntegration, setMusicIntegration] = useState(() => readMusicIntegration(profileId));
@@ -397,23 +397,13 @@ export function App() {
     window.localStorage.setItem(profileStorageKey(THEME_KEY, profileId), appearance);
   }, [appearance, darkMode, profileId]);
 
-  useEffect(() => {
-    if (reduceTransparency) document.documentElement.dataset.transparency = "reduced";
-    else delete document.documentElement.dataset.transparency;
-    window.localStorage.setItem(profileStorageKey(TRANSPARENCY_KEY, profileId), String(reduceTransparency));
-  }, [reduceTransparency, profileId]);
+  // Reduce transparency went with the glass shell; drop the per-profile key it left behind.
+  useEffect(() => { window.localStorage.removeItem(profileStorageKey(TRANSPARENCY_KEY, profileId)); }, [profileId]);
 
+  // The accent is a built theme chosen in <Theme> below; only the preset id is stored.
   useEffect(() => {
-    // Transitional: views still on the glass CSS read --accent; Phase 4 removes these writes.
-    const appliedAccent = accent.color || (darkMode ? "#F1F1F1" : "#1B1B1B");
-    document.documentElement.style.setProperty("--accent", appliedAccent);
-    document.documentElement.style.setProperty("--accent-readable", readableAccentColor(appliedAccent, darkMode));
-    document.documentElement.style.setProperty("--accent-soft", accentSoftColor(appliedAccent));
-    document.documentElement.style.setProperty("--accent-foreground", accentForegroundColor(appliedAccent));
-    document.documentElement.style.setProperty("--accent-fill", accentFillColor(appliedAccent));
-    document.documentElement.style.setProperty("--accent-fill-ink", accentFillForeground(appliedAccent));
     window.localStorage.setItem(profileStorageKey(ACCENT_COLOR_KEY, profileId), accent.id);
-  }, [accent, darkMode, profileId]);
+  }, [accent, profileId]);
 
   useEffect(() => {
     window.localStorage.setItem(profileStorageKey(MUSIC_CONNECTION_KEY, profileId), JSON.stringify(musicIntegration));
@@ -939,7 +929,7 @@ export function App() {
         {activeView === "conversations" ? <ConversationsView conversations={conversations} selected={selectedConversation} onSelect={selectConversation} onSend={sendMessage} busy={assistantBusy} profileName={activeProfile.name} configured={health.configured} actions={actions} onApprove={(id) => updateAction(id, "approve")} onReject={(id) => updateAction(id, "reject")} headerActions={headerActions} /> : null}
         {activeView === "music" ? <MusicView musicProvider={musicProvider} musicProviderId={musicProviderId} onMusicProviderChange={switchMusicProvider} musicConnection={musicConnection} musicPlayer={musicPlayer} onMusicAction={controlMusic} onOpenMusicExternally={openMusicExternally} onOpenSettings={() => setActiveView("settings")} headerActions={headerActions} /> : null}
         {musicMounted && musicConnection.embedUrl ? <MusicFrame providerId={musicProviderId} provider={musicProvider} embedUrl={musicConnection.embedUrl} isActive={activeView === "music"} /> : null}
-        {activeView === "settings" ? <SettingsView activeProfile={activeProfile} onManageProfiles={() => setProfileMenuOpen(true)} onOpenApprovals={() => setActiveView("approvals")} onRestart={() => runLifecycle("restart")} onShutdown={() => setShutdownOpen(true)} lifecycleBusy={lifecycleState !== "idle"} phone={phone} onOpenPhone={openPhone} headerActions={headerActions} reduceTransparency={reduceTransparency} onReduceTransparencyChange={setReduceTransparency} appearance={appearance} onAppearanceChange={setAppearance} accentId={accent.id} onAccentChange={setAccentId} calendar={calendar} onConnectCalendar={connectICloudCalendar} onDisconnectCalendar={disconnectICloudCalendar} musicProviderId={musicProviderId} musicConnection={musicConnection} musicPlayer={musicPlayer} onMusicProviderChange={switchMusicProvider} onSaveMusic={saveMusicConnection} onDisconnectMusic={disconnectMusic} onRefreshMusic={() => refreshMusicPlayer(true)} onOpenMusic={() => setActiveView("music")} openAiSettings={openAiSettings} onSaveOpenAiKey={saveOpenAiKey} onDeleteOpenAiKey={deleteOpenAiKey} /> : null}
+        {activeView === "settings" ? <SettingsView activeProfile={activeProfile} onManageProfiles={() => setProfileMenuOpen(true)} onOpenApprovals={() => setActiveView("approvals")} onRestart={() => runLifecycle("restart")} onShutdown={() => setShutdownOpen(true)} lifecycleBusy={lifecycleState !== "idle"} phone={phone} onOpenPhone={openPhone} headerActions={headerActions} appearance={appearance} onAppearanceChange={setAppearance} accentId={accent.id} onAccentChange={setAccentId} calendar={calendar} onConnectCalendar={connectICloudCalendar} onDisconnectCalendar={disconnectICloudCalendar} musicProviderId={musicProviderId} musicConnection={musicConnection} musicPlayer={musicPlayer} onMusicProviderChange={switchMusicProvider} onSaveMusic={saveMusicConnection} onDisconnectMusic={disconnectMusic} onRefreshMusic={() => refreshMusicPlayer(true)} onOpenMusic={() => setActiveView("music")} openAiSettings={openAiSettings} onSaveOpenAiKey={saveOpenAiKey} onDeleteOpenAiKey={deleteOpenAiKey} /> : null}
       </VStack>
     </AppShell>
     <ProfileDialog isOpen={profileMenuOpen} onOpenChange={setProfileMenuOpen} profiles={profiles} activeProfile={activeProfile} onProfilesChange={updateProfiles} onSwitch={switchProfile}

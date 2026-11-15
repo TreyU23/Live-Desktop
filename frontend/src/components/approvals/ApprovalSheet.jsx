@@ -15,8 +15,9 @@ const sentenceCase = text => (text ? text.charAt(0).toLowerCase() + text.slice(1
 
 // Modal queue of pending actions. The backend has no one-shot approval: allowing makes the scope
 // reusable, so the dialog states that instead of offering a switch it cannot honor.
-// Escape and "Decide later" close it without deciding; Dialog returns focus to the opener.
-export function ApprovalSheet({ actions, onApprove, onReject, onClose }) {
+// Escape and "Decide later" close it without deciding. It stays mounted while requests are pending
+// and toggles isOpen, so Dialog returns focus to whatever had it when the dialog opened.
+export function ApprovalSheet({ isOpen, actions, onApprove, onReject, onClose }) {
   const [submitting, setSubmitting] = useState(false);
   const [index, setIndex] = useState(0);
   const position = Math.min(index, actions.length - 1);
@@ -30,8 +31,9 @@ export function ApprovalSheet({ actions, onApprove, onReject, onClose }) {
     try { await (verb === 'approve' ? onApprove : onReject)(action.id); }
     finally { setSubmitting(false); }
   };
-  return <Dialog isOpen onOpenChange={open => { if (!open && !submitting) onClose(); }} width={480} padding={6} aria-label="Approval request">
-    <VStack gap={4}>
+  return <Dialog isOpen={isOpen} onOpenChange={open => { if (!open && !submitting) onClose(); }} width={480} padding={6} aria-labelledby="approval-dialog-title">
+    {/* CodeBlock keeps Escape for itself; capture it first so Escape always means "decide later". */}
+    <VStack gap={4} onKeyDownCapture={event => { if (event.key === 'Escape' && !submitting) { event.preventDefault(); event.stopPropagation(); onClose(); } }}>
       <HStack gap={2} vAlign="center">
         <StackItem size="fill"><Text type="supporting" role="status">Request {position + 1} of {actions.length}</Text></StackItem>
         {actions.length > 1 ? <>
@@ -39,7 +41,7 @@ export function ApprovalSheet({ actions, onApprove, onReject, onClose }) {
           <IconButton variant="ghost" size="sm" label="Next request" icon={<Icon icon={icons.ChevronRight} />} isDisabled={position === actions.length - 1 || submitting} onClick={() => setIndex(position + 1)} />
         </> : null}
       </HStack>
-      <Heading level={2}>Allow Live Desktop to {sentenceCase(action.reason)}?</Heading>
+      <Heading level={2} id="approval-dialog-title">Allow Live Desktop to {sentenceCase(action.reason)}?</Heading>
       <MetadataList>
         <MetadataListItem label="Action">{details.operation}{details.target ? <> · <Text type="code">{details.target}</Text></> : null}</MetadataListItem>
         <MetadataListItem label="How">{details.how}</MetadataListItem>

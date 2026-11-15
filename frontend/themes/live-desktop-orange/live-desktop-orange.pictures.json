@@ -1,3 +1,7 @@
 {
-  "palette.config.json": "fc3fe156f6d8444d5cf587a80917a6dc32b149f452d8dbbaf168e78e6063f7b8"
+  "palette.config.json": "ba13bdfc0fef8783d0efdb0ce88aa168af43aebe48015bdb1b40111cb1f089ef",
+  "preview.png": "d6e774b46d0789f5f0226104e82c9c33649672f4984b4c1c3c3cc1d7ad2da9a3",
+  "preview-dark.png": "564add3cd52249695ab6112298afeb9df84a29aadd7a2a15093f3a2cfa2fc189",
+  "sheet.png": "9adfbd91892b1f6412f604ba59fca82a30bdbcab0c2ae3a6e7769cd932a9844a",
+  "sheet-dark.png": "949caf8a279657eeacf339aa6bc6bbac92de060224302d69d743cc6f6fd7d570"
 }
