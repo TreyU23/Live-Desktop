@@ -1,0 +1,529 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Live Desktop Project Map</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* Layout idea: a field guide. One sticky contents rail, then numbered sections that go
+   from the widest view (three parts) down to single buttons. Three layer colors repeat everywhere. */
+:root {
+  --bg: #f3f5f9; --surface: #ffffff; --sunk: #e9edf4;
+  --ink: #131a27; --muted: #55607a; --line: #d6dce8;
+  --accent: #0a5fd6;
+  --screen: #0a66d8; --brain: #7437bd; --hands: #a85400;
+  --good: #1a8a4a; --warn: #a66d00; --crit: #c62f2f;
+  --display: "Bricolage Grotesque", "Segoe UI Variable Display", "Segoe UI", system-ui, sans-serif;
+  --body: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --bg: #0c1017; --surface: #151b26; --sunk: #1c2431;
+    --ink: #e8ecf4; --muted: #9ba6bb; --line: #2b3445;
+    --accent: #62abff;
+    --screen: #57a6ff; --brain: #bb90f2; --hands: #f0a24e;
+    --good: #4cc47f; --warn: #e2b04a; --crit: #ff7a7a;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #0c1017; --surface: #151b26; --sunk: #1c2431;
+  --ink: #e8ecf4; --muted: #9ba6bb; --line: #2b3445;
+  --accent: #62abff;
+  --screen: #57a6ff; --brain: #bb90f2; --hands: #f0a24e;
+  --good: #4cc47f; --warn: #e2b04a; --crit: #ff7a7a;
+}
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 400 16px/1.6 var(--body); }
+a { color: var(--accent); }
+a:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 4px; }
+h1, h2, h3, h4 { font-family: var(--display); line-height: 1.15; text-wrap: balance; margin: 0; }
+h1 { font-size: clamp(2rem, 5vw, 3.1rem); font-weight: 700; letter-spacing: -0.02em; }
+h2 { font-size: clamp(1.45rem, 3vw, 1.9rem); font-weight: 700; letter-spacing: -0.01em; }
+h3 { font-size: 1.15rem; font-weight: 700; }
+h4 { font-size: 1rem; font-weight: 700; }
+p { margin: 0; max-width: 66ch; }
+code, .path { font: 500 0.86em var(--mono); background: var(--sunk); padding: 1px 6px; border-radius: 5px; white-space: nowrap; }
+.wrap { max-width: 1120px; margin: 0 auto; padding: 0 20px; }
+.stack { display: flex; flex-direction: column; gap: 14px; }
+
+header.top { padding: 44px 0 26px; }
+.kicker { font: 500 0.8rem var(--mono); color: var(--muted); letter-spacing: 0.04em; text-transform: uppercase; }
+.lede { font-size: 1.14rem; color: var(--ink); max-width: 62ch; }
+.facts { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; padding: 0; list-style: none; }
+.facts li { border: 1px solid var(--line); background: var(--surface); border-radius: 999px; padding: 4px 12px; font-size: 0.86rem; color: var(--muted); }
+.facts strong { color: var(--ink); font-weight: 600; }
+
+nav.contents { position: sticky; top: 0; z-index: 5; background: color-mix(in srgb, var(--bg) 92%, transparent); backdrop-filter: blur(8px); border-block: 1px solid var(--line); }
+nav.contents ol { display: flex; gap: 4px 18px; flex-wrap: wrap; list-style: none; margin: 0; padding: 10px 0; counter-reset: c; font-size: 0.9rem; }
+nav.contents li { counter-increment: c; }
+nav.contents a { text-decoration: none; color: var(--ink); }
+nav.contents a::before { content: counter(c) " "; font: 500 0.8em var(--mono); color: var(--muted); }
+nav.contents a:hover { color: var(--accent); }
+
+section { padding: 44px 0 8px; scroll-margin-top: 56px; }
+.sec-head { display: flex; flex-direction: column; gap: 8px; margin-bottom: 20px; }
+.num { font: 500 0.8rem var(--mono); color: var(--muted); }
+
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 18px 20px; }
+.grid { display: grid; gap: 14px; }
+.g3 { grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); }
+.g2 { grid-template-columns: repeat(auto-fit, minmax(min(100%, 400px), 1fr)); }
+.layer { border-top: 4px solid var(--c); }
+.layer .tag { font: 500 0.78rem var(--mono); color: var(--c); text-transform: uppercase; letter-spacing: 0.05em; }
+.screen { --c: var(--screen); } .brain { --c: var(--brain); } .hands { --c: var(--hands); }
+.card ul { margin: 0; padding-left: 1.1em; display: flex; flex-direction: column; gap: 6px; }
+.card li { max-width: 62ch; }
+.small { font-size: 0.9rem; color: var(--muted); }
+
+figure { margin: 0; }
+.diagram { overflow-x: auto; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); padding: 10px; }
+.diagram svg { display: block; width: 100%; min-width: 780px; height: auto; color: var(--ink); font-family: var(--body); }
+figcaption { font-size: 0.9rem; color: var(--muted); margin-top: 10px; max-width: 72ch; }
+.bx { fill: var(--surface); stroke: var(--line); stroke-width: 1.5; }
+.bx-s { stroke: var(--screen); stroke-width: 2.5; } .bx-b { stroke: var(--brain); stroke-width: 2.5; } .bx-h { stroke: var(--hands); stroke-width: 2.5; }
+.bx-bar { fill: var(--sunk); stroke: var(--line); }
+.t1 { font: 700 15px var(--display); fill: currentColor; }
+.t2 { font-size: 12.5px; fill: currentColor; }
+.t3 { font-size: 11.5px; fill: var(--muted); }
+.ts { fill: var(--screen); } .tb { fill: var(--brain); } .th { fill: var(--hands); }
+.ln { stroke: currentColor; stroke-width: 1.5; fill: none; }
+.dash { stroke-dasharray: 5 4; }
+
+/* Overview mini-map: mirrors the real four-column grid */
+.mini { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; background: var(--sunk); padding: 12px; border-radius: 14px; }
+.mini div { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; min-height: 64px; font-size: 0.9rem; font-weight: 600; display: flex; gap: 8px; align-items: flex-start; }
+.mini .w3 { grid-column: span 3; } .mini .w2 { grid-column: span 2; }
+.n { flex: none; width: 22px; height: 22px; border-radius: 50%; background: var(--ink); color: var(--bg); font: 500 0.75rem/22px var(--mono); text-align: center; }
+@media (max-width: 640px) { .mini { grid-template-columns: repeat(2, 1fr); } .mini .w3, .mini .w2 { grid-column: span 2; } }
+
+.page { display: flex; flex-direction: column; gap: 12px; }
+.page-head { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+.tile { width: 34px; height: 34px; border-radius: 9px; background: var(--tc); flex: none; display: grid; place-items: center; color: #fff; font: 700 0.95rem var(--display); }
+.group-label { font: 500 0.75rem var(--mono); color: var(--muted); border: 1px solid var(--line); border-radius: 999px; padding: 1px 9px; }
+dl.parts { margin: 0; display: grid; grid-template-columns: minmax(130px, 190px) 1fr; gap: 0; border-top: 1px solid var(--line); }
+dl.parts dt, dl.parts dd { margin: 0; padding: 9px 0; border-bottom: 1px solid var(--line); }
+dl.parts dt { font-weight: 600; padding-right: 14px; display: flex; gap: 8px; align-items: flex-start; }
+dl.parts dd { color: var(--ink); }
+@media (max-width: 560px) { dl.parts { grid-template-columns: 1fr; } dl.parts dt { border-bottom: 0; padding-bottom: 0; } }
+
+.pill { display: inline-block; font: 500 0.75rem var(--mono); border-radius: 999px; padding: 1px 9px; border: 1px solid currentColor; white-space: nowrap; }
+.p-good { color: var(--good); } .p-warn { color: var(--warn); } .p-crit { color: var(--crit); } .p-muted { color: var(--muted); }
+
+.tablewrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); }
+table { border-collapse: collapse; width: 100%; min-width: 620px; font-size: 0.94rem; }
+th, td { text-align: left; padding: 10px 14px; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { font: 500 0.78rem var(--mono); color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; background: var(--sunk); }
+tr:last-child td { border-bottom: 0; }
+td.numcol { font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+.tree { font: 400 0.92rem/1.5 var(--body); display: grid; grid-template-columns: minmax(150px, 230px) 1fr; border-top: 1px solid var(--line); }
+.tree > * { padding: 9px 0; border-bottom: 1px solid var(--line); }
+.tree .k { font: 500 0.88rem var(--mono); padding-right: 12px; display: flex; gap: 8px; align-items: baseline; }
+.dot { width: 9px; height: 9px; border-radius: 50%; background: var(--c, var(--muted)); flex: none; }
+@media (max-width: 560px) { .tree { grid-template-columns: 1fr; } .tree .k { border-bottom: 0; padding-bottom: 0; } }
+
+footer { padding: 40px 0 56px; color: var(--muted); font-size: 0.88rem; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top stack">
+    <span class="kicker">Project map · version 1.1.0 · read from the code on 14 Nov 2026</span>
+    <h1>Live Desktop, explained from the outside in</h1>
+    <p class="lede">Live Desktop is a control panel for one Windows PC that opens in a web browser tab. It shows how the computer is doing, lets you flip a few switches, holds an AI assistant you can chat with, and gathers your calendar, phone and music in one place. This map shows what the project is made of and exactly what every part of the dashboard does.</p>
+    <ul class="facts">
+      <li><strong>7</strong> pages</li>
+      <li><strong>9</strong> cards on the Overview page</li>
+      <li><strong>3</strong> building blocks: Screen, Brain, Hands</li>
+      <li>Runs only on <strong>this PC</strong></li>
+      <li>Nothing changes your PC <strong>without your approval</strong></li>
+    </ul>
+  </header>
+</div>
+
+<nav class="contents" aria-label="Contents"><div class="wrap"><ol>
+  <li><a href="#big-picture">Big picture</a></li>
+  <li><a href="#always-there">Always on screen</a></li>
+  <li><a href="#pages">The seven pages</a></li>
+  <li><a href="#approval-rule">The approval rule</a></li>
+  <li><a href="#freshness">How fresh the data is</a></li>
+  <li><a href="#privacy-map">What leaves the PC</a></li>
+  <li><a href="#folders">Folder map</a></li>
+  <li><a href="#limits">What it will not do</a></li>
+  <li><a href="#words">Word list</a></li>
+</ol></div></nav>
+
+<div class="wrap">
+
+<section id="big-picture">
+  <div class="sec-head"><span class="num">1</span><h2>The big picture: three parts that pass notes</h2>
+    <p>Think of a restaurant. The <strong>Screen</strong> is the dining room you see. The <strong>Brain</strong> is the kitchen that decides what is allowed and remembers every order. The <strong>Hands</strong> are the one staff member trusted to touch the equipment, which here is Windows itself.</p></div>
+
+  <figure>
+    <div class="diagram">
+      <svg viewBox="0 0 980 540" role="img" aria-label="You use the Screen in a browser. The Screen asks the Brain for data and sends your clicks. The Brain saves data on this PC, talks to OpenAI and iCloud, and asks the Hands to read from or change Windows. A launcher starts and watches all three parts.">
+        <defs>
+          <marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="currentColor"/></marker>
+        </defs>
+        <rect class="bx" x="40" y="24" width="220" height="62" rx="10"/>
+        <text class="t1" x="56" y="50">You</text>
+        <text class="t3" x="56" y="70">a browser tab at localhost:4173</text>
+
+        <rect class="bx" x="380" y="24" width="220" height="62" rx="10"/>
+        <text class="t1" x="396" y="50">Online services</text>
+        <text class="t3" x="396" y="70">OpenAI · iCloud Calendar</text>
+
+        <rect class="bx bx-s" x="40" y="176" width="220" height="112" rx="10"/>
+        <text class="t3 ts" x="56" y="198">PART 1</text>
+        <text class="t1" x="56" y="220">The Screen</text>
+        <text class="t2" x="56" y="242">What you look at and click</text>
+        <text class="t3" x="56" y="262">React · folder frontend/</text>
+
+        <rect class="bx bx-b" x="380" y="176" width="220" height="112" rx="10"/>
+        <text class="t3 tb" x="396" y="198">PART 2</text>
+        <text class="t1" x="396" y="220">The Brain</text>
+        <text class="t2" x="396" y="242">Rules, approvals, saving</text>
+        <text class="t3" x="396" y="262">Java · folder backend/</text>
+
+        <rect class="bx bx-h" x="720" y="176" width="220" height="112" rx="10"/>
+        <text class="t3 th" x="736" y="198">PART 3</text>
+        <text class="t1" x="736" y="220">The Hands</text>
+        <text class="t2" x="736" y="242">Reaches into Windows</text>
+        <text class="t3" x="736" y="262">C++ · folder native/</text>
+
+        <rect class="bx" x="40" y="378" width="220" height="66" rx="10"/>
+        <text class="t1" x="56" y="404">Apple Music or Spotify</text>
+        <text class="t3" x="56" y="424">web player on the Music page</text>
+
+        <rect class="bx" x="380" y="378" width="220" height="66" rx="10"/>
+        <text class="t1" x="396" y="404">Saved on this PC</text>
+        <text class="t3" x="396" y="424">data/ folder: chats, memories</text>
+
+        <rect class="bx" x="720" y="378" width="220" height="66" rx="10"/>
+        <text class="t1" x="736" y="404">Windows</text>
+        <text class="t3" x="736" y="424">Wi-Fi, Bluetooth, media, apps</text>
+
+        <rect class="bx-bar" x="40" y="486" width="900" height="40" rx="10"/>
+        <text class="t2" x="56" y="511"><tspan font-weight="600">Launcher (start.cmd)</tspan> starts all three parts, restarts or stops them on request, and cleans up after them</text>
+
+        <line class="ln" x1="150" y1="88" x2="150" y2="172" marker-end="url(#ah)" marker-start="url(#ah)"/>
+        <text class="t3" x="162" y="134">you click and read</text>
+
+        <line class="ln" x1="264" y1="214" x2="376" y2="214" marker-end="url(#ah)"/>
+        <text class="t3" x="320" y="204" text-anchor="middle">your clicks</text>
+        <line class="ln" x1="376" y1="250" x2="264" y2="250" marker-end="url(#ah)"/>
+        <text class="t3" x="320" y="268" text-anchor="middle">fresh data</text>
+
+        <line class="ln" x1="604" y1="214" x2="716" y2="214" marker-end="url(#ah)"/>
+        <text class="t3" x="660" y="204" text-anchor="middle">approved actions</text>
+        <line class="ln" x1="716" y1="250" x2="604" y2="250" marker-end="url(#ah)"/>
+        <text class="t3" x="660" y="268" text-anchor="middle">PC readings</text>
+
+        <line class="ln dash" x1="490" y1="172" x2="490" y2="90" marker-end="url(#ah)" marker-start="url(#ah)"/>
+        <text class="t3" x="502" y="126">assistant chat out,</text>
+        <text class="t3" x="502" y="141">calendar events in</text>
+
+        <line class="ln" x1="490" y1="292" x2="490" y2="374" marker-end="url(#ah)" marker-start="url(#ah)"/>
+        <text class="t3" x="502" y="338">saves and loads</text>
+
+        <line class="ln" x1="830" y1="292" x2="830" y2="374" marker-end="url(#ah)" marker-start="url(#ah)"/>
+        <text class="t3" x="842" y="338">reads, changes</text>
+
+        <line class="ln dash" x1="150" y1="292" x2="150" y2="374" marker-end="url(#ah)"/>
+        <text class="t3" x="162" y="338">embeds the player</text>
+      </svg>
+    </div>
+    <figcaption>Solid lines stay inside this PC. Dashed lines go out to the internet. The Screen never talks to Windows directly: every request passes through the Brain, which is where the approval rule lives.</figcaption>
+  </figure>
+
+  <div class="grid g3" style="margin-top:16px">
+    <div class="card layer screen stack"><span class="tag">Part 1 · the Screen</span><h3>What you see</h3>
+      <p>The web page with its sidebar, seven pages and cards. It draws things and collects your clicks. It decides nothing about safety and stores only looks and layout choices (theme, accent color, profile names and photos, your music link).</p></div>
+    <div class="card layer brain stack"><span class="tag">Part 2 · the Brain</span><h3>What decides</h3>
+      <p>A program running quietly in the background. It keeps your conversations, memories and approvals, talks to OpenAI and iCloud, checks every action against a fixed allowed list, and makes sure only this PC can talk to it.</p></div>
+    <div class="card layer hands stack"><span class="tag">Part 3 · the Hands</span><h3>What acts</h3>
+      <p>Four small Windows programs: the <strong>launcher</strong> that starts everything, a <strong>host</strong> that serves the page, the <strong>bridge</strong> that reads from and changes Windows, and a <strong>credential helper</strong> that locks saved passwords to your Windows account.</p></div>
+  </div>
+</section>
+
+<section id="always-there">
+  <div class="sec-head"><span class="num">2</span><h2>Always on screen, whichever page you are on</h2></div>
+  <div class="grid g2">
+    <div class="card stack"><h3>Sidebar (left edge)</h3>
+      <ul>
+        <li><strong>Live Desktop logo</strong> shows the PC's name and whether the Brain is reachable. Clicking it goes to Overview.</li>
+        <li><strong>Search box</strong> filters the list of page names. It does not search your files or the web.</li>
+        <li><strong>Page list</strong> in four groups: Desktop, Assistant, Media, Live Desktop. A number badge on Approvals counts requests waiting for you.</li>
+        <li><strong>Profile button</strong> at the bottom opens the profile picker.</li>
+        <li>On a phone-sized window the sidebar becomes a bar along the bottom with a <strong>More</strong> button for the less-used pages.</li>
+      </ul></div>
+    <div class="card stack"><h3>Top-right of every page</h3>
+      <ul>
+        <li><strong>Status pill</strong>: <span class="pill p-good">Local mode · stored on this PC</span> when things work, <span class="pill p-warn">Backend offline</span> when the Brain cannot be reached.</li>
+        <li><strong>Restart button</strong> restarts the Screen and the Brain, then reloads the page by itself within a minute.</li>
+        <li><strong>Power button</strong> asks for confirmation, then stops Live Desktop. It never shuts down Windows. To start again you run <code>start.cmd</code>.</li>
+      </ul></div>
+    <div class="card stack"><h3>Profile picker</h3>
+      <p>Profiles are separate drawers for different people or purposes on the same PC. Each has its own conversations, memories, approvals, saved keys, theme and music link.</p>
+      <ul>
+        <li>Switch profile, rename it, change its photo, or create a new one.</li>
+        <li>Delete a profile and all of its data after a confirmation. The first profile cannot be deleted.</li>
+        <li>Profiles organize data. They are <strong>not</strong> passwords and do not lock anyone out.</li>
+      </ul></div>
+    <div class="card stack"><h3>Messages the dashboard gives you</h3>
+      <ul>
+        <li><strong>Pop-up notes</strong> at the edge confirm what just happened or explain an error, then fade after about four seconds.</li>
+        <li><strong>Per-card status</strong>: each card says when it is still waiting for data, shows the last good data with a time if a refresh failed, and offers a Retry button.</li>
+        <li><strong>Refresh banner</strong> at the top lists anything that could not refresh, with one button per item.</li>
+      </ul></div>
+  </div>
+</section>
+
+<section id="pages">
+  <div class="sec-head"><span class="num">3</span><h2>The seven pages and exactly what each one does</h2>
+    <p>The colored square next to each name matches the page's icon color in the real sidebar.</p></div>
+
+  <div class="stack" style="gap:18px">
+
+  <article class="card page" id="page-overview">
+    <div class="page-head"><span class="tile" style="--tc:#0A84FF">1</span><h3>Overview</h3><span class="group-label">Desktop</span><span class="small">The home page. Nine cards, most important first.</span></div>
+    <div class="mini" aria-label="Layout of the nine Overview cards">
+      <div class="w3"><span class="n">1</span>Performance</div><div><span class="n">2</span>This PC</div>
+      <div class="w2"><span class="n">3</span>Controls</div><div><span class="n">4</span>Calendar</div><div><span class="n">5</span>Now Playing</div>
+      <div class="w2"><span class="n">6</span>Ask Live Desktop</div><div><span class="n">7</span>Phone</div><div><span class="n">8</span>Connections</div>
+      <div class="w2"><span class="n">9</span>Recent activity</div>
+    </div>
+    <dl class="parts">
+      <dt><span class="n">1</span>Performance</dt><dd>Three dials: how busy the processor is, how much memory is in use, how full the drive is. Each dial has a small trend line of recent readings. Dial color means: <span class="pill p-good">under 75%</span> <span class="pill p-warn">75 to 89%</span> <span class="pill p-crit">90% and up</span>. A dash means no reading, never a guessed number. The storage dial covers the drive Live Desktop is installed on, not every drive.</dd>
+      <dt><span class="n">2</span>This PC</dt><dd>Computer name and Windows type, whether the network is connected, current download and upload speed, how fast the disk is reading and writing, and battery percent if the PC has a battery. A link opens System Info.</dd>
+      <dt><span class="n">3</span>Controls</dt><dd><strong>Two real switches:</strong> Wi-Fi and Bluetooth. Clicking one asks to turn it on or off. <strong>Four shortcuts:</strong> Focus, Night light, Mic privacy and Battery saver. These only open the matching Windows Settings page, and the card says so. Below, a banner shows how many actions are waiting for approval.</dd>
+      <dt><span class="n">4</span>Calendar</dt><dd>Your iCloud events for one day, read-only. Arrows move a day back or forward, Today jumps back, the round arrow refreshes. It shows the first two events, and <em>Open day view</em> shows the whole day split into all-day and scheduled. A dot marks an event happening right now. If iCloud is not connected, the card links to Settings. On a day with no events it offers to open the Windows Calendar app, and tries iCloud on the web if that fails.</dd>
+      <dt><span class="n">5</span>Now Playing</dt><dd>Song title, artist, album, cover art and progress for whatever is playing through Windows, with shuffle, previous, play or pause, next and mute. If nothing is playing it offers to open your music service.</dd>
+      <dt><span class="n">6</span>Ask Live Desktop</dt><dd>A one-line box to message the assistant. Three example questions sit underneath, and clicking one only fills the box. Pressing send takes you to Conversations to read the reply.</dd>
+      <dt><span class="n">7</span>Phone</dt><dd>What Microsoft Phone Link reports about your paired phone: its name, connection status, system and model, battery, and last sync time. <em>Phone details</em> adds a refresh button, a button to copy the phone's name, and a link that opens the Phone Link app. It can show that notifications exist, but never their contents.</dd>
+      <dt><span class="n">8</span>Connections</dt><dd>Four status lights: the Brain (Local API), iCloud, the OpenAI key, and Music.</dd>
+      <dt><span class="n">9</span>Recent activity</dt><dd>A short list of well-known apps Windows reports as running or installed. It shows four, with <em>Show more</em> for the rest. Clicking a row says where the information came from.</dd>
+    </dl>
+  </article>
+
+  <article class="card page" id="page-system">
+    <div class="page-head"><span class="tile" style="--tc:#636366">2</span><h3>System Info</h3><span class="group-label">Desktop</span><span class="small">Titled “About this PC”. Two tabs.</span></div>
+    <dl class="parts">
+      <dt>Live tab</dt><dd>A summary card (PC name, maker and model, processor, memory, graphics, storage) with a <em>Copy specifications</em> button. Next to it: bars and trend lines for processor, memory and storage, a Network tile with download and upload speed, and a Disk activity tile with read and write speed. The computer picture is a generic illustration, not a photo of your model.</dd>
+      <dt>Specifications tab</dt><dd><strong>Device:</strong> name, manufacturer, model, processor, installed memory, graphics, system type, plus Device ID and Product ID, which stay hidden until you press <em>Show IDs</em>. <strong>Windows:</strong> edition, version, install date, build and architecture. <strong>Live status:</strong> network, battery, whether the Brain and the OpenAI key are ready, the Java version, and the time of the last reading.</dd>
+      <dt>Good to know</dt><dd>Everything here is read locally with normal user rights. No administrator access is requested and the Windows product key is never read.</dd>
+    </dl>
+  </article>
+
+  <article class="card page" id="page-conversations">
+    <div class="page-head"><span class="tile" style="--tc:#30A14E">3</span><h3>Conversations</h3><span class="group-label">Assistant</span><span class="small">Chat with the AI assistant.</span></div>
+    <dl class="parts">
+      <dt>Thread list</dt><dd>Every saved conversation with its message count. The plus button starts a new one.</dd>
+      <dt>Chat panel</dt><dd>Your messages and the assistant's replies. Enter sends, Shift+Enter adds a new line. If sending fails, your draft stays in the box. A warning appears when no OpenAI key is saved.</dd>
+      <dt>What the assistant can do alone</dt><dd>List and read text files inside the Live Desktop folder (never your saved data or secret settings files), look up memories you saved, and read live dashboard information such as system status, apps, phone, calendar and music.</dd>
+      <dt>What it must ask for</dt><dd>Writing a file in that folder, opening a website in your browser, and saving a new memory. Each of these becomes an approval request.</dd>
+      <dt>Approval window</dt><dd>If a request appears while you are on this page, a window opens with <em>Allow</em>, <em>Don't Allow</em> and <em>Decide later</em>. A <em>Review requests</em> button reopens it. The same requests are listed on the Approvals page.</dd>
+      <dt>Where it goes</dt><dd>Conversation history is saved on this PC. Your message, recent messages from the same chat, and any relevant dashboard details are sent to OpenAI to produce the reply.</dd>
+    </dl>
+  </article>
+
+  <article class="card page" id="page-approvals">
+    <div class="page-head"><span class="tile" style="--tc:#C66A00">4</span><h3>Approvals</h3><span class="group-label">Assistant</span><span class="small">The checkpoint for anything that changes the PC.</span></div>
+    <dl class="parts">
+      <dt>Pending and History</dt><dd>Two filters. Pending lists requests waiting for you, with a count. History lists everything already decided, each marked completed, failed or rejected.</dd>
+      <dt>Detail panel</dt><dd>For the selected request: what it will do, how it runs, the exact target (a file, a web address, a control), what future requests the approval would also cover, the full content if it writes something, the result afterwards, and when it was requested.</dd>
+      <dt>Buttons</dt><dd><em>Approve capability</em> runs it now and remembers the permission. <em>Reject</em> cancels it and nothing happens.</dd>
+    </dl>
+  </article>
+
+  <article class="card page" id="page-memories">
+    <div class="page-head"><span class="tile" style="--tc:#8E44C9">5</span><h3>Memories</h3><span class="group-label">Assistant</span><span class="small">Notes the assistant may use later.</span></div>
+    <dl class="parts">
+      <dt>Memory list</dt><dd>Every saved note for this profile, with a category filter and a Delete button on each one.</dd>
+      <dt>Add a memory</dt><dd>Type up to 2,000 characters, pick a category (preference, project, fact or instruction) and save. Notes you add here save straight away. Notes the assistant wants to add go through approval first.</dd>
+    </dl>
+  </article>
+
+  <article class="card page" id="page-music">
+    <div class="page-head"><span class="tile" style="--tc:#E0284A">6</span><h3>Music</h3><span class="group-label">Media</span><span class="small">Titled “Your music”.</span></div>
+    <dl class="parts">
+      <dt>Large player</dt><dd>The same song information and buttons as the Now Playing card, bigger.</dd>
+      <dt>Web player</dt><dd>Apple Music's or Spotify's own player for the playlist, album or song link you saved in Settings. You sign in inside that player. Once you have visited this page, the player keeps running while you use other pages.</dd>
+      <dt>How the buttons work</dt><dd>Live Desktop does not log in to your music account. It reads the current song from Windows and sends play, pause and skip through Windows, so a track has to be started once before the buttons respond.</dd>
+    </dl>
+  </article>
+
+  <article class="card page" id="page-settings">
+    <div class="page-head"><span class="tile" style="--tc:#636366">7</span><h3>Settings</h3><span class="group-label">Live Desktop</span><span class="small">Connect services and choose the look.</span></div>
+    <dl class="parts">
+      <dt>Profile</dt><dd>Shows the current profile and opens the profile picker.</dd>
+      <dt>Appearance</dt><dd><strong>Theme:</strong> light or dark. <strong>Reduce transparency:</strong> swaps the see-through glass look for solid surfaces. <strong>Accent color:</strong> blue, red, green, purple or black, or any color typed as a hex code. Text colors adjust by themselves to stay readable.</dd>
+      <dt>Assistant</dt><dd>Save, replace or remove the OpenAI key that powers the assistant. Once saved it is never shown again. A link opens Approvals.</dd>
+      <dt>Connections</dt><dd><strong>iCloud Calendar:</strong> connect with your Apple email and an app-specific password, or disconnect and erase the saved login. <strong>Music service:</strong> choose Apple Music or Spotify, paste a share link, refresh status, open the full player, or remove the link. <strong>Phone Link:</strong> open the Phone Link app.</dd>
+      <dt>Live Desktop services</dt><dd>Restart or shut down Live Desktop itself. Windows keeps running either way.</dd>
+    </dl>
+  </article>
+
+  </div>
+</section>
+
+<section id="approval-rule">
+  <div class="sec-head"><span class="num">4</span><h2>The approval rule</h2>
+    <p>Looking is free. Changing needs a yes. The first time something would change your PC, it waits for you. After you allow it once, the same kind of request runs without asking again in that profile.</p></div>
+  <figure>
+    <div class="diagram">
+      <svg viewBox="0 0 980 232" role="img" aria-label="A request to change the PC is first checked against a fixed allowed list. If it was approved before in this profile it runs right away. Otherwise it waits in Approvals until you allow or refuse it.">
+        <defs><marker id="ah2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 L10 5 L0 10 z" fill="currentColor"/></marker></defs>
+        <rect class="bx" x="10" y="30" width="160" height="72" rx="10"/>
+        <text class="t1" x="24" y="58">A request</text><text class="t3" x="24" y="80">you or the assistant</text>
+        <rect class="bx bx-b" x="210" y="30" width="160" height="72" rx="10"/>
+        <text class="t1" x="224" y="58">Allowed list?</text><text class="t3" x="224" y="80">checked by the Brain</text>
+        <rect class="bx bx-b" x="410" y="30" width="160" height="72" rx="10"/>
+        <text class="t1" x="424" y="58">Approved before?</text><text class="t3" x="424" y="80">in this profile</text>
+        <rect class="bx" x="610" y="30" width="160" height="72" rx="10"/>
+        <text class="t1" x="624" y="58">Waits for you</text><text class="t3" x="624" y="80">listed on Approvals</text>
+        <rect class="bx" x="810" y="30" width="160" height="72" rx="10"/>
+        <text class="t1" x="824" y="58">You decide</text><text class="t3" x="824" y="80">Allow or Don't Allow</text>
+        <line class="ln" x1="172" y1="66" x2="206" y2="66" marker-end="url(#ah2)"/>
+        <line class="ln" x1="372" y1="66" x2="406" y2="66" marker-end="url(#ah2)"/>
+        <line class="ln" x1="572" y1="66" x2="606" y2="66" marker-end="url(#ah2)"/>
+        <line class="ln" x1="772" y1="66" x2="806" y2="66" marker-end="url(#ah2)"/>
+        <text class="t3" x="389" y="56" text-anchor="middle">yes</text>
+        <text class="t3" x="589" y="56" text-anchor="middle">no</text>
+        <line class="ln" x1="290" y1="104" x2="290" y2="150" marker-end="url(#ah2)"/>
+        <text class="t3" x="298" y="130">no</text>
+        <text class="t2" x="290" y="170" text-anchor="middle" font-weight="600">Refused</text>
+        <text class="t3" x="290" y="188" text-anchor="middle">never even queued</text>
+        <line class="ln" x1="490" y1="104" x2="490" y2="150" marker-end="url(#ah2)"/>
+        <text class="t3" x="498" y="130">yes</text>
+        <text class="t2" x="490" y="170" text-anchor="middle" font-weight="600">Runs right away</text>
+        <text class="t3" x="490" y="188" text-anchor="middle">the Hands carry it out</text>
+        <line class="ln" x1="890" y1="104" x2="890" y2="150" marker-end="url(#ah2)"/>
+        <text class="t2" x="890" y="170" text-anchor="middle" font-weight="600">Allow: runs, remembered</text>
+        <text class="t3" x="890" y="188" text-anchor="middle">Don't Allow: nothing happens</text>
+      </svg>
+    </div>
+    <figcaption>There is no “allow just this once” yet. Allowing always remembers the permission, and the dashboard says so before you choose. A request that was allowed but then failed to run still counts as allowed.</figcaption>
+  </figure>
+
+  <div class="tablewrap" style="margin-top:16px">
+    <table>
+      <thead><tr><th>Kind of action</th><th>Where it comes from</th><th>What one “Allow” also covers later</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Turn Wi-Fi or Bluetooth on or off</strong></td><td>Controls card</td><td>Any later on or off change of that same control</td></tr>
+        <tr><td><strong>Open a Windows page or app</strong><br><span class="small">One of nine fixed destinations: six Settings pages, Phone Link, Windows Calendar, Spotify</span></td><td>Controls shortcuts, Phone card, Calendar card, Music</td><td>Opening that exact destination again</td></tr>
+        <tr><td><strong>Open a website in your browser</strong></td><td>The assistant, iCloud Calendar on the web, Apple Music</td><td>Opening that exact web address again</td></tr>
+        <tr><td><strong>Write a file</strong> in the Live Desktop folder</td><td>The assistant</td><td>Any later write to that same file, with any content</td></tr>
+        <tr><td><strong>Save a memory</strong></td><td>The assistant</td><td>Any later memory in the same category</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="small" style="margin-top:12px">No approval needed: reading anything, music buttons (play, pause, skip, shuffle, mute), adding or deleting your own memories, and restarting or shutting down Live Desktop (shutdown asks for a simple confirmation).</p>
+</section>
+
+<section id="freshness">
+  <div class="sec-head"><span class="num">5</span><h2>How fresh the data is</h2>
+    <p>The Screen asks the Brain for new data on a timer. It pauses while the browser tab is hidden and catches up when you come back. A request that takes longer than 12 seconds is given up and reported on its card.</p></div>
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>What</th><th>Checked every</th><th>Shown on</th></tr></thead>
+      <tbody>
+        <tr><td>Current song</td><td class="numcol">5 seconds</td><td>Now Playing, Music</td></tr>
+        <tr><td>Phone status</td><td class="numcol">10 seconds</td><td>Phone card</td></tr>
+        <tr><td>Processor, memory, storage, network, battery, controls</td><td class="numcol">15 seconds</td><td>Performance, This PC, Controls, System Info</td></tr>
+        <tr><td>Is the Brain reachable, is Live Desktop running</td><td class="numcol">30 seconds</td><td>Status pill, Connections</td></tr>
+        <tr><td>Apps, approvals, memories, conversation list, key status</td><td class="numcol">60 seconds</td><td>Recent activity, Approvals, Memories, Conversations, Settings</td></tr>
+        <tr><td>Calendar events</td><td class="numcol">4 minutes</td><td>Calendar card</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="small" style="margin-top:12px">Trend lines keep the latest 60 readings, about 15 minutes, and start empty each time the page loads. Anything you change yourself refreshes straight away. Turning Wi-Fi or Bluetooth on or off outside Live Desktop can take up to about a minute to show.</p>
+</section>
+
+<section id="privacy-map">
+  <div class="sec-head"><span class="num">6</span><h2>What stays on the PC and what leaves it</h2></div>
+  <div class="grid g2">
+    <div class="card stack"><h3>Stays on this PC</h3>
+      <ul>
+        <li>Conversations, memories and the approval history, in the <code>data/</code> folder, one drawer per profile.</li>
+        <li>Your OpenAI key and iCloud login, scrambled by Windows so only your Windows account can unlock them.</li>
+        <li>Theme, accent color, profile names and photos, and your music link, kept by the browser.</li>
+        <li>All PC readings. System details are shown, not saved.</li>
+      </ul></div>
+    <div class="card stack"><h3>Goes out to the internet</h3>
+      <ul>
+        <li><strong>OpenAI:</strong> what you type to the assistant, recent messages from that chat, and only the dashboard details that relate to your question. Hardware IDs, maker, model and processor name are left out.</li>
+        <li><strong>Apple iCloud:</strong> your calendar login, to fetch events.</li>
+        <li><strong>Apple Music or Spotify:</strong> whatever their own web player sends once it loads.</li>
+      </ul></div>
+    <div class="card stack" style="grid-column:1/-1"><h3>How the door is kept shut</h3>
+      <p>The Brain only answers requests that come from this same computer. Each time it starts it makes a new secret pass, and every request must carry it, so another website open in your browser or another device on your Wi-Fi cannot give it orders. The Hands accept instructions only from the Brain, over a private channel, and only from a fixed list of operations. There is no “run any command” option anywhere.</p></div>
+  </div>
+</section>
+
+<section id="folders">
+  <div class="sec-head"><span class="num">7</span><h2>Folder map</h2>
+    <p>What you find when you open the project folder. Dots show which of the three parts a folder belongs to.</p></div>
+  <div class="card">
+    <div class="tree">
+      <div class="k"><span class="dot" style="--c:var(--screen)"></span>frontend/</div><div>The Screen. Seven page files in <code>src/views/</code>, the cards and sidebar in <code>src/components/</code>, colors and layout in <code>src/styles/</code>, and <code>src/App.jsx</code>, which connects every button to the Brain.</div>
+      <div class="k"><span class="dot" style="--c:var(--brain)"></span>backend/</div><div>The Brain. One file lists every request it accepts, and separate files handle approvals, memories, PC readings, calendar, music, saved keys, profiles and the assistant.</div>
+      <div class="k"><span class="dot" style="--c:var(--hands)"></span>native/</div><div>The Hands. Four subfolders: <code>launcher/</code>, <code>host/</code>, <code>windows-bridge/</code> and <code>credentials/</code>.</div>
+      <div class="k"><span class="dot"></span>data/</div><div>Your saved information. Private, never uploaded to GitHub. Other profiles live in <code>data/profiles/</code>.</div>
+      <div class="k"><span class="dot"></span>start.cmd</div><div>The file you double-click to start Live Desktop.</div>
+      <div class="k"><span class="dot"></span>scripts/</div><div>Helper scripts for people building the project: build, run, test, measure speed, package a release.</div>
+      <div class="k"><span class="dot"></span>docs/</div><div>Written guides: the working guide, release notes, test records, and what the system and control features can and cannot do.</div>
+      <div class="k"><span class="dot"></span>README.md, PRODUCT.md, DESIGN.md</div><div>How to install and run it, what the product promises, and the rules for how it should look.</div>
+      <div class="k"><span class="dot"></span>dist/</div><div>Finished download packages and release notes.</div>
+      <div class="k"><span class="dot"></span>.tools/</div><div>A private copy of Java 21, the engine the Brain runs on, so nothing extra has to be installed.</div>
+      <div class="k"><span class="dot"></span>.github/</div><div>Instructions GitHub follows to publish a release package.</div>
+      <div class="k"><span class="dot"></span>build/, native/build/, backend/target/</div><div>Machine-made output from building the project. Safe to ignore.</div>
+    </div>
+  </div>
+</section>
+
+<section id="limits">
+  <div class="sec-head"><span class="num">8</span><h2>What it will not do</h2></div>
+  <div class="card"><ul>
+    <li>It does not shut down or restart Windows. The power buttons only affect Live Desktop.</li>
+    <li>It does not switch Focus, Night light, Mic privacy or Battery saver itself. It opens the Windows page where you can.</li>
+    <li>It cannot add or edit calendar events. The calendar is read-only.</li>
+    <li>It does not read your phone's messages or the text of notifications.</li>
+    <li>It has no voice input.</li>
+    <li>The assistant cannot run programs or commands, and cannot read files outside the Live Desktop folder.</li>
+    <li>It never invents a reading. When Windows gives no number, the dashboard says unavailable.</li>
+    <li>It works on Windows 10 and 11 only, and is not reachable from other devices.</li>
+  </ul></div>
+</section>
+
+<section id="words">
+  <div class="sec-head"><span class="num">9</span><h2>Word list</h2></div>
+  <div class="card">
+    <dl class="parts">
+      <dt>Frontend</dt><dd>The Screen. The part of a program you see.</dd>
+      <dt>Backend</dt><dd>The Brain. The part that works out of sight.</dd>
+      <dt>Bridge</dt><dd>The small program that passes requests from the Brain to Windows.</dd>
+      <dt>localhost</dt><dd>A web address that means “this same computer”. <code>localhost:4173</code> is the dashboard's address.</dd>
+      <dt>API key</dt><dd>A long password from OpenAI that lets the assistant work. OpenAI bills its use separately.</dd>
+      <dt>App-specific password</dt><dd>A one-purpose password you create on Apple's website, so your real Apple password is never typed here.</dd>
+      <dt>Profile</dt><dd>A separate set of saved data and looks. Not a login.</dd>
+      <dt>Approval</dt><dd>Your yes to one kind of action, remembered for next time.</dd>
+      <dt>Workspace</dt><dd>The Live Desktop folder itself, the only place the assistant can read or write files.</dd>
+    </dl>
+  </div>
+</section>
+
+<footer>
+  <p>Drawn from the source code on the Development branch, release 1.1.0 with the Apple-style glass redesign of 14 November 2026. Timings are the values set in the code. If the code changes, this map needs the same change.</p>
+</footer>
+</div>
+</body>
+</html>

@@ -88,6 +88,7 @@ Readiness checks native `/_live/ready`, direct/proxied `/health` and dashboard `
 
 ## Documentation
 
+- [Project map](docs/PROJECT-MAP.html): plain-language map of the three parts, all seven views, the approval rule and the folder layout. Open it in a browser.
 - [Project working guide](docs/PROJECT-WORKING-GUIDE.md): development, design, security, validation, and release procedures for contributors and agents.
 - [Backend](backend/README.md), [frontend](frontend/README.md), [native runtime](native/README.md): implementation contracts.
 - [Validation/performance](docs/VALIDATION.md): checks, diagnostics and evidence limits.
