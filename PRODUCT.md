@@ -24,7 +24,7 @@ React/Vite calls local Java APIs; Java owns profiles/persistence/integration and
 
 ## Brand Commitments
 
-The Apple-style glass direction (selected 2026-11-14, replacing Flight Deck V2) is current: near-black wallpaper with glass cards, a floating sidebar that becomes a bottom tab bar on phones, an Overview widget grid led by the PC instruments, and all seven views. Reduced transparency (system setting or Settings switch) returns to true black with solid surfaces. Refine within this direction. [Design contract](DESIGN.md), [selected reference](docs/redesign/README.md).
+The Astryx direction (planned and implemented 2026-11-15, replacing the Apple-style glass shell) is current: Astryx components on a local theme derived from `neutral`, Segoe UI Variable with no web fonts, solid surfaces, a monochrome default accent with four preset accents, a side navigation that becomes a drawer on phones, an Overview led by the PC instruments, and all seven views. Light, Dark and System appearance per profile. Refine within this direction. [Design contract](DESIGN.md), [selected reference](docs/redesign/README.md).
 
 ## Evidence on Hand
 
@@ -36,7 +36,7 @@ Show PC state first; make action scope/availability explicit; preserve current f
 
 ## Open Decisions
 
-- One-shot approvals: the backend treats every approval as a reusable scope (`ActionService.hasPreviousApproval`). The approval sheet therefore offers **Allow** with an explicit “also allows matching requests later” notice, not the reference's *Allow Once* switch. Adding one-shot approval is a backend policy change to decide separately.
-- Approvals carry no conversation id, so the sheet opens for requests that appear while Conversations is open rather than for “this conversation”.
+- One-shot approvals: the backend treats every approval as a reusable scope (`ActionService.hasPreviousApproval`). The approval dialog and the Approvals table therefore offer **Allow** with an explicit “also allows matching requests later” notice, not the reference's *Allow Once* switch. Adding one-shot approval is a backend policy change to decide separately.
+- Approvals carry no conversation id, so the dialog opens for requests that appear while Conversations is open rather than for “this conversation”.
 
 [Validation](docs/VALIDATION.md) records automated/manual boundaries. Local implementation does not authorize publication.

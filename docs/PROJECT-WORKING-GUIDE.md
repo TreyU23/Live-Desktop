@@ -1,6 +1,6 @@
 # Live Desktop Project Working Guide
 
-Version 1.1 | 14 November 2026
+Version 1.2 | 15 November 2026
 
 Development, design, security, validation, and release procedures.
 
@@ -12,9 +12,9 @@ A practical handoff for anyone working on Live Desktop. The guide consolidates p
 
 Read the current repository instructions before each task; source, scripts, and current documentation govern implemented behavior. Saved preferences identify the expected project workflow. Historical validation results are not evidence for a new change.
 
-## Changes in version 1.1
+## Changes in version 1.2
 
-Sections 7, 8, 9, 10 (gauges), 19 and 24 now describe the Apple-style glass design implemented on 14 November 2026, which replaced the Flight Deck design: near-black wallpaper with glass cards, a floating sidebar that becomes a bottom tab bar on phones, the Overview widget grid, the approval sheet, and the reduced-transparency fallback.
+Sections 7, 8, 9, 10, 19 and 24 now describe the Astryx design implemented on 15 November 2026, which replaced the Apple-style glass design: Astryx components on a local neutral-based theme, no project stylesheet, preset accents as built themes, Light/Dark/System appearance, a side navigation that becomes a drawer on phones, the approval dialog, a Content Security Policy on the build, and the browser contrast and privacy checks. Version 1.1 (14 November 2026) described the glass design.
 
 ## Evidence status
 
@@ -28,7 +28,7 @@ This document records operating instructions. Its preparation did not run builds
 4. Inspect the checkout and define the work before editing
 5. Set up the development environment correctly
 6. Run development and production through the intended entry points
-7. Preserve the accepted glass design
+7. Preserve the accepted Astryx design
 8. Apply the visual details consistently
 9. Preserve responsive layout and accessibility behavior
 10. Never turn missing or illustrative information into product claims
@@ -77,7 +77,7 @@ Read these files before substantive work:
 | `frontend/AGENTS.md` | Frontend workflow, visual direction, integrations, and prototype constraints |
 | `README.md` | Setup, prerequisites, runtime behavior, configuration, and troubleshooting |
 | `PRODUCT.md` | Product purpose, commitments, constraints, and evidence boundaries |
-| `DESIGN.md` | Current glass design contract |
+| `DESIGN.md` | Current Astryx design contract |
 | `backend/README.md` | Backend APIs, persistence, integration lifecycle, and security boundaries |
 | `frontend/README.md` | Frontend state, refresh, integration, and build contracts |
 | `native/README.md` | Launcher, host, bridge, and credential DLL contracts |
@@ -213,23 +213,25 @@ Production startup must not build, extract, train CDS, or download dependencies.
 
 When implementing UI work, run the local server and open the preview when the environment permits. Do not hand the user server-start instructions when you can perform that work yourself.
 
-## 7. Preserve the accepted glass design
+## 7. Preserve the accepted Astryx design
 
-The Apple-style glass direction implemented on November 14, 2026 is current. Refine it in place.
+The Astryx direction implemented on November 15, 2026 is current. Refine it in place.
 
 Preserve:
 
-- Near-black wallpaper with glass cards, and a true-black solid fallback under reduced transparency
-- PC overview first: Performance gauges lead the Overview widget grid
-- Floating glass sidebar on desktop; bottom tab bar below 768px
-- Per-view headers carrying local status and Live Desktop restart/shut down
+- Astryx components on the local `live-desktop` theme (neutral plus Segoe UI Variable); solid surfaces, no glass or wallpaper
+- PC overview first: the three instrument tiles lead Overview
+- Side navigation on desktop; the AppShell drawer below 768px
+- Per-view headers carrying local status and Restart/Stop Live Desktop
 - All seven views
 - Local profile management
-- Frontend/backend restart and shutdown access (these never restart or shut down Windows)
+- Frontend/backend restart and stop access (these never restart or shut down Windows)
 
 The seven views are: Overview, System Info, Conversations, Music, Approvals, Memories, Settings.
 
-Current reference guidance is in `docs/redesign/README.md`. `DESIGN.md` is the current contract; `frontend/src/styles/tokens.css` governs runtime values. Where the generated reference differs from the contract (always-blue gauges, Inter, "Restart PC", "Allow Once"), the contract wins.
+Current reference guidance is in `docs/redesign/README.md`. `DESIGN.md` is the current contract; the generated theme files under `frontend/src/themes/` govern runtime token values. Where the concept screens differ from the contract (Figtree from Google Fonts, inline-only approval decisions, no Add memory, plain warning yellow on instruments), the contract wins.
+
+Follow the ASTRYX block in `frontend/AGENTS.md`: start pages from templates, read a component's props (`pnpm exec astryx component <Name>`) before using it, style with props then tokens, and run `pnpm exec astryx doctor --built dist/client` before delivering a build. Change themes only through the theme editor and look at its PNGs before `astryx theme add`.
 
 Use the Product Design plugin's `get-context` skill before substantial visual work when the visual source is unclear or no longer fits the goal.
 
@@ -239,94 +241,77 @@ Record durable prototype-specific design feedback, preferences, or decisions in 
 
 | Element | Requirement |
 | --- | --- |
-| Default page background | `#0B0B0C` with static wallpaper glow; `#000000` under reduced transparency |
-| Cards | Translucent glass gradient, 1px hairline, specular top edge; backdrop blur only on overlays |
-| Main text | `#F5F5F7` (light `#1D1D1F`) |
-| Default accent | `#0A84FF`; readable/fill variants derived in `accentColors.js` |
-| Main font | Segoe UI Variable on Windows (SF Pro only applies on a Mac); no web fonts |
-| Code and measurements | Consolas/monospace where specified |
-| Numerals | Tabular |
-| Body text | 14 px |
-| Prose/memories | 15–16 px |
-| Card titles | 15 px |
-| Page titles | 24–28 px |
-| Corners | 10 px navigation/fields, 16 px inset groups, 24 px cards, 999 px pills |
-| Standard interaction targets | At least 44 px high |
-| Focus outline | 2 px readable accent with 4 px offset plus a halo |
-| Icons | Explicitly imported Feather outline icons; fixed-color tiles in navigation |
-| Transitions | 150 ms for color/background/border |
-| Reduced motion | Disable animations/transitions and gauge glow |
+| Styling | Component props first, then tokens (`--color-*`, `--spacing-*`, `--radius-*`); no project stylesheet |
+| Raw elements | None in `frontend/src/` except the SVG gauge/sparkline and the provider iframe |
+| Hex and px | None in `frontend/src/` outside generated themes; media-query strings are the exception |
+| Default accent | Neutral (monochrome); Blue, Green, Orange, Red are built preset themes |
+| Main font | Segoe UI Variable through the theme; no web fonts |
+| Corners | Theme radii: 6 px inner, 10 px element, 12 px container |
+| Icons | Feather (`react-icons/fi`) through Astryx `Icon`, mapped in `components/ui/icons.js` |
+| Cards | Only the Overview instrument tiles and the Music player |
+| Counts and status | `Badge` for counts only; state is `StatusDot` plus text |
+| Dense data | `Table`, `List`/`ListItem`, `MetadataList` rows |
 
 Additional requirements:
 
-- Compose the material classes in `components.css`; views never restyle materials.
-- Every text color must pass 4.5:1 on its glass; `frontend/tests/tokens.test.mjs` enforces this.
-- Use green, amber, and red for ready, pending, and error states alongside text; utilization severity uses the same tokens.
+- Every text pair must reach 4.5:1 and every instrument/accent indicator 3:1 in both modes for every preset; `frontend/tests/browser-contrast.mjs` enforces this.
+- Utilization severity uses `--color-icon-success/warning/error` on the SVG instruments and the success/warning/error variants on Astryx components, always beside text.
 - Keep semantic status colors independent of the chosen accent.
-- Preserve saved accent choices; derive readable text, focus, fill and fill-ink colors.
-- Render a saved Black accent as white in dark mode and black in light mode.
-- Never animate the wallpaper, ambient glow or gauge glow.
-- Keep status labels as text; the amber pending badge is the only filled status.
+- A hex accent saved by the glass UI migrates to the nearest preset; Neutral covers black, white and greys.
+- Palettes and accents go through themes, never `:root` overrides.
 
 ## 9. Preserve responsive layout and accessibility behavior
 
 Desktop layout:
 
-- Sidebar and view region sit side by side; only the view region scrolls.
-- Maximum content width is 1760px.
-- Overview is a four-column widget grid led by Performance.
+- Side navigation and the content column sit side by side; only the content column scrolls.
+- `Page` places header actions beside the title from 1024px and wraps them below it on narrower widths.
+- Overview: instrument tiles, pending banner, This PC beside Controls, Ask Live Desktop, Calendar/Now playing/Phone, Connections beside Recent activity.
 - System Info uses a Live / Specifications segmented control.
-- Conversations uses a thread list and a chat card; Settings is one 720px column of grouped rows.
+- Conversations uses a thread panel beside the chat; Settings is a section list beside grouped rows.
 
-Below 1100px Overview cards span the full width. Below 768px:
+Below 768px:
 
-- Horizontal padding becomes 16px.
-- Instruments precede controls and services.
-- Workstation artwork is hidden.
-- The tab bar exposes Overview, System Info, Conversations, More and the profile avatar.
-- More contains Music, Approvals, Memories, and Settings, and shows the pending count.
+- The navigation moves into the AppShell drawer behind **Open navigation**.
+- Grids collapse to one column; instruments come first.
+- Conversations replaces the thread panel with a thread `Selector`.
 - Preserve access to all seven view IDs and lifecycle/profile controls.
-
-For short desktop viewports, shrink artwork and gauges appropriately.
 
 Interaction requirements:
 
 - Selected navigation retains `aria-current`.
-- More exposes its expanded state and supports Escape.
-- Destructive confirmations and the approval sheet contain keyboard focus.
-- Confirmations allow cancellation and restore focus afterward.
-- Fields retain visible labels and errors.
+- Dialogs (approval, add memory, stop, profile deletion) contain keyboard focus, allow cancellation and restore focus; Escape on the approval dialog decides nothing and returns focus to the composer.
+- Fields retain visible (or visually hidden) labels and errors.
 - Preserve drafts, complete action scopes, loading states, stale states, error states, and empty states.
-- Shutdown requires confirmation.
+- Stop requires confirmation.
 
 ## 10. Never turn missing or illustrative information into product claims
 
 ### Gauges
 
-- Use a shared 240-degree open-bottom arc.
-- Use nine-unit, round-ended strokes and a translucent track, with a severity-tinted glow that reduced transparency/motion turns off.
-- Put labels above, values inside, and details below.
+- Use a shared 240-degree open-bottom arc with round-ended strokes and a neutral track; no glow.
+- Expose `role="meter"` with `aria-valuetext` naming the severity.
 - Accept only finite readings in the 0–100 range for percentage displays/fills.
 - Zero means zero active stroke.
 - One hundred fills the complete sweep.
-- Unavailable readings show a dash.
-- Use four-pixel tracks for bars.
+- Unavailable readings show a dash and the tile says Unavailable; System Info draws no bar for a missing reading.
 
 ### Device imagery and status
 
-- The graphite workstation illustration is generic; do not imply it is a detected computer model.
+- There is no workstation illustration; nothing implies a detected computer model.
 - Phone imagery follows actual available platform metadata.
 - Use iPhone artwork for Apple/iOS metadata.
 - Use Android artwork for Android metadata.
-- Use a neutral placeholder when platform information is unknown.
+- Use a neutral icon when platform information is unknown.
+- Device and Product IDs stay hidden until **Show IDs**.
 - Do not infer provider availability from decorative colors.
-- Do not populate production telemetry with generated reference readings.
+- Do not populate production telemetry with sample readings from the concepts.
 
 ### Controls
 
 - Distinguish direct Wi-Fi/Bluetooth changes from opening Settings.
-- Focus, Night light, Mic privacy, and Battery saver are approved Settings launches.
-- Opening Settings does not confirm a toggle changed.
+- Focus, Night light, Mic privacy, and Battery saver are approved Settings launches with an external icon.
+- Opening Settings does not confirm a toggle changed; switches request a change that runs only after approval.
 - Label actions that leave Live Desktop and open Windows apps as external.
 
 Do not add voice input, calendar editing, or unsupported playback features under the guise of completing the existing design.
@@ -593,13 +578,19 @@ Full startup readiness and completion of every integration's loading are differe
 ## 19. Perform browser regression checks for affected UI behavior
 
 ```powershell
-npm --prefix frontend run dev -- --host 127.0.0.1 --port 4174 --strictPort
+npm --prefix frontend run build
+npm --prefix frontend run preview -- --host 127.0.0.1 --port 4174 --strictPort
 npm --prefix frontend run test:browser
 node frontend/tests/browser-mutation-races.mjs
 node frontend/tests/browser-redesign.mjs
+npm --prefix frontend run test:contrast
+npm --prefix frontend run test:privacy
+pnpm --dir frontend exec astryx doctor --built dist/client
 ```
 
-Coverage includes independent resource commits during delayed calendar loading, request budgets, hidden-document polling, profile headers, deferred/persistent music iframe behavior, mutation race protection, draft preservation/clearing, all seven views, viewport widths 1920/1440/1280/768/390/320 px, overflow and sidebar/tab-bar behavior, approval scope and literal content, the approval sheet, reduced transparency, the Overview scroll frame budget, keyboard focus, saved appearance, and loading/zero/stale/retry/agenda/phone states.
+Serve the build, not the dev server: only the build carries the Content Security Policy that `browser-redesign.mjs` checks for violations.
+
+Coverage includes independent resource commits during delayed calendar loading, request budgets, hidden-document polling, profile headers, deferred/persistent music iframe behavior, mutation race protection, draft preservation/clearing, all seven views, viewport widths 1920/1440/1280/768/390/320 px, overflow and side-navigation/drawer behavior, Approvals expandable rows with scope and literal content, the approval dialog, the Overview scroll frame budget, keyboard focus, saved appearance and accent presets, loading/zero/stale/retry/calendar/phone states, CSP violations, theme-token contrast in both modes for every preset, Show IDs, and iCloud credential non-echo.
 
 Evidence limits:
 
@@ -707,7 +698,8 @@ Before handing work back:
 
 - Confirm the requested behavior is implemented.
 - Confirm unrelated user changes were preserved.
-- Confirm the accepted glass direction remains intact, including the reduced-transparency fallback.
+- Confirm the accepted Astryx direction remains intact: no raw elements, imported CSS, hex or px in `frontend/src/` beyond the documented exceptions, and `astryx doctor --built dist/client` passes.
+- Confirm theme contrast (`test:contrast`) and the CSP (no violations in `browser-redesign.mjs`) after visual or dependency changes.
 - Confirm all affected views and navigation remain accessible.
 - Confirm profile boundaries are preserved.
 - Confirm no unsupported capability is presented as working.

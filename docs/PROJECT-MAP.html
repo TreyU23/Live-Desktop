@@ -246,7 +246,7 @@ footer { padding: 40px 0 56px; color: var(--muted); font-size: 0.88rem; }
 
   <div class="grid g3" style="margin-top:16px">
     <div class="card layer screen stack"><span class="tag">Part 1 · the Screen</span><h3>What you see</h3>
-      <p>The web page with its sidebar, seven pages and cards. It draws things and collects your clicks. It decides nothing about safety and stores only looks and layout choices (theme, accent color, profile names and photos, your music link).</p></div>
+      <p>The web page with its side menu and seven pages. It draws things and collects your clicks. It decides nothing about safety and stores only looks and layout choices (theme, accent color, profile names and photos, your music link).</p></div>
     <div class="card layer brain stack"><span class="tag">Part 2 · the Brain</span><h3>What decides</h3>
       <p>A program running quietly in the background. It keeps your conversations, memories and approvals, talks to OpenAI and iCloud, checks every action against a fixed allowed list, and makes sure only this PC can talk to it.</p></div>
     <div class="card layer hands stack"><span class="tag">Part 3 · the Hands</span><h3>What acts</h3>
@@ -257,13 +257,12 @@ footer { padding: 40px 0 56px; color: var(--muted); font-size: 0.88rem; }
 <section id="always-there">
   <div class="sec-head"><span class="num">2</span><h2>Always on screen, whichever page you are on</h2></div>
   <div class="grid g2">
-    <div class="card stack"><h3>Sidebar (left edge)</h3>
+    <div class="card stack"><h3>Side menu (left edge)</h3>
       <ul>
-        <li><strong>Live Desktop logo</strong> shows the PC's name and whether the Brain is reachable. Clicking it goes to Overview.</li>
-        <li><strong>Search box</strong> filters the list of page names. It does not search your files or the web.</li>
+        <li><strong>Live Desktop name</strong> shows the PC's name and whether the Brain is reachable.</li>
         <li><strong>Page list</strong> in four groups: Desktop, Assistant, Media, Live Desktop. A number badge on Approvals counts requests waiting for you.</li>
         <li><strong>Profile button</strong> at the bottom opens the profile picker.</li>
-        <li>On a phone-sized window the sidebar becomes a bar along the bottom with a <strong>More</strong> button for the less-used pages.</li>
+        <li>On a phone-sized window the side menu folds away behind a menu button at the top.</li>
       </ul></div>
     <div class="card stack"><h3>Top-right of every page</h3>
       <ul>
@@ -289,12 +288,12 @@ footer { padding: 40px 0 56px; color: var(--muted); font-size: 0.88rem; }
 
 <section id="pages">
   <div class="sec-head"><span class="num">3</span><h2>The seven pages and exactly what each one does</h2>
-    <p>The colored square next to each name matches the page's icon color in the real sidebar.</p></div>
+    <p>The colored squares only tell the pages apart in this map; the real side menu uses plain icons.</p></div>
 
   <div class="stack" style="gap:18px">
 
   <article class="card page" id="page-overview">
-    <div class="page-head"><span class="tile" style="--tc:#0A84FF">1</span><h3>Overview</h3><span class="group-label">Desktop</span><span class="small">The home page. Nine cards, most important first.</span></div>
+    <div class="page-head"><span class="tile" style="--tc:#0A84FF">1</span><h3>Overview</h3><span class="group-label">Desktop</span><span class="small">The home page. Nine sections, most important first.</span></div>
     <div class="mini" aria-label="Layout of the nine Overview cards">
       <div class="w3"><span class="n">1</span>Performance</div><div><span class="n">2</span>This PC</div>
       <div class="w2"><span class="n">3</span>Controls</div><div><span class="n">4</span>Calendar</div><div><span class="n">5</span>Now Playing</div>
@@ -304,20 +303,20 @@ footer { padding: 40px 0 56px; color: var(--muted); font-size: 0.88rem; }
     <dl class="parts">
       <dt><span class="n">1</span>Performance</dt><dd>Three dials: how busy the processor is, how much memory is in use, how full the drive is. Each dial has a small trend line of recent readings. Dial color means: <span class="pill p-good">under 75%</span> <span class="pill p-warn">75 to 89%</span> <span class="pill p-crit">90% and up</span>. A dash means no reading, never a guessed number. The storage dial covers the drive Live Desktop is installed on, not every drive.</dd>
       <dt><span class="n">2</span>This PC</dt><dd>Computer name and Windows type, whether the network is connected, current download and upload speed, how fast the disk is reading and writing, and battery percent if the PC has a battery. A link opens System Info.</dd>
-      <dt><span class="n">3</span>Controls</dt><dd><strong>Two real switches:</strong> Wi-Fi and Bluetooth. Clicking one asks to turn it on or off. <strong>Four shortcuts:</strong> Focus, Night light, Mic privacy and Battery saver. These only open the matching Windows Settings page, and the card says so. Below, a banner shows how many actions are waiting for approval.</dd>
-      <dt><span class="n">4</span>Calendar</dt><dd>Your iCloud events for one day, read-only. Arrows move a day back or forward, Today jumps back, the round arrow refreshes. It shows the first two events, and <em>Open day view</em> shows the whole day split into all-day and scheduled. A dot marks an event happening right now. If iCloud is not connected, the card links to Settings. On a day with no events it offers to open the Windows Calendar app, and tries iCloud on the web if that fails.</dd>
+      <dt><span class="n">3</span>Controls</dt><dd><strong>Two real switches:</strong> Wi-Fi and Bluetooth. Clicking one asks to turn it on or off; nothing changes until you allow it. <strong>Four shortcuts:</strong> Focus, Night light, Mic privacy and Battery saver. These only open the matching Windows Settings page, and the section says so. A banner above the page sections shows how many requests are waiting for your decision.</dd>
+      <dt><span class="n">4</span>Calendar</dt><dd>Your iCloud events for one day, read-only. Arrows move a day back or forward, Today jumps back, the round arrow refreshes. It shows the first three events, all-day ones first, and <em>Show all</em> lists the rest. “Now” marks an event happening right now. If iCloud is not connected, the card links to Settings. On a day with no events it offers to open the Windows Calendar app, and tries iCloud on the web if that fails.</dd>
       <dt><span class="n">5</span>Now Playing</dt><dd>Song title, artist, album, cover art and progress for whatever is playing through Windows, with shuffle, previous, play or pause, next and mute. If nothing is playing it offers to open your music service.</dd>
       <dt><span class="n">6</span>Ask Live Desktop</dt><dd>A one-line box to message the assistant. Three example questions sit underneath, and clicking one only fills the box. Pressing send takes you to Conversations to read the reply.</dd>
-      <dt><span class="n">7</span>Phone</dt><dd>What Microsoft Phone Link reports about your paired phone: its name, connection status, system and model, battery, and last sync time. <em>Phone details</em> adds a refresh button, a button to copy the phone's name, and a link that opens the Phone Link app. It can show that notifications exist, but never their contents.</dd>
+      <dt><span class="n">7</span>Phone</dt><dd>What Microsoft Phone Link reports about your paired phone: its name, connection status, system and model, battery, and last sync time. Buttons refresh it, copy the phone's name, and open the Phone Link app. It can show that notifications exist, but never their contents.</dd>
       <dt><span class="n">8</span>Connections</dt><dd>Four status lights: the Brain (Local API), iCloud, the OpenAI key, and Music.</dd>
-      <dt><span class="n">9</span>Recent activity</dt><dd>A short list of well-known apps Windows reports as running or installed. It shows four, with <em>Show more</em> for the rest. Clicking a row says where the information came from.</dd>
+      <dt><span class="n">9</span>Recent activity</dt><dd>A short table of well-known apps Windows reports as running or installed. It shows four, with <em>Show all</em> for the rest.</dd>
     </dl>
   </article>
 
   <article class="card page" id="page-system">
-    <div class="page-head"><span class="tile" style="--tc:#636366">2</span><h3>System Info</h3><span class="group-label">Desktop</span><span class="small">Titled “About this PC”. Two tabs.</span></div>
+    <div class="page-head"><span class="tile" style="--tc:#636366">2</span><h3>System Info</h3><span class="group-label">Desktop</span><span class="small">Two tabs.</span></div>
     <dl class="parts">
-      <dt>Live tab</dt><dd>A summary card (PC name, maker and model, processor, memory, graphics, storage) with a <em>Copy specifications</em> button. Next to it: bars and trend lines for processor, memory and storage, a Network tile with download and upload speed, and a Disk activity tile with read and write speed. The computer picture is a generic illustration, not a photo of your model.</dd>
+      <dt>Live tab</dt><dd>Bars for processor, memory and storage, then a table of network and disk speeds with a trend line for the last 15 minutes. Beside them: the device (name, processor, memory, system type, and IDs hidden until <em>Show IDs</em>) and Windows (edition, version, build, install date). <em>Copy specifications</em> copies the details.</dd>
       <dt>Specifications tab</dt><dd><strong>Device:</strong> name, manufacturer, model, processor, installed memory, graphics, system type, plus Device ID and Product ID, which stay hidden until you press <em>Show IDs</em>. <strong>Windows:</strong> edition, version, install date, build and architecture. <strong>Live status:</strong> network, battery, whether the Brain and the OpenAI key are ready, the Java version, and the time of the last reading.</dd>
       <dt>Good to know</dt><dd>Everything here is read locally with normal user rights. No administrator access is requested and the Windows product key is never read.</dd>
     </dl>
@@ -326,7 +325,7 @@ footer { padding: 40px 0 56px; color: var(--muted); font-size: 0.88rem; }
   <article class="card page" id="page-conversations">
     <div class="page-head"><span class="tile" style="--tc:#30A14E">3</span><h3>Conversations</h3><span class="group-label">Assistant</span><span class="small">Chat with the AI assistant.</span></div>
     <dl class="parts">
-      <dt>Thread list</dt><dd>Every saved conversation with its message count. The plus button starts a new one.</dd>
+      <dt>Thread list</dt><dd>Every saved conversation with its message count and time. <em>New</em> starts a new one. On a phone-sized window it becomes a drop-down.</dd>
       <dt>Chat panel</dt><dd>Your messages and the assistant's replies. Enter sends, Shift+Enter adds a new line. If sending fails, your draft stays in the box. A warning appears when no OpenAI key is saved.</dd>
       <dt>What the assistant can do alone</dt><dd>List and read text files inside the Live Desktop folder (never your saved data or secret settings files), look up memories you saved, and read live dashboard information such as system status, apps, phone, calendar and music.</dd>
       <dt>What it must ask for</dt><dd>Writing a file in that folder, opening a website in your browser, and saving a new memory. Each of these becomes an approval request.</dd>
@@ -338,24 +337,24 @@ footer { padding: 40px 0 56px; color: var(--muted); font-size: 0.88rem; }
   <article class="card page" id="page-approvals">
     <div class="page-head"><span class="tile" style="--tc:#C66A00">4</span><h3>Approvals</h3><span class="group-label">Assistant</span><span class="small">The checkpoint for anything that changes the PC.</span></div>
     <dl class="parts">
-      <dt>Pending and History</dt><dd>Two filters. Pending lists requests waiting for you, with a count. History lists everything already decided, each marked completed, failed or rejected.</dd>
-      <dt>Detail panel</dt><dd>For the selected request: what it will do, how it runs, the exact target (a file, a web address, a control), what future requests the approval would also cover, the full content if it writes something, the result afterwards, and when it was requested.</dd>
-      <dt>Buttons</dt><dd><em>Approve capability</em> runs it now and remembers the permission. <em>Reject</em> cancels it and nothing happens.</dd>
+      <dt>Pending and History</dt><dd>Two tabs. Pending lists requests waiting for you, with a count. History lists everything already decided, each marked completed, failed or not allowed.</dd>
+      <dt>Details</dt><dd>The arrow at the start of a row opens it: what it will do, the exact target (a file, a web address, a control), what future requests the approval would also cover, the full content if it writes something, the result afterwards, and when it was requested.</dd>
+      <dt>Buttons</dt><dd><em>Allow</em> runs it now and remembers the permission. <em>Don't Allow</em> cancels it and nothing happens.</dd>
     </dl>
   </article>
 
   <article class="card page" id="page-memories">
     <div class="page-head"><span class="tile" style="--tc:#8E44C9">5</span><h3>Memories</h3><span class="group-label">Assistant</span><span class="small">Notes the assistant may use later.</span></div>
     <dl class="parts">
-      <dt>Memory list</dt><dd>Every saved note for this profile, with a category filter and a Delete button on each one.</dd>
-      <dt>Add a memory</dt><dd>Type up to 2,000 characters, pick a category (preference, project, fact or instruction) and save. Notes you add here save straight away. Notes the assistant wants to add go through approval first.</dd>
+      <dt>Memory list</dt><dd>Every saved note for this profile in a table, with a search box and a Delete button on each one that asks before deleting.</dd>
+      <dt>Add a memory</dt><dd><em>Add memory</em> opens a small window. Type up to 2,000 characters, pick a category (preference, project, fact or instruction) and save. Notes you add here save straight away. Notes the assistant wants to add go through approval first.</dd>
     </dl>
   </article>
 
   <article class="card page" id="page-music">
-    <div class="page-head"><span class="tile" style="--tc:#E0284A">6</span><h3>Music</h3><span class="group-label">Media</span><span class="small">Titled “Your music”.</span></div>
+    <div class="page-head"><span class="tile" style="--tc:#E0284A">6</span><h3>Music</h3><span class="group-label">Media</span><span class="small">Player and provider choice.</span></div>
     <dl class="parts">
-      <dt>Large player</dt><dd>The same song information and buttons as the Now Playing card, bigger.</dd>
+      <dt>Player</dt><dd>The same song information and buttons as Now Playing, plus a switch between Apple Music and Spotify and a button to open the service outside Live Desktop.</dd>
       <dt>Web player</dt><dd>Apple Music's or Spotify's own player for the playlist, album or song link you saved in Settings. You sign in inside that player. Once you have visited this page, the player keeps running while you use other pages.</dd>
       <dt>How the buttons work</dt><dd>Live Desktop does not log in to your music account. It reads the current song from Windows and sends play, pause and skip through Windows, so a track has to be started once before the buttons respond.</dd>
     </dl>
@@ -365,7 +364,7 @@ footer { padding: 40px 0 56px; color: var(--muted); font-size: 0.88rem; }
     <div class="page-head"><span class="tile" style="--tc:#636366">7</span><h3>Settings</h3><span class="group-label">Live Desktop</span><span class="small">Connect services and choose the look.</span></div>
     <dl class="parts">
       <dt>Profile</dt><dd>Shows the current profile and opens the profile picker.</dd>
-      <dt>Appearance</dt><dd><strong>Theme:</strong> light or dark. <strong>Reduce transparency:</strong> swaps the see-through glass look for solid surfaces. <strong>Accent color:</strong> blue, red, green, purple or black, or any color typed as a hex code. Text colors adjust by themselves to stay readable.</dd>
+      <dt>Appearance</dt><dd><strong>Theme:</strong> light, dark, or System to follow Windows. <strong>Accent:</strong> Neutral (black and white), Blue, Green, Orange or Red. Each choice is a complete, tested color set, so text stays readable in both themes.</dd>
       <dt>Assistant</dt><dd>Save, replace or remove the OpenAI key that powers the assistant. Once saved it is never shown again. A link opens Approvals.</dd>
       <dt>Connections</dt><dd><strong>iCloud Calendar:</strong> connect with your Apple email and an app-specific password, or disconnect and erase the saved login. <strong>Music service:</strong> choose Apple Music or Spotify, paste a share link, refresh status, open the full player, or remove the link. <strong>Phone Link:</strong> open the Phone Link app.</dd>
       <dt>Live Desktop services</dt><dd>Restart or shut down Live Desktop itself. Windows keeps running either way.</dd>
@@ -474,7 +473,7 @@ footer { padding: 40px 0 56px; color: var(--muted); font-size: 0.88rem; }
     <p>What you find when you open the project folder. Dots show which of the three parts a folder belongs to.</p></div>
   <div class="card">
     <div class="tree">
-      <div class="k"><span class="dot" style="--c:var(--screen)"></span>frontend/</div><div>The Screen. Seven page files in <code>src/views/</code>, the cards and sidebar in <code>src/components/</code>, colors and layout in <code>src/styles/</code>, and <code>src/App.jsx</code>, which connects every button to the Brain.</div>
+      <div class="k"><span class="dot" style="--c:var(--screen)"></span>frontend/</div><div>The Screen. Seven page files in <code>src/views/</code>, the shared pieces in <code>src/components/</code>, the color themes in <code>src/themes/</code> (built from <code>themes/</code> with the Astryx tools), and <code>src/App.jsx</code>, which connects every button to the Brain.</div>
       <div class="k"><span class="dot" style="--c:var(--brain)"></span>backend/</div><div>The Brain. One file lists every request it accepts, and separate files handle approvals, memories, PC readings, calendar, music, saved keys, profiles and the assistant.</div>
       <div class="k"><span class="dot" style="--c:var(--hands)"></span>native/</div><div>The Hands. Four subfolders: <code>launcher/</code>, <code>host/</code>, <code>windows-bridge/</code> and <code>credentials/</code>.</div>
       <div class="k"><span class="dot"></span>data/</div><div>Your saved information. Private, never uploaded to GitHub. Other profiles live in <code>data/profiles/</code>.</div>
@@ -522,7 +521,7 @@ footer { padding: 40px 0 56px; color: var(--muted); font-size: 0.88rem; }
 </section>
 
 <footer>
-  <p>Drawn from the source code on the Development branch, release 1.1.0 with the Apple-style glass redesign of 14 November 2026. Timings are the values set in the code. If the code changes, this map needs the same change.</p>
+  <p>Drawn from the source code on the Development branch, release 1.1.0 with the Astryx redesign of 15 November 2026. Timings are the values set in the code. If the code changes, this map needs the same change.</p>
 </footer>
 </div>
 </body>
