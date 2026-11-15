@@ -13,7 +13,7 @@ The [Astryx concept screens](https://claude.ai/artifact/9dx9p5uB9nSpdurDAPTrVu) 
 
 ## History
 
-- **Apple-style glass** (2026-11-14 to 2026-11-15): [draft](https://claude.ai/artifact/PBWwVMJFTjGCUZjwv7TxUd) and [migration plan](https://claude.ai/artifact/PL4Njszg4C7GQjVFwca7Tq); superseded by Astryx. Its glass tokens, Reduce transparency and the generic workstation art on System Info are gone.
+- **Apple-style glass** (2026-11-14 to 2026-11-15; version 2, never released): [draft](https://claude.ai/artifact/PBWwVMJFTjGCUZjwv7TxUd) and [migration plan](https://claude.ai/artifact/PL4Njszg4C7GQjVFwca7Tq); superseded by Astryx. Its glass tokens, Reduce transparency and the generic workstation art on System Info are gone.
 - **Flight Deck V2** (2026-11-02): the [V2 reference](flight-deck-refinement/overview-concept-v2.png), [concept prompt](flight-deck-refinement/PROMPT-v2.txt) and [workstation asset prompt](flight-deck-refinement/WORKSTATION-PROMPT.txt) are retained as provenance.
 
 Regenerate synthetic implementation captures with [browser validation](../VALIDATION.md) rather than maintaining duplicate screenshot sets.
