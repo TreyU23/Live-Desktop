@@ -23,7 +23,7 @@ Coordinates: `com.localassistant:live-desktop-windows-x64:<version>:zip`, regist
 Configure private Maven `settings.xml` with server ID `github` and a classic GitHub token with `read:packages`, following [GitHub's registry instructions](https://docs.github.com/en/packages/working-with-a-github-packages-registry/working-with-the-apache-maven-registry). Never commit credentials. For example, with a published version:
 
 ```powershell
-mvn dependency:copy "-Dartifact=com.localassistant:live-desktop-windows-x64:1.1.0:zip" "-DremoteRepositories=github::default::https://maven.pkg.github.com/treyu23/live-desktop" "-DoutputDirectory=downloads"
+mvn dependency:copy "-Dartifact=com.localassistant:live-desktop-windows-x64:2.0.0:zip" "-DremoteRepositories=github::default::https://maven.pkg.github.com/treyu23/live-desktop" "-DoutputDirectory=downloads"
 ```
 
 Replace the example version with the intended release. Check Actions for checksum, authentication or duplicate-version failures. [Validation scope](VALIDATION.md).
