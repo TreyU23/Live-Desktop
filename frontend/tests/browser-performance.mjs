@@ -117,16 +117,17 @@ try {
     assert.ok(profileHeaders.length > headerIndex, 'Switched profile made no reads');
     assert.ok(profileHeaders.slice(headerIndex).every(id => id === 'second'), 'Old profile used after switch');
   }
-  // Scroll frame budget for the glass Overview (fresh page: the fake clock above would distort rAF).
+  // Scroll frame budget for the Overview (fresh page: the fake clock above would distort rAF).
   let scrollFrames;
   {
     const framePage = await browser.newPage({ viewport: { width: 1440, height: 900 } });
     await mockDashboard(framePage);
     await framePage.goto(process.env.BROWSER_TEST_BASE_URL || 'http://127.0.0.1:4174');
-    await framePage.locator('.gauge-value strong').first().waitFor();
+    await framePage.getByRole('meter', { name: 'CPU load' }).waitFor();
     await framePage.waitForTimeout(500);
     scrollFrames = await framePage.evaluate(() => new Promise(resolve => {
-      const region = document.querySelector('.view-region');
+      let region = document.querySelector('main');
+      while (region && region !== document.body && !/(auto|scroll)/.test(getComputedStyle(region).overflowY)) region = region.parentElement;
       const deltas = []; let last = performance.now(); let frame = 0;
       const step = now => {
         deltas.push(now - last); last = now; frame += 1;

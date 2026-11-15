@@ -54,8 +54,13 @@ try {
     return false;
   } });
   await page.goto(url);
-  await page.locator('.gauge-value strong').first().getByText('0', { exact: false }).waitFor();
+  const cpuMeter = page.getByRole('meter', { name: 'CPU load' });
+  await page.waitForFunction(() => document.querySelector('[role="meter"][aria-label="CPU load"]')?.getAttribute('aria-valuenow') === '0');
   assert.equal(await page.getByRole('button', { name: 'Voice input' }).count(), 0);
+  const scrollView = where => page.getByRole('main').evaluate((element, to) => {
+    while (element && element !== document.body && !/(auto|scroll)/.test(getComputedStyle(element).overflowY)) element = element.parentElement;
+    element.scrollTop = to === 'top' ? 0 : element.scrollHeight;
+  }, where);
   const navigate = async name => {
     const nav = page.getByRole('navigation', { name: 'Primary navigation' });
     const accessibleName = new RegExp(`^${name}( \\d+ pending)?$`);
@@ -72,7 +77,9 @@ try {
       await navigate(name);
       assert.ok(await page.locator('main h1').count(), `${id} has no heading`);
       const geometry = await page.evaluate(() => {
-        const region = document.querySelector('.view-region'); const nav = document.querySelector('.sidebar').getBoundingClientRect(); const view = region.getBoundingClientRect();
+        // Landmarks, not class names: the primary navigation and the scroll container of the main landmark.
+        const scroller = element => { while (element && element !== document.body && !/(auto|scroll)/.test(getComputedStyle(element).overflowY)) element = element.parentElement; return element; };
+        const region = scroller(document.querySelector('main')); const nav = document.querySelector('nav[aria-label="Primary navigation"]').getBoundingClientRect(); const view = region.getBoundingClientRect();
         // Sidebar on the left at desktop widths, tab bar at the bottom below 768px; never overlapping the view.
         const overlaps = !(nav.right <= view.left + 1 || view.right <= nav.left + 1 || nav.bottom <= view.top + 1 || view.bottom <= nav.top + 1);
         return { documentOverflow: document.documentElement.scrollWidth > innerWidth, viewOverflow: region.scrollWidth > region.clientWidth + 1, navInside: nav.bottom <= innerHeight + 1 && nav.right <= innerWidth + 1, overlaps, tabBar: nav.width >= innerWidth - 1 };
@@ -81,11 +88,11 @@ try {
       assert.equal(geometry.viewOverflow, false, `${id} view overflow at ${width}`);
       assert.ok(geometry.navInside && !geometry.overlaps, `Navigation overlaps ${id} at ${width}`);
       assert.equal(geometry.tabBar, width < 768, `Navigation layout at ${width}`);
-      await page.locator('.view-region').evaluate(element => { element.scrollTop = element.scrollHeight; });
+      await scrollView('bottom');
       assert.ok(await page.getByRole('navigation').isVisible());
       matrix.push({ width, height, view: id, overflow: false, reservedNavigation: true, tabBar: width < 768 });
       if ([1440,390,320].includes(width)) {
-        await page.locator('.view-region').evaluate(element => { element.scrollTop = 0; });
+        await scrollView('top');
         await page.locator('h1').evaluate(element => element.blur());
         await page.screenshot({ path: `${output}/${id}-${width}.png` });
       }
@@ -95,8 +102,8 @@ try {
   await navigate('Approvals');
   assert.match(await page.getByRole('article', { name: 'Selected action details' }).innerText(), /both on and off/);
   await page.getByRole('button', { name: /Save a local note/ }).click();
-  assert.match(await page.locator('.action-content').innerText(), /<script>Text only<\/script>/);
-  assert.equal(await page.locator('.action-content script').count(), 0);
+  assert.match(await page.getByLabel('Action content', { exact: true }).innerText(), /<script>Text only<\/script>/);
+  assert.equal(await page.getByLabel('Action content', { exact: true }).locator('script').count(), 0);
   await page.getByRole('button', { name: 'History', exact: true }).click();
   await page.getByRole('button', { name: /Unsupported action/ }).click();
   assert.match(await page.getByRole('article', { name: 'Selected action details' }).innerText(), /cannot describe/);
@@ -123,8 +130,8 @@ try {
   assert.match(await sheet.innerText(), /1 of 5/);
   assert.match(await sheet.innerText(), /Allowing also allows matching requests later/);
   assert.equal(await sheet.getByRole('button', { name: 'Allow Once' }).count(), 0, 'Sheet must not promise a one-shot approval');
-  assert.match(await sheet.locator('.action-content').innerText(), /<img src=x onerror=alert\(1\)>Literal/);
-  assert.equal(await sheet.locator('.action-content img').count(), 0);
+  assert.match(await sheet.getByLabel('Action content', { exact: true }).innerText(), /<img src=x onerror=alert\(1\)>Literal/);
+  assert.equal(await sheet.getByLabel('Action content', { exact: true }).locator('img').count(), 0);
   assert.ok(await sheet.evaluate(element => element.contains(document.activeElement)), 'Sheet did not take focus');
   for (let index = 0; index < 8; index += 1) await page.keyboard.press('Tab');
   assert.ok(await sheet.evaluate(element => element.contains(document.activeElement)), 'Focus escaped the sheet');
@@ -170,23 +177,24 @@ try {
   // Reduce transparency: explicit setting and the system media feature both give solid surfaces.
   await page.getByRole('switch', { name: 'Reduce transparency' }).click();
   assert.equal(await page.locator('html').getAttribute('data-transparency'), 'reduced');
-  assert.equal(await page.locator('.sidebar').evaluate(element => getComputedStyle(element).backgroundImage), 'none');
+  assert.equal(await page.getByRole('navigation', { name: 'Primary navigation' }).evaluate(element => getComputedStyle(element).backgroundImage), 'none');
   await page.getByRole('switch', { name: 'Reduce transparency' }).click();
-  assert.notEqual(await page.locator('.sidebar').evaluate(element => getComputedStyle(element).backgroundImage), 'none');
+  assert.notEqual(await page.getByRole('navigation', { name: 'Primary navigation' }).evaluate(element => getComputedStyle(element).backgroundImage), 'none');
   const cdp = await page.context().newCDPSession(page);
   await cdp.send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-transparency', value: 'reduce' }] });
-  assert.equal(await page.locator('.sidebar').evaluate(element => getComputedStyle(element).backgroundImage), 'none');
+  assert.equal(await page.getByRole('navigation', { name: 'Primary navigation' }).evaluate(element => getComputedStyle(element).backgroundImage), 'none');
   await navigate('Overview');
   await page.screenshot({ path: `${output}/overview-reduced-transparency-1440.png` });
   await cdp.send('Emulation.setEmulatedMedia', { features: [] });
   // Sidebar search filters page names locally and navigates on Enter.
   await page.getByRole('searchbox', { name: 'Find a page' }).fill('mem');
-  assert.equal(await page.getByRole('navigation', { name: 'Primary navigation' }).locator('.sidebar__section .sidebar__item').count(), 1);
+  const destinations = /^(Overview|System Info|Conversations|Approvals|Memories|Music|Settings)( \d+ pending)?$/;
+  assert.equal(await page.getByRole('navigation', { name: 'Primary navigation' }).getByRole('button', { name: destinations }).filter({ visible: true }).count(), 1);
   await page.keyboard.press('Enter');
   await page.getByRole('heading', { name: 'Memories', exact: true }).waitFor();
   await navigate('Overview');
   await navigate('Overview');
-  assert.ok(await page.locator('.resource-gauge.gauge--critical .gauge-fill--critical').count() > 0, 'high memory should use critical severity coloring');
+  assert.match(await page.getByRole('meter', { name: 'Memory used' }).getAttribute('aria-valuetext'), /critical/, 'high memory should use critical severity');
   assert.ok(await page.getByRole('button', { name: /Open Apple Music externally/ }).isVisible(), 'music empty state should offer an external open action');
   assert.ok(await page.getByText('Network throughput').isVisible());
   assert.ok(await page.getByText('Disk activity').isVisible());
@@ -203,20 +211,20 @@ try {
   failSystem = true;
   await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
   await page.getByRole('button', { name: 'Retry system', exact: true }).waitFor();
-  assert.equal(await page.locator('.gauge-value strong').first().innerText(), '0%');
+  assert.equal(await cpuMeter.getAttribute('aria-valuenow'), '0');
   failSystem = false;
   await page.getByRole('button', { name: 'Retry system', exact: true }).click();
   await page.getByRole('button', { name: 'Retry system', exact: true }).waitFor({ state: 'detached' });
   holdSystem = true;
   await page.reload();
   await page.getByRole('heading', { name: 'Overview', exact: true }).waitFor();
-  assert.equal(await page.locator('.gauge-value strong').first().innerText(), '—');
+  assert.equal(await cpuMeter.getAttribute('aria-valuetext'), 'Reading unavailable');
   releaseSystem();
   await page.getByRole('switch', { name: 'Wi-Fi: on. Request off', exact: true }).waitFor();
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.setViewportSize({ width: 640, height: 360 });
   await navigate('Settings');
-  await page.locator('.view-region').evaluate(element => { element.scrollTop = element.scrollHeight; });
+  await scrollView('bottom');
   assert.ok(await page.getByRole('button', { name: 'Open full player', exact: true }).isVisible());
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
   assert.deepEqual(errors, []);

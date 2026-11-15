@@ -1,0 +1,25 @@
+{
+  "name": "live-desktop-green",
+  "like": "neutral",
+  "mode": "both",
+  "settings": [
+    {
+      "thing": "font",
+      "value": "'Segoe UI Variable Text', 'Segoe UI Variable', 'Segoe UI', system-ui, sans-serif",
+      "source": "dial"
+    },
+    {
+      "thing": "font",
+      "value": "'Segoe UI Variable Display', 'Segoe UI Variable', 'Segoe UI', system-ui, sans-serif",
+      "source": "dial",
+      "on": "heading"
+    },
+    {
+      "thing": "accent",
+      "value": "#22C55E",
+      "source": "dial"
+    }
+  ],
+  "lifted": [],
+  "palette": "7bb6ef388f8f93af078cb92898b03dd989c133661970512be47dcbacb104c45a"
+}

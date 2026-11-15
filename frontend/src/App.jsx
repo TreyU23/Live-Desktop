@@ -11,7 +11,9 @@ import { Sidebar } from './components/shell/Sidebar.jsx';
 import { ConfirmDialog } from './components/ui/ConfirmDialog.jsx';
 import { ResourceBoundary } from './components/feedback/ResourceBoundary.jsx';
 import { adaptResourceStatus } from './presentation/resourceViewState.js';
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { Theme } from "@astryxdesign/core/theme";
+import { themes, defaultThemeSlug } from "./astryx-themes.js";
 import {
   EMPTY_MUSIC_CONNECTION,
   MUSIC_PROVIDERS,
@@ -167,6 +169,21 @@ function readProfiles() {
   window.localStorage.setItem(PROFILES_KEY, JSON.stringify([DEFAULT_PROFILE]));
   return [DEFAULT_PROFILE];
 }
+
+const kAppearances = ["system", "light", "dark"];
+// Saved values from the glass UI were "light" or "dark"; "system" follows Windows.
+function readAppearance(profileId) {
+  const saved = window.localStorage.getItem(profileStorageKey(THEME_KEY, profileId)) || (profileId === "default" ? window.localStorage.getItem(THEME_KEY) : null);
+  return kAppearances.includes(saved) ? saved : "system";
+}
+
+const kDarkQuery = "(prefers-color-scheme: dark)";
+function subscribeColorScheme(onChange) {
+  const query = window.matchMedia(kDarkQuery);
+  query.addEventListener("change", onChange);
+  return () => query.removeEventListener("change", onChange);
+}
+function prefersDark() { return window.matchMedia(kDarkQuery).matches; }
 
 function activeProfileId() {
   const profiles = readProfiles();
@@ -396,7 +413,9 @@ export function App() {
   const [shutdownOpen, setShutdownOpen] = useState(false);
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
   const [toast, setToast] = useState(null);
-  const [darkMode, setDarkMode] = useState(() => (window.localStorage.getItem(profileStorageKey(THEME_KEY, profileId)) || (profileId === "default" ? window.localStorage.getItem(THEME_KEY) : null)) !== "light");
+  const [appearance, setAppearance] = useState(() => readAppearance(profileId));
+  const systemDark = useSyncExternalStore(subscribeColorScheme, prefersDark);
+  const darkMode = appearance === "dark" || (appearance === "system" && systemDark);
   const [reduceTransparency, setReduceTransparency] = useState(() => window.localStorage.getItem(profileStorageKey(TRANSPARENCY_KEY, profileId)) === "true");
   const [accentColor, setAccentColor] = useState(() => readAccentColor(window.localStorage, profileStorageKey(ACCENT_COLOR_KEY, profileId)));
   const [musicIntegration, setMusicIntegration] = useState(() => readMusicIntegration(profileId));
@@ -418,8 +437,8 @@ export function App() {
 
   useEffect(() => {
     document.documentElement.dataset.theme = darkMode ? "dark" : "light";
-    window.localStorage.setItem(profileStorageKey(THEME_KEY, profileId), darkMode ? "dark" : "light");
-  }, [darkMode, profileId]);
+    window.localStorage.setItem(profileStorageKey(THEME_KEY, profileId), appearance);
+  }, [appearance, darkMode, profileId]);
 
   useEffect(() => {
     if (reduceTransparency) document.documentElement.dataset.transparency = "reduced";
@@ -942,6 +961,7 @@ export function App() {
     </div>
   </div>;
   return (
+    <Theme theme={themes[defaultThemeSlug]} mode={appearance}>
     <div className="desktop-shell">
       <Sidebar activeView={activeView} onNavigate={setActiveView} pendingCount={pendingCount} hostName={system.host?.name && system.host.name !== FALLBACK_SYSTEM.host.name ? system.host.name : "This PC"} connected={health.connected}
         profileSlot={<ProfilePicker profiles={profiles} activeProfile={activeProfile} onProfilesChange={updateProfiles} onSwitch={switchProfile} onDelete={(id) => setProfileDelete(profiles.find(profile => profile.id === id))} open={profileMenuOpen} setOpen={setProfileMenuOpen} />} />
@@ -961,7 +981,7 @@ export function App() {
       {activeView === "conversations" ? <ConversationsView conversations={conversations} selected={selectedConversation} onSelect={selectConversation} onSend={sendMessage} busy={assistantBusy} profileName={activeProfile.name} configured={health.configured} actions={actions} onApprove={(id) => updateAction(id, "approve")} onReject={(id) => updateAction(id, "reject")} headerActions={headerActions} /> : null}
       {activeView === "music" ? <MusicView musicProvider={musicProvider} musicConnection={musicConnection} musicPlayer={musicPlayer} onMusicAction={controlMusic} onOpenMusicExternally={openMusicExternally} onOpenSettings={() => setActiveView("settings")} headerActions={headerActions} /> : null}
       {musicMounted && musicConnection.embedUrl ? <div className={`music-web-player music-web-player--${musicProviderId} ${activeView === "music" ? "" : "music-web-player--parked"}`} aria-hidden={activeView !== "music"}><iframe key={`${musicProviderId}:${musicConnection.embedUrl}`} title={`${musicProvider.name} web player`} src={musicConnection.embedUrl} allow={musicProviderId === "apple" ? "autoplay *; encrypted-media *; fullscreen *; clipboard-write" : "autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"} loading="eager" /></div> : null}
-      {activeView === "settings" ? <SettingsView activeProfile={activeProfile} onManageProfiles={() => setProfileMenuOpen(true)} onOpenApprovals={() => setActiveView("approvals")} onRestart={() => runLifecycle("restart")} onShutdown={() => setShutdownOpen(true)} lifecycleBusy={lifecycleState !== "idle"} phone={phone} onOpenPhone={openPhone} headerActions={headerActions} reduceTransparency={reduceTransparency} onReduceTransparencyChange={setReduceTransparency} darkMode={darkMode} onDarkModeChange={setDarkMode} accentColor={accentColor} onAccentColorChange={setAccentColor} onCustomAccentColorChange={setCustomAccentColor} calendar={calendar} onConnectCalendar={connectICloudCalendar} onDisconnectCalendar={disconnectICloudCalendar} musicProviderId={musicProviderId} musicConnection={musicConnection} musicPlayer={musicPlayer} onMusicProviderChange={switchMusicProvider} onSaveMusic={saveMusicConnection} onDisconnectMusic={disconnectMusic} onRefreshMusic={() => refreshMusicPlayer(true)} onOpenMusic={() => setActiveView("music")} openAiSettings={openAiSettings} onSaveOpenAiKey={saveOpenAiKey} onDeleteOpenAiKey={deleteOpenAiKey} /> : null}
+      {activeView === "settings" ? <SettingsView activeProfile={activeProfile} onManageProfiles={() => setProfileMenuOpen(true)} onOpenApprovals={() => setActiveView("approvals")} onRestart={() => runLifecycle("restart")} onShutdown={() => setShutdownOpen(true)} lifecycleBusy={lifecycleState !== "idle"} phone={phone} onOpenPhone={openPhone} headerActions={headerActions} reduceTransparency={reduceTransparency} onReduceTransparencyChange={setReduceTransparency} darkMode={darkMode} onDarkModeChange={(dark) => setAppearance(dark ? "dark" : "light")} accentColor={accentColor} onAccentColorChange={setAccentColor} onCustomAccentColorChange={setCustomAccentColor} calendar={calendar} onConnectCalendar={connectICloudCalendar} onDisconnectCalendar={disconnectICloudCalendar} musicProviderId={musicProviderId} musicConnection={musicConnection} musicPlayer={musicPlayer} onMusicProviderChange={switchMusicProvider} onSaveMusic={saveMusicConnection} onDisconnectMusic={disconnectMusic} onRefreshMusic={() => refreshMusicPlayer(true)} onOpenMusic={() => setActiveView("music")} openAiSettings={openAiSettings} onSaveOpenAiKey={saveOpenAiKey} onDeleteOpenAiKey={deleteOpenAiKey} /> : null}
 
       </div>
       {shutdownOpen ? <ConfirmDialog title="Shut down Live Desktop?" confirmLabel="Shut down both" onCancel={() => setShutdownOpen(false)} onConfirm={() => runLifecycle('shutdown')}><p>This stops Live Desktop's frontend and backend. It does not shut down Windows.</p><p>Run <code>start.cmd</code> from the application folder to start it again. This page cannot restart stopped services.</p></ConfirmDialog> : null}
@@ -969,5 +989,6 @@ export function App() {
       <LifecycleNotice state={lifecycleState} />
       {toast ? <div className={`toast toast--${toast.tone} card--strong`} role="status"><Icon name={toast.tone === "error" ? "CircleAlert" : "CircleCheck"} size={18} />{toast.message}<button type="button" className="btn-icon btn-icon--plain" onClick={() => setToast(null)} aria-label="Dismiss"><Icon name="X" size={16} /></button></div> : null}
     </div>
+    </Theme>
   );
 }

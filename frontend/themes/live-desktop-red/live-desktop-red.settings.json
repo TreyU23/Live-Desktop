@@ -1,0 +1,25 @@
+{
+  "name": "live-desktop-red",
+  "like": "neutral",
+  "mode": "both",
+  "settings": [
+    {
+      "thing": "font",
+      "value": "'Segoe UI Variable Text', 'Segoe UI Variable', 'Segoe UI', system-ui, sans-serif",
+      "source": "dial"
+    },
+    {
+      "thing": "font",
+      "value": "'Segoe UI Variable Display', 'Segoe UI Variable', 'Segoe UI', system-ui, sans-serif",
+      "source": "dial",
+      "on": "heading"
+    },
+    {
+      "thing": "accent",
+      "value": "#EF4444",
+      "source": "dial"
+    }
+  ],
+  "lifted": [],
+  "palette": "4bbc3e8c9c980c7e69985a5c844df8589d712aa1216b34bf9d0f301f137fcb08"
+}

@@ -4,7 +4,9 @@ import { Sparkline } from './Sparkline.jsx';
 export function ResourceGauge({ label, value, detail, series = null }) {
   const available = Number.isFinite(value) && value >= 0 && value <= 100;
   const severity = available ? utilizationSeverity(value) : null;
-  return <div className={`resource-gauge ${available ? '' : 'resource-gauge--unavailable'} ${utilizationSeverityClass(value)}`.trim()}>
+  const valueText = available ? `${Math.round(value)} percent, ${severity}` : 'Reading unavailable';
+  return <div className={`resource-gauge ${available ? '' : 'resource-gauge--unavailable'} ${utilizationSeverityClass(value)}`.trim()}
+    role="meter" aria-label={label} aria-valuemin={0} aria-valuemax={100} aria-valuenow={available ? Math.round(value) : undefined} aria-valuetext={valueText}>
     <span className="gauge-label">{label}</span>
     <div className="gauge-instrument">
       <svg viewBox="0 0 180 145" aria-hidden="true">

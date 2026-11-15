@@ -1,4 +1,9 @@
-@import './styles/tokens.css';
-@import './styles/shell.css';
-@import './styles/components.css';
-@import './styles/views.css';
+/* Layer order: Astryx's reset, then the legacy glass styles, then Astryx base and theme.
+   Unlayered CSS beats layered CSS, so every legacy file is imported into layer(legacy);
+   that keeps old element selectors (button, input, …) from restyling Astryx components.
+   Transition only: Phase 4 of docs/redesign/README.md deletes these four files. */
+@layer reset, legacy, astryx-base, astryx-theme;
+@import './styles/tokens.css' layer(legacy);
+@import './styles/shell.css' layer(legacy);
+@import './styles/components.css' layer(legacy);
+@import './styles/views.css' layer(legacy);

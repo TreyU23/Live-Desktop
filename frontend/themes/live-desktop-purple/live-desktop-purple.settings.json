@@ -1,0 +1,25 @@
+{
+  "name": "live-desktop-purple",
+  "like": "neutral",
+  "mode": "both",
+  "settings": [
+    {
+      "thing": "font",
+      "value": "'Segoe UI Variable Text', 'Segoe UI Variable', 'Segoe UI', system-ui, sans-serif",
+      "source": "dial"
+    },
+    {
+      "thing": "font",
+      "value": "'Segoe UI Variable Display', 'Segoe UI Variable', 'Segoe UI', system-ui, sans-serif",
+      "source": "dial",
+      "on": "heading"
+    },
+    {
+      "thing": "accent",
+      "value": "#A855F7",
+      "source": "dial"
+    }
+  ],
+  "lifted": [],
+  "palette": "9a5d5eea484379cd892d206a564985079a48074584d1e56f929e1362d0c7f76f"
+}
