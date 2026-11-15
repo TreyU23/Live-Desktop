@@ -1,15 +1,37 @@
 import { useEffect, useRef, useState } from 'react';
-import { EmptyState, Icon } from '../components/ui/index.jsx';
+import { Badge } from '@astryxdesign/core/Badge';
+import { Banner } from '@astryxdesign/core/Banner';
+import { Button } from '@astryxdesign/core/Button';
+import { ChatComposer, ChatLayout, ChatMessage, ChatMessageBubble, ChatMessageList } from '@astryxdesign/core/Chat';
+import { EmptyState } from '@astryxdesign/core/EmptyState';
+import { Icon } from '@astryxdesign/core/Icon';
+import { LayoutPanel, HStack, StackItem, VStack } from '@astryxdesign/core/Layout';
+import { List, ListItem } from '@astryxdesign/core/List';
+import { Selector } from '@astryxdesign/core/Selector';
+import { Heading, Text } from '@astryxdesign/core/Text';
+import { useMediaQuery } from '@astryxdesign/core/hooks';
+import { Page } from '../components/shell/Page.jsx';
 import { ApprovalSheet } from '../components/approvals/ApprovalSheet.jsx';
+import { icons } from '../components/ui/icons.js';
+
+const kNew = '__new__';
+
+function threadTime(value) {
+  if (!value) return '';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  return date.toDateString() === new Date().toDateString()
+    ? date.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })
+    : date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+}
 
 export function ConversationsView({ conversations, selected, onSelect, onSend, busy, profileName, configured, actions = [], onApprove, onReject, headerActions }) {
+  const isWide = useMediaQuery('(min-width: 768px)');
   const [value, setValue] = useState('');
   const [error, setError] = useState('');
-  const [threadsOpen, setThreadsOpen] = useState(false);
   const [sheetOpen, setSheetOpen] = useState(false);
-  const composer = useRef(null);
   const pending = actions.filter(action => action.status === 'pending');
-  // Actions carry no conversation id, so the sheet opens by itself only for requests that appear
+  // Actions carry no conversation id, so the dialog opens by itself only for requests that appear
   // while this view is open (for example after sending a message). Older ones wait behind "Review".
   const seen = useRef(null);
   useEffect(() => {
@@ -19,51 +41,65 @@ export function ConversationsView({ conversations, selected, onSelect, onSend, b
     if (fresh.length) setSheetOpen(true);
   }, [pending.map(action => action.id).join('|')]);
 
-  const submit = async event => {
-    event?.preventDefault();
-    if (busy || !value.trim()) return;
-    const draft = value; setError('');
+  const submit = async text => {
+    const draft = text ?? value;
+    if (busy || !draft.trim()) return;
+    setError('');
     if (await onSend(draft.trim(), selected?.id ?? null)) setValue(current => current === draft ? '' : current);
     else setError('Message could not be sent. Your draft is preserved; try again.');
   };
-  const choose = summary => { setThreadsOpen(false); onSelect(summary); };
-  return <div className="legacy view-shell conversations-view">
-    <div className="conversation-layout">
-      <aside className="conversation-threads" aria-label="Conversation threads">
-        <header className="page-heading conversation-threads__heading">
-          <div><h1 tabIndex={-1}>Conversations</h1><p>{profileName} · stored on this PC</p></div>
-          <button className="btn-icon new-chat" type="button" aria-label="New conversation" onClick={() => choose(null)} disabled={busy}><Icon name="Plus" size={18} strokeWidth={2.2} /></button>
-        </header>
-        <button className="thread-toggle" type="button" aria-expanded={threadsOpen} aria-controls="conversation-threads" onClick={() => setThreadsOpen(open => !open)}>Threads · {selected?.title || 'New conversation'}</button>
-        <div id="conversation-threads" className={`conversation-list ${threadsOpen ? 'conversation-list--open' : ''}`}>
-          {conversations.map(conversation => <button className="thread-row" aria-current={selected?.id === conversation.id ? 'true' : undefined} type="button" key={conversation.id} onClick={() => choose(conversation)} disabled={busy}><strong>{conversation.title}</strong><span>{conversation.messageCount} messages</span></button>)}
-          {!conversations.length ? <p className="muted conversation-list__empty">No saved conversations yet.</p> : null}
-        </div>
-      </aside>
-      <section className="card card--flush chat-panel" aria-label="Conversation">
-        <header className="chat-header">
-          <div><h2>{selected?.title || 'New conversation'}</h2><span className="muted">History is stored locally. Assistant requests and context are sent to OpenAI.</span></div>
-          <div className="chat-header__status">
-            {!configured ? <span className="status-label"><i className="status-dot status-dot--warn" aria-hidden="true" />OpenAI key not set — add it in Settings</span> : null}
-            {pending.length ? <button type="button" className="chip" onClick={() => setSheetOpen(true)}><span className="badge" aria-hidden="true">{pending.length}</span>Review {pending.length === 1 ? 'request' : 'requests'}</button> : null}
-            {headerActions}
-          </div>
-        </header>
-        <div className="messages" aria-live="polite">
-          {selected?.messages?.length ? selected.messages.map(message => <article className={`message message--${message.role}`} key={message.id} aria-label={message.role === 'user' ? 'You' : 'Live Desktop'}><h3 className="visually-hidden">{message.role === 'user' ? 'You' : 'Live Desktop'}</h3><p>{message.content}</p></article>) : <EmptyState icon="MessageCircle" title="Start a conversation" detail="Ask about your files, system, or current work. Anything that changes your PC asks for approval first." />}
-        </div>
-        <form className="chat-compose" onSubmit={submit}>
-          <div className="pill-input">
-            <label className="visually-hidden" htmlFor="chat-message">Message your assistant</label>
-            <textarea id="chat-message" ref={composer} value={value} rows={1} placeholder="Message Live Desktop"
-              onChange={event => setValue(event.target.value)}
-              onKeyDown={event => { if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) { event.preventDefault(); submit(); } }} />
-            <button className="btn-round-primary" type="submit" aria-label="Send" disabled={busy || !value.trim()}><Icon name={busy ? 'LoaderCircle' : 'ArrowUp'} size={18} strokeWidth={2.4} className={busy ? 'spin' : ''} /></button>
-          </div>
-          {error ? <p className="form-error" role="alert">{error}</p> : null}
-        </form>
-      </section>
-    </div>
-    {sheetOpen && pending.length ? <ApprovalSheet actions={pending} onApprove={onApprove} onReject={onReject} onClose={() => setSheetOpen(false)} returnFocus={() => composer.current} /> : null}
-  </div>;
+  const choose = summary => onSelect(summary);
+  const messages = selected?.messages || [];
+
+  const threads = <VStack gap={2} aria-label="Conversation threads">
+    <HStack gap={2} vAlign="center">
+      <StackItem size="fill"><Heading level={2}>Threads</Heading></StackItem>
+      <Button label="New" aria-label="New conversation" size="sm" icon={<Icon icon={icons.Plus} />} isDisabled={busy} onClick={() => choose(null)} />
+    </HStack>
+    {conversations.length ? <List>
+      {conversations.map(conversation => <ListItem key={conversation.id}
+        label={conversation.title}
+        description={`${conversation.messageCount} ${conversation.messageCount === 1 ? 'message' : 'messages'}`}
+        endContent={<Text type="supporting">{threadTime(conversation.updatedAt)}</Text>}
+        isSelected={selected?.id === conversation.id}
+        isDisabled={busy}
+        onClick={() => choose(conversation)} />)}
+    </List> : <Text type="supporting">No saved conversations yet.</Text>}
+  </VStack>;
+
+  const reviewButton = pending.length
+    ? <Button label={`Review ${pending.length === 1 ? 'request' : 'requests'}`} endContent={<Badge label={String(pending.length)} />} onClick={() => setSheetOpen(true)} />
+    : null;
+
+  const chat = <VStack gap={4}>
+    <HStack gap={3} vAlign="center" wrap="wrap">
+      <StackItem size="fill">
+        {isWide ? <Heading level={2}>{selected?.title || 'New conversation'}</Heading>
+          : <Selector label="Conversation" value={selected?.id ?? kNew} isDisabled={busy}
+            onChange={id => choose(id === kNew ? null : conversations.find(item => item.id === id) || null)}
+            options={[{ value: kNew, label: 'New conversation' }, ...conversations.map(item => ({ value: item.id, label: item.title }))]} />}
+      </StackItem>
+      {reviewButton}
+    </HStack>
+    {!configured ? <Banner status="warning" title="OpenAI key not set" description="Add it in Settings to send messages. History is stored on this PC; assistant requests and context are sent to OpenAI." /> : null}
+    <ChatLayout scrollButton={null}
+      emptyState={<EmptyState title="Start a conversation" description="Ask about your files, system, or current work. Anything that changes your PC asks for approval first." />}
+      composer={<VStack gap={2}>
+        <ChatComposer value={value} onChange={setValue} onSubmit={submit} placeholder="Message Live Desktop" isDisabled={busy} elevation="none"
+          status={error ? { type: 'error', message: error } : undefined} />
+        <Text type="supporting">Anything that changes your PC asks for approval first. History stays on this PC; messages are sent to OpenAI.</Text>
+      </VStack>}>
+      {messages.length ? <ChatMessageList align="top" isStreaming={busy}>
+        {messages.map(message => message.role === 'user'
+          ? <ChatMessage key={message.id} sender="user"><ChatMessageBubble>{message.content}</ChatMessageBubble></ChatMessage>
+          : <ChatMessage key={message.id} sender="assistant"><ChatMessageBubble variant="ghost" name="Live Desktop">{message.content}</ChatMessageBubble></ChatMessage>)}
+      </ChatMessageList> : null}
+    </ChatLayout>
+  </VStack>;
+
+  return <Page title="Conversations" detail={`Ask about this PC or request a change. ${profileName} · stored on this PC.`} actions={headerActions}
+    start={isWide ? <LayoutPanel width={300} hasDivider padding={6} label="Conversation threads">{threads}</LayoutPanel> : undefined}>
+    {chat}
+    {sheetOpen && pending.length ? <ApprovalSheet actions={pending} onApprove={onApprove} onReject={onReject} onClose={() => setSheetOpen(false)} /> : null}
+  </Page>;
 }

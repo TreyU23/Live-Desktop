@@ -1,65 +1,59 @@
-import { useEffect, useRef, useState } from 'react';
-import { Icon } from '../ui/index.jsx';
+import { useEffect, useState } from 'react';
+import { Banner } from '@astryxdesign/core/Banner';
+import { Button } from '@astryxdesign/core/Button';
+import { CodeBlock } from '@astryxdesign/core/CodeBlock';
+import { Dialog } from '@astryxdesign/core/Dialog';
+import { Icon } from '@astryxdesign/core/Icon';
+import { IconButton } from '@astryxdesign/core/IconButton';
+import { HStack, StackItem, VStack } from '@astryxdesign/core/Layout';
+import { MetadataList, MetadataListItem } from '@astryxdesign/core/MetadataList';
+import { Heading, Text } from '@astryxdesign/core/Text';
+import { icons } from '../ui/icons.js';
 import { actionDetails } from '../../presentation/actionDetails.js';
 
-const KIND_ICON = { windows_set_control: 'Settings', windows_open_uri: 'ExternalLink', browser_open_url: 'Globe2', workspace_write_file: 'Clipboard', remember: 'Bookmark' };
-const CONTROL_ICON = { wifi: 'Wifi', bluetooth: 'Bluetooth' };
+const sentenceCase = text => (text ? text.charAt(0).toLowerCase() + text.slice(1) : 'run this action');
 
-// Modal queue of pending actions. The backend has no one-shot approval: approving makes the scope
-// reusable, so the sheet states that instead of offering a switch it cannot honor.
-export function ApprovalSheet({ actions, onApprove, onReject, onClose, returnFocus }) {
-  const dialog = useRef(null);
+// Modal queue of pending actions. The backend has no one-shot approval: allowing makes the scope
+// reusable, so the dialog states that instead of offering a switch it cannot honor.
+// Escape and "Decide later" close it without deciding; Dialog returns focus to the opener.
+export function ApprovalSheet({ actions, onApprove, onReject, onClose }) {
   const [submitting, setSubmitting] = useState(false);
   const [index, setIndex] = useState(0);
-  const action = actions[Math.min(index, actions.length - 1)];
-  useEffect(() => {
-    const element = dialog.current;
-    element.showModal();
-    element.querySelector('.approval-sheet__actions button')?.focus();
-    return () => { element.close(); (returnFocus?.() || null)?.focus?.(); };
-  }, []);
-  useEffect(() => { if (!action) onClose(); }, [action]);
-  if (!action) return <dialog ref={dialog} className="legacy approval-sheet card--strong" aria-label="Approval request" />;
-  const details = actionDetails(action);
   const position = Math.min(index, actions.length - 1);
+  const action = actions[position];
+  useEffect(() => { if (!action) onClose(); }, [action]);
+  if (!action) return null;
+  const details = actionDetails(action);
   const decide = async verb => {
     if (submitting) return;
     setSubmitting(true);
     try { await (verb === 'approve' ? onApprove : onReject)(action.id); }
     finally { setSubmitting(false); }
   };
-  const trapFocus = event => {
-    if (event.key !== 'Tab') return;
-    const focusable = [...dialog.current.querySelectorAll('button:not(:disabled), [tabindex="0"]')];
-    const first = focusable[0]; const last = focusable.at(-1);
-    if (!first) { event.preventDefault(); return; }
-    if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
-    else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
-  };
-  const icon = action.kind === 'windows_set_control' ? CONTROL_ICON[action.arguments?.control] || 'Settings' : KIND_ICON[action.kind] || 'Shield';
-  return <dialog ref={dialog} className="legacy approval-sheet card--strong" aria-labelledby="approval-sheet-title" aria-describedby="approval-sheet-reason"
-    onKeyDown={trapFocus} onCancel={event => { event.preventDefault(); if (!submitting) onClose(); }}>
-    <div className="approval-sheet__queue">
-      {actions.length > 1 ? <>
-        <button type="button" className="btn-icon btn-icon--plain" aria-label="Previous request" disabled={position === 0 || submitting} onClick={() => setIndex(position - 1)}><Icon name="ChevronLeft" size={16} /></button>
-        <span role="status">{position + 1} of {actions.length}</span>
-        <button type="button" className="btn-icon btn-icon--plain" aria-label="Next request" disabled={position === actions.length - 1 || submitting} onClick={() => setIndex(position + 1)}><Icon name="ChevronRight" size={16} /></button>
-      </> : <span>1 of 1</span>}
-    </div>
-    <span className="tile tile--48 tile--accent" aria-hidden="true"><Icon name={icon} size={26} strokeWidth={2} /></span>
-    <h2 id="approval-sheet-title">{details.title}?</h2>
-    <p id="approval-sheet-reason">{action.reason}</p>
-    <dl className="group">
-      <div><dt>Action</dt><dd>{details.operation}{details.target ? <> · <span className="data-value">{details.target}</span></> : null}</dd></div>
-      <div><dt>How</dt><dd>{details.how}</dd></div>
-      <div><dt>Requested</dt><dd>{action.createdAt ? new Date(action.createdAt).toLocaleString() : 'Time not recorded'}</dd></div>
-    </dl>
-    {details.content != null ? <pre className="action-content well" tabIndex={0} aria-label="Action content">{String(details.content)}</pre> : null}
-    <p className="scope-notice"><Icon name="Info" size={16} /><span><strong>Allowing also allows matching requests later.</strong> {details.scope} An execution failure does not revoke that approval.</span></p>
-    <div className="approval-sheet__actions">
-      <button type="button" disabled={submitting} onClick={() => decide('reject')}>Don’t Allow</button>
-      <button type="button" className="btn-primary" disabled={submitting || details.unsupported} onClick={() => decide('approve')}>{submitting ? 'Submitting…' : 'Allow'}</button>
-    </div>
-    <button type="button" className="text-action approval-sheet__later" onClick={onClose} disabled={submitting}>Decide later</button>
-  </dialog>;
+  return <Dialog isOpen onOpenChange={open => { if (!open && !submitting) onClose(); }} width={480} padding={6} aria-label="Approval request">
+    <VStack gap={4}>
+      <HStack gap={2} vAlign="center">
+        <StackItem size="fill"><Text type="supporting" role="status">Request {position + 1} of {actions.length}</Text></StackItem>
+        {actions.length > 1 ? <>
+          <IconButton variant="ghost" size="sm" label="Previous request" icon={<Icon icon={icons.ChevronLeft} />} isDisabled={position === 0 || submitting} onClick={() => setIndex(position - 1)} />
+          <IconButton variant="ghost" size="sm" label="Next request" icon={<Icon icon={icons.ChevronRight} />} isDisabled={position === actions.length - 1 || submitting} onClick={() => setIndex(position + 1)} />
+        </> : null}
+      </HStack>
+      <Heading level={2}>Allow Live Desktop to {sentenceCase(action.reason)}?</Heading>
+      <MetadataList>
+        <MetadataListItem label="Action">{details.operation}{details.target ? <> · <Text type="code">{details.target}</Text></> : null}</MetadataListItem>
+        <MetadataListItem label="How">{details.how}</MetadataListItem>
+        <MetadataListItem label="Requested">{action.createdAt ? new Date(action.createdAt).toLocaleString() : 'Time not recorded'}</MetadataListItem>
+      </MetadataList>
+      {details.content != null ? <CodeBlock code={String(details.content)} isWrapped maxHeight={240} width="100%" aria-label="Action content" /> : null}
+      <Banner status="info" title="Allowing also allows matching requests later."
+        description={`${details.scope} An execution failure does not revoke that approval.`} />
+      <HStack gap={2} vAlign="center" wrap="wrap">
+        <Button label="Decide later" variant="ghost" isDisabled={submitting} onClick={onClose} />
+        <StackItem size="fill" />
+        <Button label="Don’t Allow" isDisabled={submitting} onClick={() => decide('reject')} />
+        <Button label="Allow" variant="primary" isLoading={submitting} isDisabled={submitting || details.unsupported} onClick={() => decide('approve')} />
+      </HStack>
+    </VStack>
+  </Dialog>;
 }
