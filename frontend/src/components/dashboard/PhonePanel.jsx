@@ -5,7 +5,8 @@ import { HStack, StackItem, VStack } from '@astryxdesign/core/Layout';
 import { MetadataList, MetadataListItem } from '@astryxdesign/core/MetadataList';
 import { StatusDot } from '@astryxdesign/core/StatusDot';
 import { Text } from '@astryxdesign/core/Text';
-import { Thumbnail } from '@astryxdesign/core/Thumbnail';
+import { AspectRatio } from '@astryxdesign/core/AspectRatio';
+import { Card } from '@astryxdesign/core/Card';
 import { SectionHeader } from './SectionHeader.jsx';
 import { icons } from '../ui/icons.js';
 import { getPhoneDeviceVisual } from '../../phoneDevice.js';
@@ -22,7 +23,13 @@ export function PhonePanel({ phone, onOpen, onRefresh, onCopy, busy, refreshing 
       <IconButton variant="ghost" size="sm" label="Refresh Phone Link information" icon={<Icon icon={icons.Refresh} />} isLoading={refreshing} onClick={onRefresh} />
     </SectionHeader>
     <HStack gap={3} vAlign="center">
-      {visual.src ? <Thumbnail src={visual.src} alt={visual.alt} /> : <Icon icon={icons.Smartphone} color="secondary" aria-label={visual.alt} />}
+      {/* The phone artwork is portrait: letterbox it inside a square tile instead of cropping it.
+          A raw <img> is the native element for a picture; Astryx has no image component. */}
+      <Card variant="muted" width={56} padding={1}>
+        {visual.src
+          ? <AspectRatio ratio={1} fit="contain"><img src={visual.src} alt={visual.alt} /></AspectRatio>
+          : <AspectRatio ratio={1} fit="center"><Icon icon={icons.Smartphone} color="secondary" aria-label={visual.alt} /></AspectRatio>}
+      </Card>
       <StackItem size="fill">
         <VStack gap={0}>
           <Text weight="medium">{ready ? phone.deviceName || 'Linked phone' : 'Your phone'}</Text>
