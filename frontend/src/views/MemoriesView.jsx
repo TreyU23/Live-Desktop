@@ -67,7 +67,7 @@ export function MemoriesView({ memories, onCreate, onDelete, headerActions }) {
   return <Page title="Memories" detail="What the assistant has saved for this profile. Inspect or delete anything." actions={headerActions}>
     <VStack gap={6}>
       <HStack gap={3} vAlign="center" wrap="wrap">
-        <StackItem size="static" width={360}>
+        <StackItem size="static">
           <TextInput type="search" label="Search memories" isLabelHidden placeholder="Search memories" value={query} onChange={setQuery} hasClear />
         </StackItem>
         <StackItem size="fill">

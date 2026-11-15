@@ -1,10 +1,45 @@
 import { useState } from 'react';
-import { Icon, DetailRows } from '../components/ui/index.jsx';
+import { Button } from '@astryxdesign/core/Button';
+import { Grid } from '@astryxdesign/core/Grid';
+import { Icon } from '@astryxdesign/core/Icon';
+import { HStack, StackItem, VStack } from '@astryxdesign/core/Layout';
+import { MetadataList, MetadataListItem } from '@astryxdesign/core/MetadataList';
+import { ProgressBar } from '@astryxdesign/core/ProgressBar';
+import { SegmentedControl, SegmentedControlItem } from '@astryxdesign/core/SegmentedControl';
+import { StatusDot } from '@astryxdesign/core/StatusDot';
+import { Table } from '@astryxdesign/core/Table';
+import { Heading, Text } from '@astryxdesign/core/Text';
 import { Page } from '../components/shell/Page.jsx';
-import { formatBytes, formatBytesPerSec, percent, formatInstalledDate, formatPercent } from '../presentation/formatters.js';
-import { ResourceBar } from '../components/instruments/ResourceBar.jsx';
 import { Sparkline } from '../components/instruments/Sparkline.jsx';
+import { icons } from '../components/ui/icons.js';
+import { formatBytes, formatBytesPerSec, percent, formatInstalledDate } from '../presentation/formatters.js';
 import { utilizationSeverity } from '../presentation/utilizationSeverity.js';
+
+const kBarVariant = { normal: 'success', elevated: 'warning', critical: 'error' };
+const shown = value => (value == null || value === '' ? 'Unavailable' : value);
+
+// One utilization row: name and percent, a severity-colored bar, and the detail line.
+// A missing reading is said to be unavailable and draws no bar, never a zero.
+function ResourceRow({ label, value, detail }) {
+  const available = Number.isFinite(value) && value >= 0 && value <= 100;
+  const severity = available ? utilizationSeverity(value) : null;
+  return <VStack gap={2} paddingBlock={3}>
+    <HStack gap={3} vAlign="center">
+      <StackItem size="fill"><Text weight="medium">{label}</Text></StackItem>
+      <Text weight="medium">{available ? `${Math.round(value)}%` : '—'}</Text>
+    </HStack>
+    {available ? <ProgressBar label={`${label} utilization`} isLabelHidden value={value} variant={kBarVariant[severity]} /> : null}
+    <Text type="supporting">{available ? detail : value == null ? 'Reading unavailable' : `Invalid reading: ${value}`}</Text>
+  </VStack>;
+}
+
+function SectionHeading({ id, title, children }) {
+  return <HStack gap={3} vAlign="center">
+    <StackItem size="fill"><Heading level={2} id={id}>{title}</Heading></StackItem>
+    {children}
+  </HStack>;
+}
+
 export function SystemInfoView({ system, series = [], connected, configured, onCopy, headerActions }) {
   const [tab, setTab] = useState('live');
   const [showIds, setShowIds] = useState(false);
@@ -12,107 +47,116 @@ export function SystemInfoView({ system, series = [], connected, configured, onC
   const resources = system.resources;
   const device = system.device || {};
   const windows = system.windows || {};
-  const graphics = device.graphics?.length ? device.graphics : [{ name: "Unavailable", driverVersion: "Unavailable" }];
+  const network = resources.network || {};
+  const disk = resources.diskActivity || {};
+  const battery = resources.battery || {};
+  const graphics = device.graphics?.length ? device.graphics : [{ name: 'Unavailable', driverVersion: 'Unavailable' }];
   const memoryPercent = percent(resources.memoryUsedBytes, resources.memoryTotalBytes);
   const storagePercent = percent(resources.storageUsedBytes, resources.storageTotalBytes);
   const processorDetail = [
     device.processorCores ? `${device.processorCores} cores` : null,
     device.processorLogicalProcessors ? `${device.processorLogicalProcessors} logical processors` : null,
     device.maxClockMhz ? `${(device.maxClockMhz / 1000).toFixed(2)} GHz max` : null,
-  ].filter(Boolean).join(" · ") || "Windows processor information unavailable";
-  const deviceRows = [
-    { label: "Device name", value: system.host.name },
-    { label: "Manufacturer", value: device.manufacturer },
-    { label: "Model", value: device.model },
-    { label: "Processor", value: device.processorName },
-    { label: "Installed RAM", value: formatBytes(device.installedMemoryBytes || resources.memoryTotalBytes) },
-    { label: "Graphics", value: graphics.map((item) => item.name).join(", ") },
-    { label: "System type", value: device.systemType },
-    { label: "Device ID", value: showIds ? device.deviceId : "Hidden" },
-    { label: "Product ID", value: showIds ? device.productId : "Hidden" },
+  ].filter(Boolean).join(', ') || 'Windows processor information unavailable';
+
+  const activity = [
+    { id: 'net-down', source: 'Network down', now: network.ratesAvailable ? formatBytesPerSec(network.rxBytesPerSec) : 'Unavailable', trend: 'netRx' },
+    { id: 'net-up', source: 'Network up', now: network.ratesAvailable ? formatBytesPerSec(network.txBytesPerSec) : 'Unavailable', trend: 'netTx' },
+    { id: 'disk-read', source: 'Disk read', now: disk.available ? formatBytesPerSec(disk.readBytesPerSec) : 'Unavailable', trend: 'diskRead' },
+    { id: 'disk-write', source: 'Disk write', now: disk.available ? formatBytesPerSec(disk.writeBytesPerSec) : 'Unavailable', trend: 'diskWrite' },
+    { id: 'battery', source: 'Battery', now: battery.available ? `${battery.percent}%` : 'Not reported', trend: null, detail: battery.detail },
   ];
-  const windowsRows = [
-    { label: "Edition", value: windows.edition },
-    { label: "Version", value: windows.version },
-    { label: "Installed on", value: formatInstalledDate(windows.installedOn) },
-    { label: "OS build", value: windows.build },
-    { label: "OS version", value: windows.osVersion },
-    { label: "Architecture", value: windows.architecture },
-  ];
-  const liveRows = [
-    { label: "Network", value: resources.network.connected ? `${resources.network.name} · ${resources.network.address}` : "Offline" },
-    { label: "Battery", value: resources.battery.available ? `${resources.battery.percent}% · ${resources.battery.detail}` : resources.battery.detail },
-    { label: "Backend", value: connected ? "Local API connected" : "Unavailable" },
-    { label: "OpenAI", value: configured ? "Key configured" : "API key needed" },
-    { label: "Java runtime", value: `Java ${system.host.javaVersion}` },
-    { label: "Last refreshed", value: system.capturedAt ? new Date(system.capturedAt).toLocaleString() : "Not yet received" },
+  const activityColumns = [
+    { key: 'source', header: 'Source' },
+    { key: 'now', header: 'Now' },
+    { key: 'trend', header: 'Last 15 minutes', renderCell: row => row.trend
+      ? <Sparkline values={seriesValues(row.trend)} label={`${row.source} trend`} />
+      : <Text type="supporting">{row.detail || 'No readings'}</Text> },
   ];
 
-  const network = resources.network || {};
-  const disk = resources.diskActivity || {};
-  const summaryRows = [
-    { label: "Processor", value: device.processorName },
-    { label: "Memory", value: formatBytes(device.installedMemoryBytes || resources.memoryTotalBytes) },
-    { label: "Graphics", value: graphics[0].name },
-    { label: "Storage", value: formatBytes(resources.storageTotalBytes, 0) },
-  ];
+  const ids = showIds
+    ? [<MetadataListItem key="device-id" label="Device ID"><Text type="code">{shown(device.deviceId)}</Text></MetadataListItem>,
+      <MetadataListItem key="product-id" label="Product ID"><Text type="code">{shown(device.productId)}</Text></MetadataListItem>]
+    : [<MetadataListItem key="device-id" label="Device ID"><Text type="supporting">Hidden</Text></MetadataListItem>,
+      <MetadataListItem key="product-id" label="Product ID"><Text type="supporting">Hidden</Text></MetadataListItem>];
+  const showIdsButton = <Button label={showIds ? 'Hide IDs' : 'Show IDs'} size="sm" aria-pressed={showIds} onClick={() => setShowIds(value => !value)} />;
 
-  return (
-    <Page title="About this PC" detail="Device specifications, Windows information, and live resource status reported by this PC." actions={headerActions} status={<span>
-        <span className={`status-label ${connected ? "status-label--good" : "status-label--warn"}`}><Icon name={connected ? "CircleCheck" : "CircleAlert"} size={14} />{connected ? "Live Windows data" : "Backend unavailable"}</span>
-      </span>}><div className="legacy system-info-view">
-      <div className="segmented system-tabs" role="tablist" aria-label="System information">
-        <button type="button" role="tab" id="system-tab-live" aria-selected={tab === "live"} aria-controls="system-panel" onClick={() => setTab("live")}>Live</button>
-        <button type="button" role="tab" id="system-tab-specs" aria-selected={tab === "specs"} aria-controls="system-panel" onClick={() => setTab("specs")}>Specifications</button>
-      </div>
-      <div id="system-panel" role="tabpanel" aria-labelledby={tab === "live" ? "system-tab-live" : "system-tab-specs"}>
-      {tab === "live" ? <div className="system-live-grid">
-        <section className="card system-identity-card" aria-labelledby="system-identity-title">
-          <img className="pc-illustration" src="/assets/workstation-v2.png" width="1536" height="1024" alt="Illustrative graphite workstation, not a detected hardware model" />
-          <div><h2 id="system-identity-title">{system.host.name}</h2><span className="muted">{[device.manufacturer, device.model].filter(value => value && value !== "Unavailable").join(" ") || "Model unavailable"} · {windows.edition || system.host.os}</span></div>
-          <dl className="group">{summaryRows.map(row => <div key={row.label}><dt>{row.label}</dt><dd title={String(row.value)}>{row.value}</dd></div>)}</dl>
-          <button className="btn-pill" type="button" onClick={onCopy}><Icon name="Copy" size={15} /> Copy specifications</button>
-        </section>
-        <div className="system-live-column">
-          <section className="card" aria-labelledby="system-resources-title">
-            <h2 id="system-resources-title">Resources</h2>
-            <div className="system-resource-bars" aria-label="Current resource utilization">
-              <div><ResourceBar label="CPU" value={resources.cpuPercent} detail={`Current utilization · ${processorDetail}`} /><Sparkline values={seriesValues("cpu")} label="CPU trend" severity={utilizationSeverity(resources.cpuPercent)} /></div>
-              <div><ResourceBar label="Memory" value={memoryPercent} detail={`${formatBytes(resources.memoryUsedBytes)} / ${formatBytes(resources.memoryTotalBytes)}`} /><Sparkline values={seriesValues("memory")} label="Memory trend" severity={utilizationSeverity(memoryPercent)} /></div>
-              <div><ResourceBar label="Storage" value={storagePercent} detail={`${formatBytes(resources.storageUsedBytes)} / ${formatBytes(resources.storageTotalBytes)}`} /><Sparkline values={seriesValues("storage")} label="Storage trend" severity={utilizationSeverity(storagePercent)} /></div>
-            </div>
-          </section>
-          <div className="stat-tiles">
-            <section className="card stat-tile" aria-labelledby="network-stat-title">
-              <h2 id="network-stat-title"><Icon name="Network" size={16} /> Network</h2>
-              <strong className="data-value">{network.ratesAvailable ? `↓ ${formatBytesPerSec(network.rxBytesPerSec)} · ↑ ${formatBytesPerSec(network.txBytesPerSec)}` : "Rates unavailable"}</strong>
-              <span className="muted">{network.connected ? `${network.name} · ${network.address}` : "Offline"}</span>
-              <div className="stat-tile__sparks" aria-hidden="true"><Sparkline values={seriesValues("netRx")} label="Network download trend" /><Sparkline values={seriesValues("netTx")} label="Network upload trend" /></div>
-            </section>
-            <section className="card stat-tile" aria-labelledby="disk-stat-title">
-              <h2 id="disk-stat-title"><Icon name="HardDrive" size={16} /> Disk activity</h2>
-              <strong className="data-value">{disk.available ? `Read ${formatBytesPerSec(disk.readBytesPerSec)} · Write ${formatBytesPerSec(disk.writeBytesPerSec)}` : "Activity unavailable"}</strong>
-              <span className="muted">{formatPercent(storagePercent)} of {formatBytes(resources.storageTotalBytes, 0)} used</span>
-              <div className="stat-tile__sparks" aria-hidden="true"><Sparkline values={seriesValues("diskRead")} label="Disk read trend" /><Sparkline values={seriesValues("diskWrite")} label="Disk write trend" /></div>
-            </section>
-          </div>
-        </div>
-      </div> : <div className="system-spec-grid">
-        <section className="card system-spec-panel" aria-labelledby="device-info-title">
-          <header className="card-header"><div><h2 id="device-info-title">Device specifications</h2><p className="muted">Hardware and identifiers exposed by Windows.</p></div><button type="button" className="text-action" aria-pressed={showIds} onClick={() => setShowIds(value => !value)}>{showIds ? "Hide IDs" : "Show IDs"}</button></header>
-          <DetailRows rows={deviceRows} />
-        </section>
-        <section className="card system-spec-panel" aria-labelledby="windows-info-title">
-          <header className="card-header"><div><h2 id="windows-info-title">Windows specifications</h2><p className="muted">Installed Windows edition, version, and build.</p></div></header>
-          <DetailRows rows={windowsRows} />
-        </section>
-        <section className="card system-spec-panel system-spec-panel--wide" aria-labelledby="live-info-title">
-          <header className="card-header"><div><h2 id="live-info-title">Live system status</h2><p className="muted">The same local status shown on Overview, collected in one place.</p></div></header>
-          <DetailRows rows={liveRows} />
-        </section>
-      </div>}
-      </div>
-      <p className="system-privacy-note inline-caption"><Icon name="ShieldCheck" size={15} /> Read locally from Windows, the Java runtime, and the workspace drive. No administrator access is requested.</p>
-    </div></Page>
-  );
+  const deviceSection = full => <VStack as="section" gap={2} aria-labelledby="system-device-title">
+    <SectionHeading id="system-device-title" title="Device">{showIdsButton}</SectionHeading>
+    <MetadataList>
+      <MetadataListItem label="Device name">{shown(system.host.name)}</MetadataListItem>
+      {full ? <MetadataListItem label="Manufacturer">{shown(device.manufacturer)}</MetadataListItem> : null}
+      {full ? <MetadataListItem label="Model">{shown(device.model)}</MetadataListItem> : null}
+      <MetadataListItem label="Processor">{shown(device.processorName)}</MetadataListItem>
+      <MetadataListItem label="Installed RAM">{formatBytes(device.installedMemoryBytes || resources.memoryTotalBytes)}</MetadataListItem>
+      {full ? <MetadataListItem label="Graphics">{graphics.map(item => item.name).join(', ')}</MetadataListItem> : null}
+      <MetadataListItem label="System type">{shown(device.systemType)}</MetadataListItem>
+      {ids}
+    </MetadataList>
+  </VStack>;
+  const windowsSection = full => <VStack as="section" gap={2} aria-labelledby="system-windows-title">
+    <SectionHeading id="system-windows-title" title="Windows" />
+    <MetadataList>
+      <MetadataListItem label="Edition">{shown(windows.edition)}</MetadataListItem>
+      <MetadataListItem label="Version">{shown(windows.version)}</MetadataListItem>
+      <MetadataListItem label="OS build">{shown(windows.build)}</MetadataListItem>
+      <MetadataListItem label="Installed on">{formatInstalledDate(windows.installedOn)}</MetadataListItem>
+      {full ? <MetadataListItem label="OS version">{shown(windows.osVersion)}</MetadataListItem> : null}
+      {full ? <MetadataListItem label="Architecture">{shown(windows.architecture)}</MetadataListItem> : null}
+    </MetadataList>
+  </VStack>;
+
+  return <Page title="System Info" detail="Live readings and device specifications." actions={headerActions}
+    status={<HStack gap={2} vAlign="center"><StatusDot variant={connected ? 'success' : 'warning'} label={connected ? 'Live Windows data' : 'Backend unavailable'} />
+      <Text type="supporting">{connected ? 'Live Windows data' : 'Backend unavailable'}</Text></HStack>}>
+    <VStack gap={6}>
+      <HStack gap={3} vAlign="center" wrap="wrap">
+        <StackItem size="fill">
+          <SegmentedControl label="System information" value={tab} onChange={setTab}>
+            <SegmentedControlItem value="live" label="Live" />
+            <SegmentedControlItem value="specs" label="Specifications" />
+          </SegmentedControl>
+        </StackItem>
+        <Button label="Copy specifications" icon={<Icon icon={icons.Copy} />} onClick={onCopy} />
+      </HStack>
+
+      {tab === 'live' ? <Grid columns={{ minWidth: 400, max: 2 }} gap={8} align="start">
+        <VStack gap={6}>
+          <VStack as="section" gap={0} aria-labelledby="system-resources-title">
+            <SectionHeading id="system-resources-title" title="Resources" />
+            <ResourceRow label="CPU" value={resources.cpuPercent} detail={processorDetail} />
+            <ResourceRow label="Memory" value={memoryPercent} detail={`${formatBytes(resources.memoryUsedBytes)} of ${formatBytes(resources.memoryTotalBytes)} in use`} />
+            <ResourceRow label="Storage" value={storagePercent} detail={`${formatBytes(resources.storageUsedBytes)} of ${formatBytes(resources.storageTotalBytes)} in use`} />
+          </VStack>
+          <VStack as="section" gap={2} aria-labelledby="system-activity-title">
+            <SectionHeading id="system-activity-title" title="Activity" />
+            <Table data={activity} columns={activityColumns} idKey="id" verticalAlign="middle" density="compact" />
+          </VStack>
+        </VStack>
+        <VStack gap={6}>
+          {deviceSection(false)}
+          {windowsSection(false)}
+        </VStack>
+      </Grid> : <Grid columns={{ minWidth: 400, max: 2 }} gap={8} align="start">
+        {deviceSection(true)}
+        {windowsSection(true)}
+        <VStack as="section" gap={2} aria-labelledby="system-status-title">
+          <SectionHeading id="system-status-title" title="Live system status" />
+          <MetadataList>
+            <MetadataListItem label="Network">{network.connected ? `${shown(network.name)}, ${shown(network.address)}` : 'Offline'}</MetadataListItem>
+            <MetadataListItem label="Battery">{battery.available ? `${battery.percent}%, ${battery.detail}` : shown(battery.detail)}</MetadataListItem>
+            <MetadataListItem label="Backend">{connected ? 'Local API connected' : 'Unavailable'}</MetadataListItem>
+            <MetadataListItem label="OpenAI">{configured ? 'Key configured' : 'API key needed'}</MetadataListItem>
+            <MetadataListItem label="Java runtime">{system.host.javaVersion ? `Java ${system.host.javaVersion}` : 'Unavailable'}</MetadataListItem>
+            <MetadataListItem label="Last refreshed">{system.capturedAt ? new Date(system.capturedAt).toLocaleString() : 'Not yet received'}</MetadataListItem>
+          </MetadataList>
+        </VStack>
+      </Grid>}
+
+      <HStack gap={2} vAlign="center">
+        <Icon icon={icons.Shield} size="sm" color="secondary" />
+        <Text type="supporting">Read locally from Windows, the Java runtime and the workspace drive. No administrator access is requested.</Text>
+      </HStack>
+    </VStack>
+  </Page>;
 }
