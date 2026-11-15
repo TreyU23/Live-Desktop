@@ -29,7 +29,7 @@ import {
   MUSIC_PROVIDERS,
   migrateMusicIntegration,
 } from "./musicProviders.js";
-import { readableAccentColor, accentForegroundColor, accentSoftColor, accentFillColor, accentFillForeground, effectiveAccentColor, normalizeHexColor, readAccentColor } from "./accentColors.js";
+import { readableAccentColor, accentForegroundColor, accentSoftColor, accentFillColor, accentFillForeground, accentPreset, readAccentPreset } from "./accentColors.js";
 import { applyCompletedControlAction, upsertAction } from "./systemControls.js";
 import { createResourceScheduler } from "./resourceScheduler.js";
 import { recordTiming } from "./performanceDiagnostics.js";
@@ -335,8 +335,11 @@ export function App() {
   const controlPending = useRef(false);
   const [profileDelete, setProfileDelete] = useState(null);
   const [profileDeleting, setProfileDeleting] = useState(false);
+  const viewChanged = useRef(false);
   useEffect(() => {
     // Move focus to the new view's heading and reset the scroll position of AppShell's content area.
+    // Not on first load: focus stays at the top of the document there.
+    if (!viewChanged.current) { viewChanged.current = true; return; }
     const main = document.querySelector('main, [role="main"]');
     const heading = main?.querySelector('h1');
     if (heading) { heading.tabIndex = -1; heading.focus({ preventScroll: true }); }
@@ -369,7 +372,8 @@ export function App() {
   const systemDark = useSyncExternalStore(subscribeColorScheme, prefersDark);
   const darkMode = appearance === "dark" || (appearance === "system" && systemDark);
   const [reduceTransparency, setReduceTransparency] = useState(() => window.localStorage.getItem(profileStorageKey(TRANSPARENCY_KEY, profileId)) === "true");
-  const [accentColor, setAccentColor] = useState(() => readAccentColor(window.localStorage, profileStorageKey(ACCENT_COLOR_KEY, profileId)));
+  const [accentId, setAccentId] = useState(() => readAccentPreset(window.localStorage, profileStorageKey(ACCENT_COLOR_KEY, profileId)));
+  const accent = accentPreset(accentId);
   const [musicIntegration, setMusicIntegration] = useState(() => readMusicIntegration(profileId));
   const musicProviderId = musicIntegration.provider;
   const musicProvider = MUSIC_PROVIDERS[musicProviderId];
@@ -399,21 +403,16 @@ export function App() {
   }, [reduceTransparency, profileId]);
 
   useEffect(() => {
-    const appliedAccent = effectiveAccentColor(accentColor, darkMode);
+    // Transitional: views still on the glass CSS read --accent; Phase 4 removes these writes.
+    const appliedAccent = accent.color || (darkMode ? "#F1F1F1" : "#1B1B1B");
     document.documentElement.style.setProperty("--accent", appliedAccent);
     document.documentElement.style.setProperty("--accent-readable", readableAccentColor(appliedAccent, darkMode));
     document.documentElement.style.setProperty("--accent-soft", accentSoftColor(appliedAccent));
     document.documentElement.style.setProperty("--accent-foreground", accentForegroundColor(appliedAccent));
     document.documentElement.style.setProperty("--accent-fill", accentFillColor(appliedAccent));
     document.documentElement.style.setProperty("--accent-fill-ink", accentFillForeground(appliedAccent));
-    window.localStorage.setItem(profileStorageKey(ACCENT_COLOR_KEY, profileId), accentColor);
-  }, [accentColor, darkMode, profileId]);
-
-  const setCustomAccentColor = (hexCode) => {
-    const normalized = normalizeHexColor(hexCode);
-    setAccentColor(normalized);
-    return normalized;
-  };
+    window.localStorage.setItem(profileStorageKey(ACCENT_COLOR_KEY, profileId), accent.id);
+  }, [accent, darkMode, profileId]);
 
   useEffect(() => {
     window.localStorage.setItem(profileStorageKey(MUSIC_CONNECTION_KEY, profileId), JSON.stringify(musicIntegration));
@@ -915,7 +914,7 @@ export function App() {
   const failedResources = Object.entries(resourceStatus).filter(([, value]) => value.error);
   const hostName = system.host?.name && system.host.name !== FALLBACK_SYSTEM.host.name ? system.host.name : "This PC";
   return (
-    <Theme theme={themes[defaultThemeSlug]} mode={appearance}>
+    <Theme theme={themes[accent.theme] || themes[defaultThemeSlug]} mode={appearance}>
     <ToastViewport position="bottomEnd" maxVisible={3}>
     <AppShell
       banner={<LifecycleBanner state={lifecycleState} />}
@@ -936,7 +935,7 @@ export function App() {
       {activeView === "conversations" ? <ConversationsView conversations={conversations} selected={selectedConversation} onSelect={selectConversation} onSend={sendMessage} busy={assistantBusy} profileName={activeProfile.name} configured={health.configured} actions={actions} onApprove={(id) => updateAction(id, "approve")} onReject={(id) => updateAction(id, "reject")} headerActions={headerActions} /> : null}
       {activeView === "music" ? <MusicView musicProvider={musicProvider} musicConnection={musicConnection} musicPlayer={musicPlayer} onMusicAction={controlMusic} onOpenMusicExternally={openMusicExternally} onOpenSettings={() => setActiveView("settings")} headerActions={headerActions} /> : null}
       {musicMounted && musicConnection.embedUrl ? <div className={`music-web-player music-web-player--${musicProviderId} ${activeView === "music" ? "" : "music-web-player--parked"}`} aria-hidden={activeView !== "music"}><iframe key={`${musicProviderId}:${musicConnection.embedUrl}`} title={`${musicProvider.name} web player`} src={musicConnection.embedUrl} allow={musicProviderId === "apple" ? "autoplay *; encrypted-media *; fullscreen *; clipboard-write" : "autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"} loading="eager" /></div> : null}
-      {activeView === "settings" ? <SettingsView activeProfile={activeProfile} onManageProfiles={() => setProfileMenuOpen(true)} onOpenApprovals={() => setActiveView("approvals")} onRestart={() => runLifecycle("restart")} onShutdown={() => setShutdownOpen(true)} lifecycleBusy={lifecycleState !== "idle"} phone={phone} onOpenPhone={openPhone} headerActions={headerActions} reduceTransparency={reduceTransparency} onReduceTransparencyChange={setReduceTransparency} darkMode={darkMode} onDarkModeChange={(dark) => setAppearance(dark ? "dark" : "light")} accentColor={accentColor} onAccentColorChange={setAccentColor} onCustomAccentColorChange={setCustomAccentColor} calendar={calendar} onConnectCalendar={connectICloudCalendar} onDisconnectCalendar={disconnectICloudCalendar} musicProviderId={musicProviderId} musicConnection={musicConnection} musicPlayer={musicPlayer} onMusicProviderChange={switchMusicProvider} onSaveMusic={saveMusicConnection} onDisconnectMusic={disconnectMusic} onRefreshMusic={() => refreshMusicPlayer(true)} onOpenMusic={() => setActiveView("music")} openAiSettings={openAiSettings} onSaveOpenAiKey={saveOpenAiKey} onDeleteOpenAiKey={deleteOpenAiKey} /> : null}
+      {activeView === "settings" ? <SettingsView activeProfile={activeProfile} onManageProfiles={() => setProfileMenuOpen(true)} onOpenApprovals={() => setActiveView("approvals")} onRestart={() => runLifecycle("restart")} onShutdown={() => setShutdownOpen(true)} lifecycleBusy={lifecycleState !== "idle"} phone={phone} onOpenPhone={openPhone} headerActions={headerActions} reduceTransparency={reduceTransparency} onReduceTransparencyChange={setReduceTransparency} appearance={appearance} onAppearanceChange={setAppearance} accentId={accent.id} onAccentChange={setAccentId} calendar={calendar} onConnectCalendar={connectICloudCalendar} onDisconnectCalendar={disconnectICloudCalendar} musicProviderId={musicProviderId} musicConnection={musicConnection} musicPlayer={musicPlayer} onMusicProviderChange={switchMusicProvider} onSaveMusic={saveMusicConnection} onDisconnectMusic={disconnectMusic} onRefreshMusic={() => refreshMusicPlayer(true)} onOpenMusic={() => setActiveView("music")} openAiSettings={openAiSettings} onSaveOpenAiKey={saveOpenAiKey} onDeleteOpenAiKey={deleteOpenAiKey} /> : null}
     </AppShell>
     <ProfileDialog isOpen={profileMenuOpen} onOpenChange={setProfileMenuOpen} profiles={profiles} activeProfile={activeProfile} onProfilesChange={updateProfiles} onSwitch={switchProfile}
       onDelete={(id) => { setProfileMenuOpen(false); setProfileDelete(profiles.find(profile => profile.id === id)); }} />

@@ -4,8 +4,9 @@
 // prettier-ignore
 export const liveDesktopBluePaletteRefs = {
   accent: {
-    light: {35: '#0050a3', 55: '#0a84ff', 85: '#b9d7ff'},
-    dark: {30: '#00448d', 55: '#0a84ff', 80: '#a1caff'},
+    light: {35: '#0050a2', 50: '#0074e2', 85: '#b9d7ff'},
+    dark: {30: '#00458d', 50: '#0074e2', 80: '#a1caff'},
   },
+  white: '#ffffff',
   black: '#000000',
 };

@@ -1,12 +1,46 @@
 export const DEFAULT_ACCENT_COLOR = "#0A84FF";
 
+// Accent presets (decision 4): each is a built Astryx theme added with `astryx theme add`.
+// Neutral is the theme default and has no hue of its own. `swatch` is an Astryx Icon color name.
 export const ACCENT_PRESETS = [
-  { id: "blue", label: "Blue", color: DEFAULT_ACCENT_COLOR },
-  { id: "red", label: "Red", color: "#EF4444" },
-  { id: "green", label: "Green", color: "#22C55E" },
-  { id: "purple", label: "Purple", color: "#A855F7" },
-  { id: "black", label: "Black", color: "#000000" },
+  { id: "neutral", label: "Neutral", color: null, theme: "live-desktop", swatch: "primary" },
+  { id: "blue", label: "Blue", color: "#0074E2", theme: "live-desktop-blue", swatch: "blue" },
+  { id: "green", label: "Green", color: "#198100", theme: "live-desktop-green", swatch: "green" },
+  { id: "orange", label: "Orange", color: "#D57113", theme: "live-desktop-orange", swatch: "orange" },
+  { id: "red", label: "Red", color: "#D62830", theme: "live-desktop-red", swatch: "red" },
 ];
+export const DEFAULT_ACCENT_PRESET = "neutral";
+
+function channels(value) {
+  const color = normalizeHexColor(value);
+  return [1, 3, 5].map(start => Number.parseInt(color.slice(start, start + 2), 16));
+}
+
+// A custom hex saved by the glass UI maps to the closest preset: low-saturation colors
+// (black, white, greys) become Neutral, everything else the nearest hue by RGB distance.
+export function nearestAccentPreset(value) {
+  const rgb = channels(value);
+  const saturation = (Math.max(...rgb) - Math.min(...rgb)) / 255;
+  if (saturation < 0.2) return DEFAULT_ACCENT_PRESET;
+  let best = DEFAULT_ACCENT_PRESET; let bestDistance = Infinity;
+  for (const preset of ACCENT_PRESETS) {
+    if (!preset.color) continue;
+    const distance = channels(preset.color).reduce((sum, channel, index) => sum + (channel - rgb[index]) ** 2, 0);
+    if (distance < bestDistance) { best = preset.id; bestDistance = distance; }
+  }
+  return best;
+}
+
+export function accentPreset(id) {
+  return ACCENT_PRESETS.find(preset => preset.id === id) || ACCENT_PRESETS[0];
+}
+
+// Saved value is a preset id; an older hex value is migrated to its nearest preset.
+export function readAccentPreset(storage, key) {
+  const saved = storage.getItem(key);
+  if (ACCENT_PRESETS.some(preset => preset.id === saved)) return saved;
+  try { return saved ? nearestAccentPreset(saved) : DEFAULT_ACCENT_PRESET; } catch { return DEFAULT_ACCENT_PRESET; }
+}
 
 export function normalizeHexColor(value) {
   const candidate = String(value || "").trim();

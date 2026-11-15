@@ -31,7 +31,7 @@ export function EmptyState({ icon, title, detail, children }) {
 
 // Transitional: legacy views keep their class names inside the Astryx page frame until each view moves.
 export function ViewShell({ title, detail, actions, className = "", children }) {
-  return <Page title={title} detail={detail} actions={actions}><div className={`view-shell ${className}`.trim()}>{children}</div></Page>;
+  return <Page title={title} detail={detail} actions={actions}><div className={`legacy view-shell ${className}`.trim()}>{children}</div></Page>;
 }
 
 export function InfoLine({ icon, label, value, healthy }) {

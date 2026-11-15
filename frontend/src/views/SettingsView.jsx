@@ -1,201 +1,204 @@
 import { useEffect, useState } from 'react';
-import { Icon } from '../components/ui/index.jsx';
+import { FaCircle } from 'react-icons/fa6';
+import { Avatar } from '@astryxdesign/core/Avatar';
+import { Banner } from '@astryxdesign/core/Banner';
+import { Button } from '@astryxdesign/core/Button';
+import { Icon } from '@astryxdesign/core/Icon';
+import { HStack, StackItem, VStack } from '@astryxdesign/core/Layout';
+import { Link } from '@astryxdesign/core/Link';
+import { List, ListItem } from '@astryxdesign/core/List';
+import { SegmentedControl, SegmentedControlItem } from '@astryxdesign/core/SegmentedControl';
+import { StatusDot } from '@astryxdesign/core/StatusDot';
+import { Switch } from '@astryxdesign/core/Switch';
+import { Text } from '@astryxdesign/core/Text';
+import { TextInput } from '@astryxdesign/core/TextInput';
+import { useMediaQuery } from '@astryxdesign/core/hooks';
 import { Page } from '../components/shell/Page.jsx';
+import { SettingRow, SettingSection } from '../components/ui/SettingRow.jsx';
+import { icons } from '../components/ui/icons.js';
 import { formatRelativeTime } from '../presentation/formatters.js';
 import { MUSIC_PROVIDERS, normalizeMusicUrl } from '../musicProviders.js';
-import { ACCENT_PRESETS, effectiveAccentColor } from '../accentColors.js';
-export function SettingsView({ activeProfile, onManageProfiles, onOpenApprovals, onRestart, onShutdown, lifecycleBusy, phone, onOpenPhone, headerActions, reduceTransparency, onReduceTransparencyChange, darkMode, onDarkModeChange, accentColor, onAccentColorChange, onCustomAccentColorChange, calendar, onConnectCalendar, onDisconnectCalendar, musicProviderId, musicConnection, musicPlayer, onMusicProviderChange, onSaveMusic, onDisconnectMusic, onRefreshMusic, onOpenMusic, openAiSettings, onSaveOpenAiKey, onDeleteOpenAiKey }) {
+import { ACCENT_PRESETS } from '../accentColors.js';
+
+const kSections = [
+  { id: 'settings-profile', label: 'Profile' },
+  { id: 'settings-appearance', label: 'Appearance' },
+  { id: 'settings-assistant', label: 'Assistant' },
+  { id: 'settings-connections', label: 'Connections' },
+  { id: 'settings-services', label: 'Live Desktop services' },
+];
+
+function StateLabel({ tone, children }) {
+  return <HStack gap={2} vAlign="center"><StatusDot variant={tone} label={String(children)} /><Text type="supporting">{children}</Text></HStack>;
+}
+
+export function SettingsView({ activeProfile, onManageProfiles, onOpenApprovals, onRestart, onShutdown, lifecycleBusy, phone, onOpenPhone, headerActions, reduceTransparency, onReduceTransparencyChange, appearance, onAppearanceChange, accentId, onAccentChange, calendar, onConnectCalendar, onDisconnectCalendar, musicProviderId, musicConnection, musicPlayer, onMusicProviderChange, onSaveMusic, onDisconnectMusic, onRefreshMusic, onOpenMusic, openAiSettings, onSaveOpenAiKey, onDeleteOpenAiKey }) {
+  const isWide = useMediaQuery('(min-width: 1024px)');
   const musicProvider = MUSIC_PROVIDERS[musicProviderId];
-  const [musicUrl, setMusicUrl] = useState(musicConnection.sourceUrl || "");
-  const [error, setError] = useState("");
-  const [calendarEmail, setCalendarEmail] = useState(calendar.email || "");
-  const [calendarPassword, setCalendarPassword] = useState("");
-  const [calendarError, setCalendarError] = useState("");
+  const [musicUrl, setMusicUrl] = useState(musicConnection.sourceUrl || '');
+  const [musicError, setMusicError] = useState('');
+  const [calendarEmail, setCalendarEmail] = useState(calendar.email || '');
+  const [calendarPassword, setCalendarPassword] = useState('');
+  const [calendarError, setCalendarError] = useState('');
   const [calendarBusy, setCalendarBusy] = useState(false);
-  const [openAiKey, setOpenAiKey] = useState("");
-  const [openAiBusy, setOpenAiBusy] = useState(false);
-  const [openAiError, setOpenAiError] = useState("");
-  const [customAccent, setCustomAccent] = useState(accentColor);
-  const [accentError, setAccentError] = useState("");
   const [calendarFormOpen, setCalendarFormOpen] = useState(false);
+  const [openAiKey, setOpenAiKey] = useState('');
+  const [openAiBusy, setOpenAiBusy] = useState(false);
+  const [openAiError, setOpenAiError] = useState('');
 
-  useEffect(() => {
-    setMusicUrl(musicConnection.sourceUrl || "");
-    setError("");
-  }, [musicConnection.sourceUrl, musicProviderId]);
+  useEffect(() => { setMusicUrl(musicConnection.sourceUrl || ''); setMusicError(''); }, [musicConnection.sourceUrl, musicProviderId]);
 
-  useEffect(() => {
-    setCustomAccent(accentColor);
-    setAccentError("");
-  }, [accentColor]);
-
-  const saveMusic = (event) => {
-    event.preventDefault();
+  const saveMusic = () => {
     try {
       const embedUrl = normalizeMusicUrl(musicProviderId, musicUrl);
       onSaveMusic({ sourceUrl: musicUrl.trim(), embedUrl });
-      setError("");
-    } catch (urlError) {
-      setError(urlError.message);
-    }
+      setMusicError('');
+    } catch (urlError) { setMusicError(urlError.message); }
   };
-
-  const connectCalendar = async (event) => {
-    event.preventDefault();
-    setCalendarBusy(true);
-    setCalendarError("");
-    try {
-      await onConnectCalendar(calendarEmail, calendarPassword);
-      setCalendarPassword("");
-    } catch (connectionError) {
-      setCalendarError(connectionError.message);
-    } finally {
-      setCalendarBusy(false);
-    }
-  };
-
-  const removeOpenAiKey = async () => {
-    if (openAiBusy) return;
-    setOpenAiBusy(true); setOpenAiError('');
-    try { await onDeleteOpenAiKey(); } catch (error) { setOpenAiError(error.message); }
-    finally { setOpenAiBusy(false); }
+  const connectCalendar = async () => {
+    if (calendarBusy || !calendarEmail.trim() || !calendarPassword) return;
+    setCalendarBusy(true); setCalendarError('');
+    try { await onConnectCalendar(calendarEmail, calendarPassword); setCalendarPassword(''); }
+    catch (connectionError) { setCalendarError(connectionError.message); }
+    finally { setCalendarBusy(false); }
   };
   const disconnectCalendar = async () => {
     if (calendarBusy) return;
     setCalendarBusy(true); setCalendarError('');
     try { if (await onDisconnectCalendar() === false) setCalendarError('Could not disconnect iCloud. Try again.'); }
-    catch (error) { setCalendarError(error.message); }
+    catch (disconnectError) { setCalendarError(disconnectError.message); }
     finally { setCalendarBusy(false); }
   };
-
-  const saveOpenAi = async (event) => {
-    event.preventDefault(); setOpenAiBusy(true); setOpenAiError("");
-    try { await onSaveOpenAiKey(openAiKey); setOpenAiKey(""); } catch (keyError) { setOpenAiError(keyError.message); } finally { setOpenAiBusy(false); }
+  const saveOpenAi = async () => {
+    if (openAiBusy || !openAiKey.trim()) return;
+    setOpenAiBusy(true); setOpenAiError('');
+    try { await onSaveOpenAiKey(openAiKey); setOpenAiKey(''); } catch (keyError) { setOpenAiError(keyError.message); } finally { setOpenAiBusy(false); }
   };
-  const applyCustomAccent = (event) => {
-    event.preventDefault();
-    try { const normalized = onCustomAccentColorChange(customAccent); setCustomAccent(normalized); setAccentError(""); } catch (colorError) { setAccentError(colorError.message); }
+  const removeOpenAiKey = async () => {
+    if (openAiBusy) return;
+    setOpenAiBusy(true); setOpenAiError('');
+    try { await onDeleteOpenAiKey(); } catch (keyError) { setOpenAiError(keyError.message); } finally { setOpenAiBusy(false); }
   };
-  const tile = (icon, color) => <span className="tile tile--32" style={{ "--tile-color": color }} aria-hidden="true"><Icon name={icon} size={17} strokeWidth={2} /></span>;
+  const jumpTo = id => document.getElementById(id)?.scrollIntoView({ block: 'start' });
 
-  return (
-    <Page title="Settings" detail="Connect services and choose how Live Desktop looks. Preferences and credentials stay local to this PC." actions={headerActions}><div className="view-shell settings-view">
-      <div className="settings-column">
-        <section className="card settings-profile" aria-labelledby="settings-profile-title">
-          <img src={activeProfile.avatar} alt="" />
-          <div><h2 id="settings-profile-title">{activeProfile.name}</h2><span className="muted">Profile stored on this PC · Not a sign-in</span></div>
-          <button type="button" onClick={onManageProfiles}>Manage Profiles…</button>
-        </section>
+  const sections = <VStack gap={8} maxWidth={720}>
+    <SettingSection id="settings-profile" title="Profile">
+      <SettingRow isLast title={activeProfile.name} description="Profiles keep settings, conversations and connections separate on this PC. They are not sign-ins.">
+        <Avatar src={activeProfile.avatar} name={activeProfile.name} size="sm" tooltip={false} />
+        <Button label="Manage profiles…" onClick={onManageProfiles} />
+      </SettingRow>
+    </SettingSection>
 
-        <section className="settings-section" aria-labelledby="appearance-title">
-          <h2 id="appearance-title" className="settings-section__title">Appearance</h2>
-          <div className="group">
-            <div className="settings-row settings-row--stack">
-              <span className="settings-row__label">{tile(darkMode ? "Moon" : "Sun", "#5E5CE6")}<span>Theme<small>Saved for this profile</small></span></span>
-              <div className="theme-swatches" role="radiogroup" aria-label="Theme">
-                {[{ id: "light", label: "Light", dark: false }, { id: "dark", label: "Dark", dark: true }].map(option => (
-                  <button key={option.id} type="button" role="radio" aria-checked={darkMode === option.dark} className={`theme-swatch theme-swatch--${option.id}`} onClick={() => onDarkModeChange(option.dark)}>
-                    <span className="theme-swatch__preview" aria-hidden="true"><i /><i /></span><span>{option.label}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
-            <div className="settings-row">
-              <span className="settings-row__label">{tile("Layers3", "#636366")}<span id="reduce-transparency-label">Reduce transparency<small>Solid surfaces without glass, glow or wallpaper. Also follows the system setting.</small></span></span>
-              <button type="button" className="switch" role="switch" aria-checked={reduceTransparency} aria-labelledby="reduce-transparency-label" onClick={() => onReduceTransparencyChange(!reduceTransparency)}><span className="switch__track" /></button>
-            </div>
-            <div className="settings-row settings-row--stack">
-              <span className="settings-row__label">{tile("Sparkles", "#0A84FF")}<span>Accent color<small>Buttons, links, selection and focus rings</small></span></span>
-              <div className="accent-presets" role="group" aria-label="Accent presets">
-                {ACCENT_PRESETS.map((preset) => (
-                  <button className={`accent-swatch ${accentColor === preset.color ? "active" : ""}`} data-color={preset.id} key={preset.id} type="button" aria-label={`Use ${preset.label} accent`} aria-pressed={accentColor === preset.color} title={preset.label} onClick={() => onAccentColorChange(preset.color)}>
-                    <span style={{ backgroundColor: effectiveAccentColor(preset.color, darkMode) }}>{accentColor === preset.color ? <Icon name="Check" size={14} strokeWidth={3} /> : null}</span>
-                  </button>
-                ))}
-              </div>
-              <form className="custom-accent-form" onSubmit={applyCustomAccent}>
-                <label htmlFor="custom-accent-color">Custom hex color</label>
-                <div className="field-row"><span className="custom-accent-preview" aria-hidden="true" style={{ backgroundColor: effectiveAccentColor(/^#[0-9a-f]{6}$/i.test(customAccent) ? customAccent : accentColor, darkMode) }} /><input id="custom-accent-color" value={customAccent} onChange={(event) => { setCustomAccent(event.target.value); setAccentError(""); }} placeholder="#0A84FF" spellCheck="false" autoComplete="off" /><button type="submit">Apply</button></div>
-                {accentError ? <p className="form-error" role="alert">{accentError}</p> : <small className="form-hint">Enter a 3- or 6-digit hex code. Text and focus colors are adjusted automatically to stay readable.</small>}
-              </form>
-            </div>
-          </div>
-        </section>
+    <SettingSection id="settings-appearance" title="Appearance">
+      <SettingRow title="Theme" description="System follows the Windows light or dark setting. Saved for this profile.">
+        <SegmentedControl label="Theme" value={appearance} onChange={onAppearanceChange}>
+          <SegmentedControlItem value="light" label="Light" icon={<Icon icon={icons.Sun} />} />
+          <SegmentedControlItem value="dark" label="Dark" icon={<Icon icon={icons.Moon} />} />
+          <SegmentedControlItem value="system" label="System" icon={<Icon icon={icons.Monitor} />} />
+        </SegmentedControl>
+      </SettingRow>
+      <SettingRow title="Reduce transparency" description="Solid surfaces on views that still use the glass styles.">
+        <Switch label="Reduce transparency" isLabelHidden value={reduceTransparency} onChange={onReduceTransparencyChange} />
+      </SettingRow>
+      <SettingRow isLast title="Accent" description="Neutral is the theme default. Other accents are applied through the theme.">
+        <SegmentedControl label="Accent" value={accentId} onChange={onAccentChange}>
+          {ACCENT_PRESETS.map(preset => <SegmentedControlItem key={preset.id} value={preset.id} label={preset.label}
+            icon={<Icon icon={FaCircle} color={preset.swatch} size="xsm" />} />)}
+        </SegmentedControl>
+      </SettingRow>
+    </SettingSection>
 
-        <section className="settings-section" aria-labelledby="assistant-title">
-          <h2 id="assistant-title" className="settings-section__title">Assistant</h2>
-          <div className="group">
-            <div className="settings-row settings-row--stack" aria-labelledby="openai-key-title">
-              <span className="settings-row__label">{tile("Bot", "#30A14E")}<span id="openai-key-title">OpenAI API key<small>Only this local profile uses it. Protected with Windows data protection.</small></span><span className={`connection-pill ${openAiSettings.openAiConfigured ? "connection-pill--on" : ""}`}>{openAiSettings.openAiConfigured ? "Key configured" : "Not set"}</span></span>
-              <form className="profile-key-form" onSubmit={saveOpenAi}>
-                <label className="visually-hidden" htmlFor="openai-api-key">API key</label>
-                <div className="field-row"><input id="openai-api-key" type="password" value={openAiKey} onChange={(event) => setOpenAiKey(event.target.value)} autoComplete="off" placeholder={openAiSettings.profileApiKey ? "Profile key saved" : "sk-..."} required /><button className="btn-primary" type="submit" disabled={openAiBusy}>{openAiBusy ? "Saving…" : openAiSettings.profileApiKey ? "Replace key" : "Save key"}</button>{openAiSettings.profileApiKey ? <button type="button" className="btn-danger" disabled={openAiBusy} onClick={removeOpenAiKey}>Remove</button> : null}</div>
-                <small className="form-hint">The key is never returned to the browser after saving.</small>{openAiError ? <p className="form-error" role="alert">{openAiError}</p> : null}
-              </form>
-            </div>
-            <div className="settings-row">
-              <span className="settings-row__label">{tile("Shield", "#C66A00")}<span>Remembered approvals<small>Approving an action also allows matching requests later.</small></span></span>
-              <button type="button" className="text-action" onClick={onOpenApprovals}>Review <Icon name="ChevronRight" size={14} /></button>
-            </div>
-          </div>
-        </section>
+    <SettingSection id="settings-assistant" title="Assistant">
+      <SettingRow title="OpenAI API key"
+        description="Only this local profile uses it. Protected with Windows data protection and never returned to the browser after saving."
+        details={<HStack gap={2} vAlign="end" wrap="wrap">
+          <StackItem size="fill">
+            <TextInput type="password" label="API key" value={openAiKey} onChange={setOpenAiKey} onEnter={saveOpenAi} autoComplete="off"
+              placeholder={openAiSettings.profileApiKey ? 'Profile key saved' : 'sk-…'} status={openAiError ? { type: 'error', message: openAiError } : undefined} />
+          </StackItem>
+          <Button label={openAiBusy ? 'Saving…' : openAiSettings.profileApiKey ? 'Replace key' : 'Save key'} variant="primary" isLoading={openAiBusy} isDisabled={!openAiKey.trim()} onClick={saveOpenAi} />
+          {openAiSettings.profileApiKey ? <Button label="Remove key" variant="destructive" isDisabled={openAiBusy} onClick={removeOpenAiKey} /> : null}
+        </HStack>}>
+        <StateLabel tone={openAiSettings.openAiConfigured ? 'success' : 'warning'}>{openAiSettings.openAiConfigured ? 'Key configured' : 'Not set'}</StateLabel>
+      </SettingRow>
+      <SettingRow isLast title="Remembered approvals" description="Allowing an action also allows matching requests later.">
+        <Button label="Review approvals" endContent={<Icon icon={icons.ChevronRight} />} onClick={onOpenApprovals} />
+      </SettingRow>
+    </SettingSection>
 
-        <section className="settings-section" aria-labelledby="connections-title">
-          <h2 id="connections-title" className="settings-section__title">Connections</h2>
-          <div className="group">
-            <div className="settings-row settings-row--stack" aria-labelledby="icloud-calendar-title">
-              <span className="settings-row__label">{tile("CalendarDays", "#E0284A")}<span id="icloud-calendar-title">iCloud Calendar<small>{calendar.connected ? [calendar.email, calendar.detail, `Last refreshed ${formatRelativeTime(calendar.capturedAt)}`].filter(Boolean).join(" · ") : "Sync your Apple calendars into the Overview day view."}</small></span>
-                {calendar.connected ? <button type="button" disabled={calendarBusy} onClick={disconnectCalendar}>Disconnect</button> : <button type="button" aria-expanded={calendarFormOpen} aria-controls="icloud-connect-form" onClick={() => setCalendarFormOpen(open => !open)}>{calendarFormOpen ? "Cancel" : "Connect…"}</button>}
-              </span>
-              {!calendar.connected && calendarFormOpen ? (
-                <form id="icloud-connect-form" className="icloud-connect-form" onSubmit={connectCalendar}>
-                  <div className="field"><label htmlFor="icloud-email">Apple Account email</label><input id="icloud-email" type="email" value={calendarEmail} onChange={(event) => { setCalendarEmail(event.target.value); setCalendarError(""); }} autoComplete="username" placeholder="you@icloud.com" required /></div>
-                  <div className="field"><label htmlFor="icloud-app-password">App-specific password</label><input id="icloud-app-password" type="password" value={calendarPassword} onChange={(event) => { setCalendarPassword(event.target.value); setCalendarError(""); }} autoComplete="new-password" placeholder="xxxx-xxxx-xxxx-xxxx" required /></div>
-                  <div className="field-row"><button className="btn-primary" type="submit" disabled={calendarBusy}>{calendarBusy ? "Connecting…" : "Connect iCloud Calendar"}</button><a className="text-action" href="https://account.apple.com/account/manage" target="_blank" rel="noreferrer">Create an app-specific password <Icon name="ExternalLink" size={13} /></a></div>
-                  <small className="form-hint">Use an app-specific password from Apple—never your regular Apple Account password. It is encrypted with Windows data protection and stays on this PC.</small>
-                  {calendarError ? <p className="form-error" role="alert">{calendarError}</p> : null}
-                </form>
-              ) : null}
-              {calendar.connected && calendarError ? <p className="form-error" role="alert">{calendarError}</p> : null}
-            </div>
+    <SettingSection id="settings-connections" title="Connections">
+      <SettingRow title="iCloud Calendar"
+        description={calendar.connected ? [calendar.email, calendar.detail, `Last refreshed ${formatRelativeTime(calendar.capturedAt)}`].filter(Boolean).join(' · ') : 'Sync your Apple calendars into the Overview day view.'}
+        details={!calendar.connected && calendarFormOpen ? <VStack gap={3}>
+          <TextInput type="email" label="Apple Account email" value={calendarEmail} onChange={value => { setCalendarEmail(value); setCalendarError(''); }} autoComplete="username" placeholder="you@icloud.com" isRequired />
+          <TextInput type="password" label="App-specific password" value={calendarPassword} onChange={value => { setCalendarPassword(value); setCalendarError(''); }} onEnter={connectCalendar}
+            autoComplete="new-password" placeholder="xxxx-xxxx-xxxx-xxxx" isRequired
+            description="Use an app-specific password from Apple, never your regular Apple Account password. It is encrypted with Windows data protection and stays on this PC."
+            status={calendarError ? { type: 'error', message: calendarError } : undefined} />
+          <HStack gap={3} vAlign="center" wrap="wrap">
+            <Button label={calendarBusy ? 'Connecting…' : 'Connect iCloud Calendar'} variant="primary" isLoading={calendarBusy} isDisabled={!calendarEmail.trim() || !calendarPassword} onClick={connectCalendar} />
+            <Link href="https://account.apple.com/account/manage" isExternalLink>Create an app-specific password</Link>
+          </HStack>
+        </VStack> : calendar.connected && calendarError ? <Banner status="error" title={calendarError} /> : null}>
+        <StateLabel tone={calendar.connected ? calendar.status === 'error' ? 'warning' : 'success' : 'neutral'}>{calendar.connected ? calendar.status === 'error' ? 'Sync error' : 'Connected' : 'Not connected'}</StateLabel>
+        {calendar.connected
+          ? <Button label="Disconnect" isLoading={calendarBusy} onClick={disconnectCalendar} />
+          : <Button label={calendarFormOpen ? 'Cancel' : 'Connect…'} aria-expanded={calendarFormOpen} onClick={() => setCalendarFormOpen(open => !open)} />}
+      </SettingRow>
 
-            <div className="settings-row settings-row--stack" aria-labelledby="music-account-title">
-              <span className="settings-row__label"><span className="tile tile--32 tile--device" aria-hidden="true"><img src={musicProvider.icon} alt="" /></span><span id="music-account-title">Music service<small>Powers the Now Playing card and the Music view. No developer credentials required.</small></span></span>
-              <div className="segmented music-provider-picker" role="radiogroup" aria-label="Music service">
-                {Object.values(MUSIC_PROVIDERS).map((provider) => (
-                  <button key={provider.id} type="button" role="radio" aria-checked={provider.id === musicProviderId} onClick={() => onMusicProviderChange(provider.id)}>
-                    <img src={provider.icon} alt="" />{provider.name}
-                  </button>
-                ))}
-              </div>
-              <div className="music-auth-row">
-                <span><strong>Windows media session</strong><small className="form-hint">{musicPlayer.available ? `${musicPlayer.title} · ${musicPlayer.detail}` : musicPlayer.detail}</small></span>
-                <button type="button" onClick={onRefreshMusic}><Icon name="RefreshCw" size={15} /> Refresh status</button>
-              </div>
-              <form className="music-link-form" onSubmit={saveMusic}>
-                <label htmlFor="music-service-url">{musicProvider.linkLabel}</label>
-                <div className="field-row"><input id="music-service-url" type="url" value={musicUrl} onChange={(event) => setMusicUrl(event.target.value)} placeholder={musicProvider.placeholder} required /><button type="submit">Connect link</button></div>
-                <small className="form-hint">Sign in only inside {musicProvider.name}’s player. In {musicProvider.name}, choose Share, copy the link, and paste it here. Start a track once; Live Desktop then reads the song and sends playback commands locally through Windows.</small>
-                {error ? <p className="form-error" role="alert">{error}</p> : null}
-              </form>
-              <div className="field-row connected-actions"><button className="btn-primary" type="button" onClick={onOpenMusic}><Icon name="Music2" size={16} /> Open full player</button><a className="btn-pill" href={musicProvider.externalUrl} target="_blank" rel="noreferrer"><Icon name="ExternalLink" size={15} /> Open {musicProvider.name} externally</a>{musicConnection.embedUrl ? <button className="text-action text-action--danger" type="button" onClick={onDisconnectMusic}>Disconnect {musicProvider.contentLabel}</button> : null}</div>
-            </div>
+      <SettingRow title="Music service" description="One provider at a time. Powers Now Playing and the Music view. No developer account needed."
+        details={<VStack gap={3}>
+          <HStack gap={3} vAlign="center" wrap="wrap">
+            <StackItem size="fill">
+              <VStack gap={0.5}>
+                <Text weight="medium">Windows media session</Text>
+                <Text type="supporting">{musicPlayer.available ? `${musicPlayer.title} · ${musicPlayer.detail}` : musicPlayer.detail}</Text>
+              </VStack>
+            </StackItem>
+            <Button label="Refresh status" icon={<Icon icon={icons.Refresh} />} onClick={onRefreshMusic} />
+          </HStack>
+          <HStack gap={2} vAlign="end" wrap="wrap">
+            <StackItem size="fill">
+              <TextInput type="url" label={musicProvider.linkLabel} value={musicUrl} onChange={setMusicUrl} onEnter={saveMusic} placeholder={musicProvider.placeholder}
+                description={`Sign in only inside ${musicProvider.name}'s player. In ${musicProvider.name}, choose Share, copy the link, and paste it here.`}
+                status={musicError ? { type: 'error', message: musicError } : undefined} />
+            </StackItem>
+            <Button label="Connect link" isDisabled={!musicUrl.trim()} onClick={saveMusic} />
+          </HStack>
+          <HStack gap={2} wrap="wrap">
+            <Button label="Open full player" variant="primary" icon={<Icon icon={icons.Music} />} onClick={onOpenMusic} />
+            <Button label={`Open ${musicProvider.name} externally`} icon={<Icon icon={icons.ExternalLink} />} href={musicProvider.externalUrl} target="_blank" rel="noreferrer" />
+            {musicConnection.embedUrl ? <Button label={`Disconnect ${musicProvider.contentLabel}`} variant="ghost" onClick={onDisconnectMusic} /> : null}
+          </HStack>
+        </VStack>}>
+        <SegmentedControl label="Music service" value={musicProviderId} onChange={onMusicProviderChange}>
+          {Object.values(MUSIC_PROVIDERS).map(provider => <SegmentedControlItem key={provider.id} value={provider.id} label={provider.name} />)}
+        </SegmentedControl>
+      </SettingRow>
 
-            <div className="settings-row">
-              <span className="settings-row__label">{tile("Smartphone", "#636366")}<span>Phone Link<small>{phone?.installed ? phone.detail || "Installed" : "Phone Link setup available"}</small></span></span>
-              <button type="button" onClick={onOpenPhone} disabled={!phone?.installed}>Open externally <Icon name="ExternalLink" size={14} /></button>
-            </div>
-          </div>
-        </section>
+      <SettingRow isLast title="Phone Link" description={phone?.installed ? phone.detail || 'Installed' : 'Phone Link setup available'}>
+        <Button label="Open Phone Link externally" icon={<Icon icon={icons.ExternalLink} />} isDisabled={!phone?.installed} onClick={onOpenPhone} />
+      </SettingRow>
+    </SettingSection>
 
-        <section className="settings-section" aria-labelledby="power-title">
-          <h2 id="power-title" className="settings-section__title">Live Desktop services</h2>
-          <div className="group">
-            <div className="settings-row"><span className="settings-row__label">{tile("RotateCw", "#636366")}<span>Restart Live Desktop<small>Restarts the frontend and backend. Windows keeps running.</small></span></span><button type="button" onClick={onRestart} disabled={lifecycleBusy}>Restart</button></div>
-            <div className="settings-row"><span className="settings-row__label">{tile("Power", "#C8202F")}<span>Shut down Live Desktop<small>Stops the frontend and backend. It does not shut down Windows.</small></span></span><button type="button" className="btn-danger" onClick={onShutdown} disabled={lifecycleBusy}>Shut Down…</button></div>
-          </div>
-        </section>
-      </div>
-    </div></Page>
-  );
+    <SettingSection id="settings-services" title="Live Desktop services">
+      <SettingRow title="Restart Live Desktop" description="Restarts the local frontend and backend services. Windows keeps running.">
+        <Button label="Restart" icon={<Icon icon={icons.Restart} />} isDisabled={lifecycleBusy} onClick={onRestart} />
+      </SettingRow>
+      <SettingRow isLast title="Stop Live Desktop" description="Stops the local services until you run start.cmd again. It does not shut down Windows.">
+        <Button label="Stop…" variant="destructive" icon={<Icon icon={icons.Power} />} isDisabled={lifecycleBusy} onClick={onShutdown} />
+      </SettingRow>
+    </SettingSection>
+  </VStack>;
+
+  return <Page title="Settings" detail="Preferences and connections for this profile, stored only on this PC." actions={headerActions}>
+    {isWide ? <HStack gap={8} vAlign="start">
+      <StackItem>
+        <List density="compact" header={<Text type="label" color="secondary">Sections</Text>}>
+          {kSections.map(section => <ListItem key={section.id} label={section.label} onClick={() => jumpTo(section.id)} />)}
+        </List>
+      </StackItem>
+      <StackItem size="fill">{sections}</StackItem>
+    </HStack> : sections}
+  </Page>;
 }

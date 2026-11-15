@@ -184,20 +184,32 @@ try {
   await page.getByRole('menu').waitFor();
   await page.keyboard.press('Escape');
   assert.equal(await profileTrigger.evaluate(element => element === document.activeElement), true);
+  // Appearance: Light / Dark / System per profile; accents are built themes, chosen by preset.
+  // Tokens are light-dark() pairs, so resolve the accent through a probe element's computed color.
+  const accentToken = () => page.getByRole('main').evaluate(element => {
+    const probe = document.createElement('i'); probe.style.color = 'var(--color-accent)'; element.append(probe);
+    const color = getComputedStyle(probe).color; probe.remove(); return color;
+  });
   await navigate('Settings');
   await page.getByRole('radio', { name: 'Light', exact: true }).click();
-  await page.getByRole('textbox', { name: 'Custom hex color' }).fill('#FFFF00');
-  await page.getByRole('button', { name: 'Apply', exact: true }).click();
-  assert.equal(await page.evaluate(() => localStorage.getItem('live-desktop.accent-color.default')), '#FFFF00');
-  await page.screenshot({ path: `${output}/settings-light-yellow.png` });
+  await page.getByRole('radio', { name: 'Blue', exact: true }).click();
+  assert.equal(await page.evaluate(() => localStorage.getItem('live-desktop.accent-color.default')), 'blue');
+  assert.equal(await page.evaluate(() => localStorage.getItem('live-desktop.theme.default')), 'light');
+  assert.equal(await accentToken(), 'rgb(0, 116, 226)');
+  await page.screenshot({ path: `${output}/settings-light-blue.png` });
+  // A custom hex saved by the glass UI maps to the nearest preset.
+  await page.evaluate(() => localStorage.setItem('live-desktop.accent-color.default', '#FFFF00'));
   await page.reload();
-  assert.equal(await page.locator('html').getAttribute('data-theme'), 'light');
-  assert.equal(await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--accent-foreground').trim()), '#000000');
   await navigate('Settings');
+  assert.equal(await page.getByRole('radio', { name: 'Orange', exact: true }).getAttribute('aria-checked'), 'true');
+  assert.equal(await page.getByRole('radio', { name: 'Light', exact: true }).getAttribute('aria-checked'), 'true');
   await page.screenshot({ path: `${output}/settings-light-1440.png` });
   await page.getByRole('radio', { name: 'Dark', exact: true }).click();
-  await page.getByRole('button', { name: 'Use Blue accent' }).click();
-  assert.equal(await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--accent-fill-ink').trim()), '#FFFFFF');
+  await page.getByRole('radio', { name: 'Neutral', exact: true }).click();
+  assert.equal(await accentToken(), 'rgb(241, 241, 241)', 'Neutral dark accent is monochrome');
+  await page.getByRole('radio', { name: 'System', exact: true }).click();
+  assert.equal(await page.evaluate(() => localStorage.getItem('live-desktop.theme.default')), 'system');
+  await page.getByRole('radio', { name: 'Dark', exact: true }).click();
   // Reduce transparency: explicit setting and the system media feature both give solid surfaces.
   await page.getByRole('switch', { name: 'Reduce transparency' }).click();
   assert.equal(await page.locator('html').getAttribute('data-transparency'), 'reduced');

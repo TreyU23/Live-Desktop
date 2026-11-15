@@ -3,7 +3,7 @@
   "recipe": "astryx-oklch-v1",
   "generatorVersion": "palette-generator-v1",
   "candidateFormatVersion": "palette-typescript-v1",
-  "candidateSha256": "374d510b7eb77d8e162cc242bc29b25f9e97851e6ef544447f001a40d7344250",
+  "candidateSha256": "fa0e9531d458c3d833ae72957ce2c95160411c2b5c5a59d82c062e8456829ff2",
   "request": {
     "recipe": "astryx-oklch-v1",
     "vibrancy": 50,
@@ -36,19 +36,19 @@
       {
         "id": "accent",
         "name": "Accent",
-        "seed": "#0a84ff",
+        "seed": "#0074e2",
         "kind": "chromatic",
         "anchors": [
           {
             "mode": "light",
-            "stop": 55,
-            "color": "#0a84ff",
+            "stop": 50,
+            "color": "#0074e2",
             "policy": "exact"
           },
           {
             "mode": "dark",
-            "stop": 55,
-            "color": "#0a84ff",
+            "stop": 50,
+            "color": "#0074e2",
             "policy": "exact"
           }
         ]
@@ -60,9 +60,9 @@
       "accent": {
         "light": {
           "monotonic": true,
-          "minimumAdjacentDeltaE": 4.297632166863895,
-          "maximumAdjacentDeltaE": 19.336058666927737,
-          "maximumHueDrift": 4.924331233351268,
+          "minimumAdjacentDeltaE": 4.114451923385638,
+          "maximumAdjacentDeltaE": 19.354634049078946,
+          "maximumHueDrift": 4.261077952851451,
           "hueIdentityRisk": null,
           "gamutMappedStops": [
             5,
@@ -86,19 +86,19 @@
           "anchors": [
             {
               "mode": "light",
-              "stop": 55,
-              "color": "#0a84ff",
+              "stop": 50,
+              "color": "#0074e2",
               "policy": "exact",
-              "generatedColor": "#0a84ff",
+              "generatedColor": "#0074e2",
               "deltaE": 0
             }
           ]
         },
         "dark": {
           "monotonic": true,
-          "minimumAdjacentDeltaE": 4.297632166863895,
-          "maximumAdjacentDeltaE": 19.336058666927737,
-          "maximumHueDrift": 4.732911254945975,
+          "minimumAdjacentDeltaE": 4.279738184184406,
+          "maximumAdjacentDeltaE": 19.354634049078946,
+          "maximumHueDrift": 4.232869197536161,
           "hueIdentityRisk": null,
           "gamutMappedStops": [
             5,
@@ -119,10 +119,10 @@
           "anchors": [
             {
               "mode": "dark",
-              "stop": 55,
-              "color": "#0a84ff",
+              "stop": 50,
+              "color": "#0074e2",
               "policy": "exact",
-              "generatedColor": "#0a84ff",
+              "generatedColor": "#0074e2",
               "deltaE": 0
             }
           ]

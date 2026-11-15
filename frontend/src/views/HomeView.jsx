@@ -15,7 +15,7 @@ export function HomeView({ system, systemSeries = [], health, controls, pendingC
   const boundary = (key, name, children) => <ResourceBoundary name={name} status={states[key]} onRetry={() => retry(key)}>{children}</ResourceBoundary>;
   const ready = Boolean(states.system?.hasData);
   const today = new Date().toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' });
-  return <Page title="Overview" detail={today} actions={headerActions}><div className="home-view">
+  return <Page title="Overview" detail={today} actions={headerActions}><div className="legacy home-view">
     <ResourceBoundary name="System" status={states.system} onRetry={() => retry('system')} />
     <div className="overview-grid">
       <PerformanceCard system={system} series={systemSeries} ready={ready} onOpenSystem={() => navigate('system')} />

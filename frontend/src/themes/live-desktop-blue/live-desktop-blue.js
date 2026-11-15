@@ -119,8 +119,8 @@ export const liveDesktopBlueTheme = {
     "--color-background-card": "light-dark(#ffffff, #1b1b1b)",
     "--color-background-popover": "light-dark(#ffffff, #1b1b1b)",
     "--color-background-muted": "light-dark(#f1f1f1, #1b1b1b)",
-    "--color-accent": "light-dark(#0a84ff, #0a84ff)",
-    "--color-accent-muted": "light-dark(#b9d7ff, #00448d)",
+    "--color-accent": "light-dark(#0074e2, #0074e2)",
+    "--color-accent-muted": "light-dark(#b9d7ff, #00458d)",
     "--color-neutral": "light-dark(#0000000F, #ffffff1A)",
     "--color-overlay": "light-dark(#00000080, #000000CC)",
     "--color-overlay-hover": "light-dark(#0000000D, #ffffff0D)",
@@ -128,10 +128,10 @@ export const liveDesktopBlueTheme = {
     "--color-text-primary": "light-dark(#000000, #ffffff)",
     "--color-text-secondary": "light-dark(#474747, #9e9e9e)",
     "--color-text-disabled": "light-dark(#919191, #525252)",
-    "--color-text-accent": "light-dark(#0050a3, #a1caff)",
+    "--color-text-accent": "light-dark(#0050a2, #a1caff)",
     "--color-on-dark": "#ffffff",
     "--color-on-light": "#111111",
-    "--color-on-accent": "light-dark(#000000, #000000)",
+    "--color-on-accent": "light-dark(#ffffff, #000000)",
     "--color-on-success": "light-dark(#ffffff, #111111)",
     "--color-on-error": "light-dark(#ffffff, #111111)",
     "--color-on-warning": "#111111",
@@ -146,7 +146,7 @@ export const liveDesktopBlueTheme = {
     "--color-on-success-muted": "light-dark(#00490b, #90ca90)",
     "--color-on-warning-muted": "light-dark(#4b3900, #eec448)",
     "--color-on-error-muted": "light-dark(#76000c, #ffaea7)",
-    "--color-icon-accent": "light-dark(#0050a3, #a1caff)",
+    "--color-icon-accent": "light-dark(#0050a2, #a1caff)",
     "--color-icon-primary": "light-dark(#000000, #ffffff)",
     "--color-icon-secondary": "light-dark(#6a6a6a, #9e9e9e)",
     "--color-icon-disabled": "light-dark(#919191, #525252)",
@@ -215,7 +215,7 @@ export const liveDesktopBlueTheme = {
     "--shadow-inset-success": "inset 0px 0px 0px 2px #2f7d334D",
     "--shadow-inset-warning": "inset 0px 0px 0px 2px #f8d36a4D",
     "--shadow-inset-error": "inset 0px 0px 0px 2px #de47454D",
-    "--focus-outline-color": "light-dark(#0a84ff, #0a84ff)"
+    "--focus-outline-color": "light-dark(#0074e2, #0074e2)"
   },
   localTokens: {
     "--astryx-theme-neutral-color-status-fill-accent": "light-dark(#0074e2, #6d9cfe)"

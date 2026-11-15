@@ -71,3 +71,22 @@ test("falls back to blue when the saved color is invalid", () => {
   const storage = { getItem: () => "not-a-color" };
   assert.equal(readAccentColor(storage, "accent"), DEFAULT_ACCENT_COLOR);
 });
+
+test("maps saved custom hex colors to the nearest accent preset", async () => {
+  const { nearestAccentPreset } = await import("../src/accentColors.js");
+  assert.equal(nearestAccentPreset("#0A84FF"), "blue");
+  assert.equal(nearestAccentPreset("#FFFF00"), "orange");
+  assert.equal(nearestAccentPreset("#22C55E"), "green");
+  assert.equal(nearestAccentPreset("#EF4444"), "red");
+  assert.equal(nearestAccentPreset("#000000"), "neutral");
+  assert.equal(nearestAccentPreset("#FFFFFF"), "neutral");
+});
+
+test("reads a saved accent preset, migrating hex values and ignoring bad ones", async () => {
+  const { readAccentPreset } = await import("../src/accentColors.js");
+  const storage = value => ({ getItem: () => value });
+  assert.equal(readAccentPreset(storage("green"), "k"), "green");
+  assert.equal(readAccentPreset(storage("#0A84FF"), "k"), "blue");
+  assert.equal(readAccentPreset(storage("not a color"), "k"), "neutral");
+  assert.equal(readAccentPreset(storage(null), "k"), "neutral");
+});

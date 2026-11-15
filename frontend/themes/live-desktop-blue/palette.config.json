@@ -4,18 +4,18 @@
     {
       "id": "accent",
       "name": "Accent",
-      "seed": "#0a84ff",
+      "seed": "#0074e2",
       "anchors": [
         {
           "mode": "light",
-          "stop": 55,
-          "color": "#0a84ff",
+          "stop": 50,
+          "color": "#0074e2",
           "policy": "exact"
         },
         {
           "mode": "dark",
-          "stop": 55,
-          "color": "#0a84ff",
+          "stop": 50,
+          "color": "#0074e2",
           "policy": "exact"
         }
       ]

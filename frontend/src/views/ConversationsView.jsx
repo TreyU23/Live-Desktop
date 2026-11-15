@@ -27,7 +27,7 @@ export function ConversationsView({ conversations, selected, onSelect, onSend, b
     else setError('Message could not be sent. Your draft is preserved; try again.');
   };
   const choose = summary => { setThreadsOpen(false); onSelect(summary); };
-  return <div className="view-shell conversations-view">
+  return <div className="legacy view-shell conversations-view">
     <div className="conversation-layout">
       <aside className="conversation-threads" aria-label="Conversation threads">
         <header className="page-heading conversation-threads__heading">

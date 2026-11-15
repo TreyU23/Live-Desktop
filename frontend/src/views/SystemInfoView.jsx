@@ -60,7 +60,7 @@ export function SystemInfoView({ system, series = [], connected, configured, onC
   return (
     <Page title="About this PC" detail="Device specifications, Windows information, and live resource status reported by this PC." actions={headerActions} status={<span>
         <span className={`status-label ${connected ? "status-label--good" : "status-label--warn"}`}><Icon name={connected ? "CircleCheck" : "CircleAlert"} size={14} />{connected ? "Live Windows data" : "Backend unavailable"}</span>
-      </span>}><div className="system-info-view">
+      </span>}><div className="legacy system-info-view">
       <div className="segmented system-tabs" role="tablist" aria-label="System information">
         <button type="button" role="tab" id="system-tab-live" aria-selected={tab === "live"} aria-controls="system-panel" onClick={() => setTab("live")}>Live</button>
         <button type="button" role="tab" id="system-tab-specs" aria-selected={tab === "specs"} aria-controls="system-panel" onClick={() => setTab("specs")}>Specifications</button>

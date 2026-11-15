@@ -19,7 +19,7 @@ export function ApprovalSheet({ actions, onApprove, onReject, onClose, returnFoc
     return () => { element.close(); (returnFocus?.() || null)?.focus?.(); };
   }, []);
   useEffect(() => { if (!action) onClose(); }, [action]);
-  if (!action) return <dialog ref={dialog} className="approval-sheet card--strong" aria-label="Approval request" />;
+  if (!action) return <dialog ref={dialog} className="legacy approval-sheet card--strong" aria-label="Approval request" />;
   const details = actionDetails(action);
   const position = Math.min(index, actions.length - 1);
   const decide = async verb => {
@@ -37,7 +37,7 @@ export function ApprovalSheet({ actions, onApprove, onReject, onClose, returnFoc
     else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
   };
   const icon = action.kind === 'windows_set_control' ? CONTROL_ICON[action.arguments?.control] || 'Settings' : KIND_ICON[action.kind] || 'Shield';
-  return <dialog ref={dialog} className="approval-sheet card--strong" aria-labelledby="approval-sheet-title" aria-describedby="approval-sheet-reason"
+  return <dialog ref={dialog} className="legacy approval-sheet card--strong" aria-labelledby="approval-sheet-title" aria-describedby="approval-sheet-reason"
     onKeyDown={trapFocus} onCancel={event => { event.preventDefault(); if (!submitting) onClose(); }}>
     <div className="approval-sheet__queue">
       {actions.length > 1 ? <>

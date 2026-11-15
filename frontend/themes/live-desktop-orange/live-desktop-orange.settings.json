@@ -1,5 +1,5 @@
 {
-  "name": "live-desktop-purple",
+  "name": "live-desktop-orange",
   "like": "neutral",
   "mode": "both",
   "settings": [
@@ -16,10 +16,10 @@
     },
     {
       "thing": "accent",
-      "value": "#A855F7",
+      "value": "#d57113",
       "source": "dial"
     }
   ],
   "lifted": [],
-  "palette": "9a5d5eea484379cd892d206a564985079a48074584d1e56f929e1362d0c7f76f"
+  "palette": "fc3fe156f6d8444d5cf587a80917a6dc32b149f452d8dbbaf168e78e6063f7b8"
 }
