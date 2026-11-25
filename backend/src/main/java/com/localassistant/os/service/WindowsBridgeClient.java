@@ -27,6 +27,8 @@ public class WindowsBridgeClient implements AutoCloseable {
     private static final int MAX_RESPONSE_BYTES = 8 * 1024 * 1024;
     private final ObjectMapper mapper = new ObjectMapper();
     private final Path executable;
+    private final Duration queueTimeout;
+    private final Duration callTimeout;
     private final ExecutorService io = Executors.newSingleThreadExecutor(
             Thread.ofPlatform().daemon().name("windows-native-radio-io").factory());
     private Process process;
@@ -43,51 +45,39 @@ public class WindowsBridgeClient implements AutoCloseable {
                 .resolve("native/build/Release/live-desktop-windows-bridge.exe"));
     }
 
-    WindowsBridgeClient(Path executable) { this.executable = executable; }
+    WindowsBridgeClient(Path executable) { this(executable, DEFAULT_QUEUE_TIMEOUT, DEFAULT_CALL_TIMEOUT); }
+
+    WindowsBridgeClient(Path executable, Duration queueTimeout, Duration callTimeout) {
+        this.executable = executable;
+        this.queueTimeout = queueTimeout;
+        this.callTimeout = callTimeout;
+    }
+
+    /** How long a call may wait for the bridge while another call is in flight. */
+    static final Duration DEFAULT_QUEUE_TIMEOUT = Duration.ofSeconds(15);
+    /** How long a dispatched call may run before the bridge is considered hung and restarted. */
+    static final Duration DEFAULT_CALL_TIMEOUT = Duration.ofSeconds(15);
 
     public Map<String, Object> request(String operation, Map<String, Object> arguments) {
-        if (!System.getProperty("os.name", "").toLowerCase(java.util.Locale.ROOT).contains("windows")) {
+        if (!supported()) {
             return Map.of("available", false, "detail", "Windows integration is available on Windows only.");
         }
-        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(15);
         long enqueued = System.nanoTime();
         long dispatched = enqueued;
         boolean acquired = false;
         try {
-            acquired = dispatchLock.tryLock(15, TimeUnit.SECONDS);
-            if (!acquired || System.nanoTime() >= deadline) return Map.of("available", false, "code", "QUEUE_TIMEOUT", "detail", "Windows request expired before dispatch. Refresh state and try again.");
+            // Queue wait and call time are separate budgets (issue #10). Waiting behind a
+            // slow but healthy call is not a bridge failure, so it must never reset the bridge.
+            acquired = dispatchLock.tryLock(queueTimeout.toNanos(), TimeUnit.NANOSECONDS);
+            if (!acquired) return Map.of("available", false, "code", "BRIDGE_BUSY",
+                    "detail", "Windows bridge is busy with another request. Refresh state and try again.");
             if (closed) return Map.of("available", false, "detail", "Windows bridge is shutting down.");
             dispatched = System.nanoTime();
-            var task = io.submit(() -> {
-                connect();
-                FileChannel channel = pipe;
-                String id = UUID.randomUUID().toString();
-                byte[] payload = mapper.writeValueAsBytes(Map.of("protocolVersion", 1,
-                        "requestId", id, "operation", operation, "arguments", arguments));
-                ByteBuffer output = ByteBuffer.wrap((new String(payload, StandardCharsets.UTF_8) + "\n")
-                        .getBytes(StandardCharsets.UTF_8));
-                while (output.hasRemaining()) channel.write(output);
-                var response = new java.io.ByteArrayOutputStream();
-                ByteBuffer byteBuffer = ByteBuffer.allocate(8192);
-                while (response.size() < MAX_RESPONSE_BYTES) {
-                    byteBuffer.clear();
-                    if (channel.read(byteBuffer) < 0) throw new IOException("Native radio bridge disconnected.");
-                    if (byteBuffer.position() == 0) continue;
-                    byteBuffer.flip();
-                    while (byteBuffer.hasRemaining()) {
-                        byte value = byteBuffer.get();
-                        if (value == '\n') return decode(mapper, response.toByteArray(), id);
-                        if (response.size() >= MAX_RESPONSE_BYTES) throw new IOException("Native response exceeded the size limit.");
-                        response.write(value);
-                    }
-                }
-                throw new IOException("Native radio bridge response exceeded the size limit.");
-            });
+            var task = io.submit(() -> exchange(operation, arguments));
             try {
-                long remaining = deadline - System.nanoTime();
-                if (remaining <= 0) throw new java.util.concurrent.TimeoutException();
-                return task.get(remaining, TimeUnit.NANOSECONDS);
+                return task.get(callTimeout.toNanos(), TimeUnit.NANOSECONDS);
             } catch (Exception error) {
+                // Only the dispatched call itself failed or overran its own deadline here.
                 reset();
                 task.cancel(true);
                 if (error instanceof InterruptedException) Thread.currentThread().interrupt();
@@ -104,6 +94,37 @@ public class WindowsBridgeClient implements AutoCloseable {
                     ((acquired ? dispatched : System.nanoTime()) - enqueued) / 1_000_000.0, (System.nanoTime() - enqueued) / 1_000_000.0);
             if (acquired) dispatchLock.unlock();
         }
+    }
+
+    boolean supported() {
+        return System.getProperty("os.name", "").toLowerCase(java.util.Locale.ROOT).contains("windows");
+    }
+
+    /** One request/response exchange over the pipe. Runs on the single IO thread. */
+    Map<String, Object> exchange(String operation, Map<String, Object> arguments) throws Exception {
+        connect();
+        FileChannel channel = pipe;
+        String id = UUID.randomUUID().toString();
+        byte[] payload = mapper.writeValueAsBytes(Map.of("protocolVersion", 1,
+                "requestId", id, "operation", operation, "arguments", arguments));
+        ByteBuffer output = ByteBuffer.wrap((new String(payload, StandardCharsets.UTF_8) + "\n")
+                .getBytes(StandardCharsets.UTF_8));
+        while (output.hasRemaining()) channel.write(output);
+        var response = new java.io.ByteArrayOutputStream();
+        ByteBuffer byteBuffer = ByteBuffer.allocate(8192);
+        while (response.size() < MAX_RESPONSE_BYTES) {
+            byteBuffer.clear();
+            if (channel.read(byteBuffer) < 0) throw new IOException("Native radio bridge disconnected.");
+            if (byteBuffer.position() == 0) continue;
+            byteBuffer.flip();
+            while (byteBuffer.hasRemaining()) {
+                byte value = byteBuffer.get();
+                if (value == '\n') return decode(mapper, response.toByteArray(), id);
+                if (response.size() >= MAX_RESPONSE_BYTES) throw new IOException("Native response exceeded the size limit.");
+                response.write(value);
+            }
+        }
+        throw new IOException("Native radio bridge response exceeded the size limit.");
     }
 
     static Map<String, Object> decode(ObjectMapper mapper, byte[] bytes, String expectedId) throws IOException {
@@ -143,7 +164,7 @@ public class WindowsBridgeClient implements AutoCloseable {
         }
     }
 
-    private void reset() {
+    void reset() {
         synchronized (connectionLock) {
         // Terminate the peer first to release any blocking pipe IO, then close the channel.
         if (process != null) process.destroyForcibly();
