@@ -61,12 +61,12 @@ Settings is the normal credential entry point. Optionally copy `.env.example` to
 
 | Variable | Default | Purpose |
 | --- | --- | --- |
-| `HOST`, `PORT` | `127.0.0.1`, `4317` | Backend bind; production fixes both |
+| `HOST`, `PORT` | `127.0.0.1`, `4317` | Backend bind; production fixes both on the backend command line, so `.env` cannot change them |
 | `OPENAI_API_KEY` | empty | Default-profile fallback |
 | `OPENAI_MODEL` | `gpt-5.6-sol` | Configured API model identifier |
 | `OPENAI_REASONING_EFFORT` | `medium` | SDK reasoning option |
 | `DATA_DIR` | `../data` | Production resolves relative paths against `backend/` |
-| `WORKSPACE_ROOT` | `..` | Assistant workspace; production fixes installation root |
+| `WORKSPACE_ROOT` | `..` | Assistant workspace; production fixes installation root on the command line, so `.env` cannot widen it |
 | `LIVE_DESKTOP_DIAGNOSTICS` | unset | Launch with `1` for bounded backend timing logs |
 | `VITE_API_BASE` | same origin | Frontend build/development API override |
 

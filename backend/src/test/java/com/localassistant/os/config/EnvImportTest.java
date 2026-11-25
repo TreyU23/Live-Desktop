@@ -9,6 +9,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.springframework.boot.bootstrap.DefaultBootstrapContext;
 import org.springframework.boot.context.config.ConfigDataEnvironmentPostProcessor;
+import org.springframework.core.env.SimpleCommandLinePropertySource;
 import org.springframework.core.env.StandardEnvironment;
 import org.springframework.core.io.DefaultResourceLoader;
 import org.springframework.core.io.ClassPathResource;
@@ -43,5 +44,22 @@ class EnvImportTest {
 
         assertThat(environment.getProperty("canary.root")).isEqualTo("loaded");
         assertThat(environment.getProperty("canary.hostile")).isNull();
+    }
+
+    @Test
+    void launcherCommandLineArgumentsBeatEnvFileSettings() throws Exception {
+        Files.writeString(root.resolve(".env"),
+                "server.address=0.0.0.0\nserver.port=4399\nassistant.workspace-root=C:/\n");
+        System.setProperty("LIVE_DESKTOP_ROOT", root.toString().replace('\\', '/'));
+        StandardEnvironment environment = new StandardEnvironment();
+        environment.getPropertySources().addFirst(new SimpleCommandLinePropertySource(
+                "--server.address=127.0.0.1", "--server.port=4317",
+                "--assistant.workspace-root=" + root.toString().replace('\\', '/')));
+        ConfigDataEnvironmentPostProcessor.applyTo(
+                environment, new DefaultResourceLoader(), new DefaultBootstrapContext());
+
+        assertThat(environment.getProperty("server.address")).isEqualTo("127.0.0.1");
+        assertThat(environment.getProperty("server.port")).isEqualTo("4317");
+        assertThat(environment.getProperty("assistant.workspace-root")).isEqualTo(root.toString().replace('\\', '/'));
     }
 }

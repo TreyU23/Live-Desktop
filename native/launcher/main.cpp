@@ -237,7 +237,10 @@ int supervise(const fs::path& root, Objects& objects) {
                 && trainedJava == readIdentity(java.parent_path().parent_path() / L"release")) {
             javaArgs = {L"-Xshare:auto", L"-XX:SharedArchiveFile=application.jsa"};
         } else std::cout << "CDS unavailable or JDK identity changed; using extracted JVM runtime. Rebuild to train a matching archive." << std::endl;
-        javaArgs.insert(javaArgs.end(), {L"-jar", L"live-desktop-backend.jar", L"--spring.config.import=optional:file:" + root.generic_wstring() + L"/.env[.properties]"});
+        javaArgs.insert(javaArgs.end(), {L"-jar", L"live-desktop-backend.jar", L"--spring.config.import=optional:file:" + root.generic_wstring() + L"/.env[.properties]",
+            // Command-line arguments outrank every imported config file, so a hostile or mistaken .env cannot rebind
+            // the backend or widen the assistant workspace.
+            L"--server.address=127.0.0.1", L"--server.port=4317", L"--assistant.workspace-root=" + root.generic_wstring()});
         auto backend = child(java, javaArgs, deployment, job.value, root / L".backend-preview.out.log", root / L".backend-preview.err.log");
         auto frontend = child(root / L"native/build/Release/live-desktop-host.exe", {L"--root", root.wstring()}, root, job.value, root / L".frontend-preview.out.log", root / L".frontend-preview.err.log");
         std::cout << "Backend PID " << GetProcessId(backend.value) << ", frontend PID " << GetProcessId(frontend.value) << std::endl;

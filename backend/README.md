@@ -9,7 +9,7 @@ Java 21/Spring Boot 4.1 owns HTTP APIs, profiles, persistence, approvals, OpenAI
 .\start.cmd
 ```
 
-For development, `scripts/run-backend.ps1` checks the built bridge/DLL, selects the local JDK and runs Maven. Stop the backend before replacing its loaded DLL. Production runs the extracted JAR/`lib/`, with build-time CDS, from `backend/target/runtime/`. The backend imports only the install-root `.env` (`${LIVE_DESKTOP_ROOT:..}/.env`), never `backend/target/.env`. The supervisor imports root `.env`, fixes loopback/workspace settings and resolves relative `DATA_DIR` against `backend/`.
+For development, `scripts/run-backend.ps1` checks the built bridge/DLL, selects the local JDK and runs Maven. Stop the backend before replacing its loaded DLL. Production runs the extracted JAR/`lib/`, with build-time CDS, from `backend/target/runtime/`. The backend imports only the install-root `.env` (`${LIVE_DESKTOP_ROOT:..}/.env`), never `backend/target/.env`. The supervisor imports root `.env`, fixes loopback address, port and workspace root with command-line arguments (which outrank any `.env` setting such as `server.address` or `assistant.workspace-root`) and resolves relative `DATA_DIR` against `backend/`.
 
 ## API
 
