@@ -1,5 +1,7 @@
 package com.localassistant.os.service;
 
+import com.localassistant.os.profile.ProfileContext;
+import com.localassistant.os.profile.ProfileLifecycle;
 import com.localassistant.os.profile.ProfilePaths;
 import com.localassistant.os.store.StateStore;
 import java.io.IOException;
@@ -33,12 +35,16 @@ public class ProfileDataService {
         if (profilesRoot == null || !target.startsWith(profilesRoot) || target.equals(profilesRoot)) {
             throw new IllegalStateException("Profile data path is invalid.");
         }
-        state.clearCurrentCache();
-        calendar.clearCurrentCache();
-        profileCredentials.clearCurrentCache();
-        if (Files.notExists(target)) return;
-        try (var files = Files.walk(target)) {
-            for (Path path : files.sorted(Comparator.reverseOrder()).toList()) Files.deleteIfExists(path);
-        }
+        // Exclusive: waits for in-flight profile work, and chats suspended around
+        // OpenAI calls fail with ProfileDeletedException instead of rewriting data.
+        ProfileLifecycle.exclusive(ProfileContext.currentId(), () -> {
+            state.clearCurrentCache();
+            calendar.clearCurrentCache();
+            profileCredentials.clearCurrentCache();
+            if (Files.notExists(target)) return;
+            try (var files = Files.walk(target)) {
+                for (Path path : files.sorted(Comparator.reverseOrder()).toList()) Files.deleteIfExists(path);
+            }
+        });
     }
 }

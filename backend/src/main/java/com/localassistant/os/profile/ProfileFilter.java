@@ -14,10 +14,10 @@ public class ProfileFilter extends OncePerRequestFilter {
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain)
             throws ServletException, IOException {
         ProfileContext.set(request.getHeader("X-Profile-Id"));
-        // DELETE requests take an exclusive profile lease even when the servlet
-        // container normalizes encoded paths or matrix parameters for routing.
-        boolean deleting = request.getMethod().equals("DELETE");
-        try (var lease = ProfileLifecycle.acquire(ProfileContext.currentId(), deleting)) {
+        // Every request holds a shared lease. Profile deletion upgrades to the
+        // exclusive lock inside ProfileDataService, so the decision does not depend
+        // on how the servlet container normalizes the path or the HTTP verb.
+        try (var lease = ProfileLifecycle.acquire(ProfileContext.currentId())) {
             chain.doFilter(request, response);
         } finally {
             ProfileContext.clear();

@@ -4,6 +4,7 @@ import com.localassistant.os.config.AssistantProperties;
 import com.localassistant.os.model.Conversation;
 import com.localassistant.os.model.ConversationMessage;
 import com.localassistant.os.profile.ProfileContext;
+import com.localassistant.os.profile.ProfileLifecycle;
 import com.localassistant.os.service.ActionService;
 import com.localassistant.os.service.DashboardContextService;
 import com.localassistant.os.service.MemoryService;
@@ -142,8 +143,13 @@ public class OpenAiAgent {
                 .store(false);
 
         for (int turn = 0; turn < 8; turn++) {
-            Response response = client.responses().create(
-                    builder.input(ResponseCreateParams.Input.ofResponse(inputs)).build());
+            ResponseCreateParams params = builder.input(ResponseCreateParams.Input.ofResponse(inputs)).build();
+            Response response;
+            // Don't hold the profile lease across the network call; a profile deletion
+            // would otherwise queue behind it and stall every later request (issue #6).
+            try (var suspended = ProfileLifecycle.suspend()) {
+                response = client.responses().create(params);
+            }
             List<ResponseFunctionToolCall> calls = response.output().stream()
                     .filter(item -> item.isFunctionCall())
                     .map(item -> item.asFunctionCall())

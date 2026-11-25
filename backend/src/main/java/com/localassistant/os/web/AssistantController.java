@@ -3,6 +3,7 @@ package com.localassistant.os.web;
 import com.localassistant.os.agent.OpenAiAgent;
 import com.localassistant.os.model.Conversation;
 import com.localassistant.os.model.ConversationMessage;
+import com.localassistant.os.profile.ProfileLifecycle;
 import com.localassistant.os.service.ActionService;
 import com.localassistant.os.service.MemoryService;
 import com.localassistant.os.service.ProfileCredentialStore;
@@ -132,6 +133,8 @@ public class AssistantController {
             ConversationMessage message = store.addMessage(
                     conversation.id(), "assistant", agent.reply(current));
             return ResponseEntity.ok(Map.of("conversationId", conversation.id(), "message", message));
+        } catch (ProfileLifecycle.ProfileDeletedException error) {
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(error(error));
         } catch (Exception error) {
             return ResponseEntity.status(HttpStatus.BAD_GATEWAY).body(error(error));
         }
