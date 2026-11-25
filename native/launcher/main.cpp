@@ -224,7 +224,7 @@ int supervise(const fs::path& root, Objects& objects) {
         require(SetInformationJobObject(job.value, JobObjectExtendedLimitInformation, &limits, sizeof(limits)), "Cannot configure owned process cleanup");
         // Backend working directory preserves ../.env and ../data semantics.
         SetEnvironmentVariableW(L"WORKSPACE_ROOT", root.c_str());
-        SetEnvironmentVariableW(L"LIVE_DESKTOP_ROOT", root.c_str());
+        SetEnvironmentVariableW(L"LIVE_DESKTOP_ROOT", root.generic_wstring().c_str());
         SetEnvironmentVariableW(L"HOST", L"127.0.0.1"); SetEnvironmentVariableW(L"PORT", L"4317");
         std::vector<std::wstring> javaArgs;
         auto deployment = root / L"backend/target/runtime";

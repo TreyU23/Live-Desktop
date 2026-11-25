@@ -70,7 +70,7 @@ Settings is the normal credential entry point. Optionally copy `.env.example` to
 | `LIVE_DESKTOP_DIAGNOSTICS` | unset | Launch with `1` for bounded backend timing logs |
 | `VITE_API_BASE` | same origin | Frontend build/development API override |
 
-The supervisor imports root `.env` and sets internal `LIVE_DESKTOP_ROOT` for data resolution. Java selection: `.tools/jdk-21`, `JAVA_HOME`, PATH. Production runs `backend/target/runtime/live-desktop-backend.jar` with `lib/` and compatible build-time CDS; launch never builds, extracts, trains or downloads.
+The backend imports only the install-root `.env` (`${LIVE_DESKTOP_ROOT}/.env`); a `.env` anywhere else, such as `backend/target/.env`, is never loaded. The supervisor sets internal `LIVE_DESKTOP_ROOT` for data resolution. Java selection: `.tools/jdk-21`, `JAVA_HOME`, PATH. Production runs `backend/target/runtime/live-desktop-backend.jar` with `lib/` and compatible build-time CDS; launch never builds, extracts, trains or downloads.
 
 ## Troubleshooting
 

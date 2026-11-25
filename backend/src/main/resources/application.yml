@@ -6,7 +6,7 @@ spring:
   application:
     name: local-assistant-os
   config:
-    import: optional:file:../.env[.properties]
+    import: optional:file:${LIVE_DESKTOP_ROOT:..}/.env[.properties]
 
 assistant:
   data-dir: ${DATA_DIR:../data}
