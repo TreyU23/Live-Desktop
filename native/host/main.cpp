@@ -155,10 +155,17 @@ std::set<std::string> hopHeaders(const std::map<std::string, std::string>& heade
     }
     return result;
 }
+// /api/chat runs the whole agent loop (several model turns and tool calls). Its upstream timeout
+// must exceed the backend's overall agent deadline (OpenAiAgent.AGENT_DEADLINE, 240s) so the UI
+// gets the backend's real answer or error, never a proxy 502 while the reply is still being saved.
+constexpr int kApiUpstreamTimeoutMs = 120000;
+constexpr int kChatUpstreamTimeoutMs = 300000;
 void proxy(SOCKET socket, const Request& req) {
     Internet session(WinHttpOpen(L"LiveDesktopHost/1", WINHTTP_ACCESS_TYPE_NO_PROXY, nullptr, nullptr, 0));
     if (!session.value) throw HttpError{502, "Unable to initialize API proxy"};
-    WinHttpSetTimeouts(session.value, 2000, 2000, 120000, 120000);
+    const bool chat = req.method == "POST" && req.target.substr(0, req.target.find('?')) == "/api/chat";
+    const int upstreamTimeout = chat ? kChatUpstreamTimeoutMs : kApiUpstreamTimeoutMs;
+    WinHttpSetTimeouts(session.value, 2000, 2000, upstreamTimeout, upstreamTimeout);
     Internet connection(WinHttpConnect(session.value, L"127.0.0.1", 4317, 0));
     auto method = wide(req.method), target = wide(req.target);
     Internet request(connection.value ? WinHttpOpenRequest(connection.value, method.c_str(), target.c_str(), nullptr, nullptr, nullptr, WINHTTP_FLAG_ESCAPE_DISABLE) : nullptr);

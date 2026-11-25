@@ -17,7 +17,9 @@ public final class ProfileClientPool {
     private final HashSet<Entry> active = new HashSet<>();
     private boolean closed;
     private final java.util.function.Function<String, OpenAIClient> factory;
-    public ProfileClientPool() { this(key -> OpenAIOkHttpClient.builder().apiKey(key).build()); }
+    /** One retry for transient OpenAI errors; OpenAiAgent sizes per-attempt timeouts from this. */
+    static final int MAX_RETRIES = 1;
+    public ProfileClientPool() { this(key -> OpenAIOkHttpClient.builder().apiKey(key).maxRetries(MAX_RETRIES).build()); }
     ProfileClientPool(java.util.function.Function<String, OpenAIClient> factory) { this.factory = factory; }
     private static final class Entry {
         final String fingerprint;

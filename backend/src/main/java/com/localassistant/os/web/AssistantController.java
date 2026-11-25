@@ -135,6 +135,8 @@ public class AssistantController {
             return ResponseEntity.ok(Map.of("conversationId", conversation.id(), "message", message));
         } catch (ProfileLifecycle.ProfileDeletedException error) {
             return ResponseEntity.status(HttpStatus.CONFLICT).body(error(error));
+        } catch (OpenAiAgent.AgentDeadlineException error) {
+            return ResponseEntity.status(HttpStatus.GATEWAY_TIMEOUT).body(error(error));
         } catch (Exception error) {
             return ResponseEntity.status(HttpStatus.BAD_GATEWAY).body(error(error));
         }

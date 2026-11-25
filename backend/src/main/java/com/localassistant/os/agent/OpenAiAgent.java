@@ -12,6 +12,7 @@ import com.localassistant.os.service.ProfileCredentialStore;
 import com.localassistant.os.service.WorkspaceService;
 import com.openai.client.OpenAIClient;
 import com.openai.client.okhttp.OpenAIOkHttpClient;
+import com.openai.core.RequestOptions;
 import com.openai.models.Reasoning;
 import com.openai.models.ReasoningEffort;
 import com.openai.models.responses.Response;
@@ -19,6 +20,7 @@ import com.openai.models.responses.ResponseCreateParams;
 import com.openai.models.responses.ResponseFunctionToolCall;
 import com.openai.models.responses.ResponseInputItem;
 import java.io.IOException;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -26,6 +28,23 @@ import org.springframework.stereotype.Service;
 
 @Service
 public class OpenAiAgent {
+    /**
+     * Overall budget for one chat request, all model turns and tool calls included. The native
+     * host's /api/chat upstream timeout (native/host/main.cpp, kChatUpstreamTimeoutMs) must stay
+     * above this, so the UI always receives the backend's real outcome (issue #11).
+     */
+    public static final Duration AGENT_DEADLINE = Duration.ofSeconds(240);
+    /** Matches ProfileClientPool's maxRetries; each attempt gets an equal share of what is left. */
+    static final int MODEL_CALL_ATTEMPTS = ProfileClientPool.MAX_RETRIES + 1;
+
+    /** Thrown when a chat request runs past {@link #AGENT_DEADLINE}; nothing is saved. */
+    public static final class AgentDeadlineException extends IllegalStateException {
+        public AgentDeadlineException() {
+            super("The assistant ran out of time for this request (" + AGENT_DEADLINE.toSeconds()
+                    + "s). Nothing was saved; try a narrower request.");
+        }
+    }
+
     private static final String SYSTEM_PROMPT = """
             You are the reasoning engine for a local-first Windows assistant.
 
@@ -94,6 +113,7 @@ public class OpenAiAgent {
         if (key == null) {
             throw new IllegalStateException("OPENAI_API_KEY is not configured.");
         }
+        long deadline = System.nanoTime() + AGENT_DEADLINE.toNanos();
         try (var lease = clients.acquire(ProfileContext.currentId(), key)) {
         OpenAIClient client = lease.client();
 
@@ -144,11 +164,20 @@ public class OpenAiAgent {
 
         for (int turn = 0; turn < 8; turn++) {
             ResponseCreateParams params = builder.input(ResponseCreateParams.Input.ofResponse(inputs)).build();
+            long remaining = deadline - System.nanoTime();
+            if (remaining <= 0) throw new AgentDeadlineException();
+            // Per-attempt timeout so attempts plus retries fit in the remaining budget.
+            RequestOptions options = RequestOptions.builder()
+                    .timeout(Duration.ofNanos(remaining / MODEL_CALL_ATTEMPTS))
+                    .build();
             Response response;
             // Don't hold the profile lease across the network call; a profile deletion
             // would otherwise queue behind it and stall every later request (issue #6).
             try (var suspended = ProfileLifecycle.suspend()) {
-                response = client.responses().create(params);
+                response = client.responses().create(params, options);
+            } catch (RuntimeException error) {
+                if (System.nanoTime() >= deadline) throw new AgentDeadlineException();
+                throw error;
             }
             List<ResponseFunctionToolCall> calls = response.output().stream()
                     .filter(item -> item.isFunctionCall())
