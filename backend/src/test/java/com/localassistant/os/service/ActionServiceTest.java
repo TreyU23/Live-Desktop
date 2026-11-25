@@ -51,6 +51,45 @@ class ActionServiceTest {
     }
 
     @Test
+    void approvingOneWriteDoesNotAutoApproveDifferentContentForTheSamePath() throws Exception {
+        var first = actions.propose(
+                "workspace_write_file", Map.of("path", "notes/a.txt", "content", "one"), "First.");
+        actions.approve(first.id());
+
+        var same = actions.propose(
+                "workspace_write_file", Map.of("path", "notes/a.txt", "content", "one"), "Same content.");
+        var different = actions.propose(
+                "workspace_write_file", Map.of("path", "notes/a.txt", "content", "two"), "Other content.");
+
+        assertThat(same.status()).isEqualTo("completed");
+        assertThat(different.status()).isEqualTo("pending");
+        assertThat(Files.readString(root.resolve("notes/a.txt"))).isEqualTo("one");
+    }
+
+    @Test
+    void failedActionsDoNotCountAsApprovals() throws Exception {
+        Files.createDirectories(root.resolve("notes"));
+        Files.createDirectory(root.resolve("notes/blocked.txt"));
+        var first = actions.propose(
+                "workspace_write_file", Map.of("path", "notes/blocked.txt", "content", "x"), "Will fail.");
+        assertThat(actions.approve(first.id()).status()).isEqualTo("failed");
+
+        var second = actions.propose(
+                "workspace_write_file", Map.of("path", "notes/blocked.txt", "content", "x"), "Retry.");
+        assertThat(second.status()).isEqualTo("pending");
+    }
+
+    @Test
+    void writesToLaunchableOrConfigurationFilesAreRejectedBeforeQueueing() {
+        for (String path : new String[] { "start.cmd", ".env", "backend/target/.env", "scripts/bootstrap-java.ps1" }) {
+            assertThatThrownBy(() -> actions.propose(
+                    "workspace_write_file", Map.of("path", path, "content", "x"), "Should not queue."))
+                    .as(path).isInstanceOf(IllegalArgumentException.class);
+        }
+        assertThat(actions.list(null)).isEmpty();
+    }
+
+    @Test
     void rejectedMemoryIsNotStored() throws Exception {
         var action = actions.propose(
                 "remember",
@@ -138,7 +177,7 @@ class ActionServiceTest {
     }
 
     @Test
-    void approvedFileTargetRunsImmediatelyButDifferentTargetStillWaits() throws Exception {
+    void approvedFileWriteRunsImmediatelyOnlyForTheSamePathAndContent() throws Exception {
         var first = actions.propose(
                 "workspace_write_file",
                 Map.of("path", "notes/reusable.txt", "content", "first"),
@@ -147,15 +186,15 @@ class ActionServiceTest {
 
         var repeated = actions.propose(
                 "workspace_write_file",
-                Map.of("path", "notes/reusable.txt", "content", "second"),
-                "Update the reusable note.");
+                Map.of("path", "notes/reusable.txt", "content", "first"),
+                "Write the reusable note again.");
         var different = actions.propose(
                 "workspace_write_file",
                 Map.of("path", "notes/different.txt", "content", "separate"),
                 "Create another note.");
 
         assertThat(repeated.status()).isEqualTo("completed");
-        assertThat(Files.readString(root.resolve("notes/reusable.txt"))).isEqualTo("second");
+        assertThat(Files.readString(root.resolve("notes/reusable.txt"))).isEqualTo("first");
         assertThat(different.status()).isEqualTo("pending");
         assertThat(root.resolve("notes/different.txt")).doesNotExist();
     }
@@ -176,11 +215,11 @@ class ActionServiceTest {
                 systemControls);
         var repeated = reloadedActions.propose(
                 "workspace_write_file",
-                Map.of("path", "notes/persistent.txt", "content", "after restart"),
-                "Update the persistent note.");
+                Map.of("path", "notes/persistent.txt", "content", "first"),
+                "Write the persistent note again.");
 
         assertThat(repeated.status()).isEqualTo("completed");
-        assertThat(Files.readString(root.resolve("notes/persistent.txt"))).isEqualTo("after restart");
+        assertThat(Files.readString(root.resolve("notes/persistent.txt"))).isEqualTo("first");
     }
 
     @Test

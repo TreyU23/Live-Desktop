@@ -60,6 +60,21 @@ class WorkspaceServiceTest {
     }
 
     @Test
+    void writesRefuseLiveDesktopFoldersEnvironmentFilesAndExecutableTypes() throws Exception {
+        WorkspaceService workspace = workspace();
+        for (String path : new String[] {
+                "start.cmd", "START.CMD", "start.cmd.", "start.cmd. ", "tools/run.ps1", "lib/app.jar", "bin/x.dll",
+                ".env", ".env.local", "backend/target/.env", "sub/.env", "data/state.json", "native/main.cpp",
+                "backend/pom.xml", "frontend/app.js", "scripts/run.txt", ".tools/jdk-21/conf/security/java.security",
+                ".git/config", ".github/workflows/x.yml", ".mvn/maven.config", "BACKEND/pom.xml",
+                "notes/PROGRA~1.txt", "notes/file.txt:stream", "." }) {
+            assertThatThrownBy(() -> workspace.resolveWritablePath(path))
+                    .as(path).isInstanceOf(IllegalArgumentException.class);
+        }
+        assertThat(workspace.resolveWritablePath("notes/todo.md")).isEqualTo(root.resolve("notes/todo.md"));
+    }
+
+    @Test
     @EnabledOnOs(OS.WINDOWS)
     void windowsJunctionCannotExposeOrWriteOutsideWorkspace() throws Exception {
         Path workspaceRoot = Files.createDirectory(root.resolve("workspace"));

@@ -410,7 +410,8 @@ Workspace tools must preserve:
 - Directory listing limits of 500 entries
 - Exclusion of configured/conventional profile data directories
 - Exclusion of root `.env` variants, except `.env.example`
-- Existing approval and path checks for writes
+- Existing approval and path checks for writes, plus `resolveWritablePath`: no writes to Live Desktop's own folders, `.env` files or executable/loadable types
+- Write approvals keyed on path and content hash; failed actions never count as approvals
 
 These checks do not lock the filesystem against concurrent replacement. Do not claim they provide stronger isolation than they do.
 

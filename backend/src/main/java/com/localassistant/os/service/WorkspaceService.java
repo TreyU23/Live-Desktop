@@ -12,6 +12,7 @@ import java.nio.file.attribute.BasicFileAttributes;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Locale;
 import java.util.Set;
 import org.springframework.stereotype.Service;
 
@@ -19,6 +20,14 @@ import org.springframework.stereotype.Service;
 public class WorkspaceService {
     private static final Set<String> IGNORED_DIRECTORIES =
             Set.of(".git", ".tools", "node_modules", "dist", "target");
+    /** Live Desktop's own top-level folders. The assistant may read some of them, but never write to them. */
+    private static final Set<String> PROTECTED_WRITE_DIRECTORIES = Set.of(
+            "data", "native", "backend", "frontend", "scripts",
+            ".tools", ".git", ".github", ".mvn");
+    /** Executable, script and loadable-library extensions that the assistant may not create or overwrite. */
+    private static final Set<String> BLOCKED_WRITE_EXTENSIONS = Set.of(
+            "cmd", "bat", "ps1", "psm1", "psd1", "ps1xml", "exe", "dll", "com", "scr", "msi", "msp", "sys",
+            "cpl", "vbs", "vbe", "jse", "wsf", "wsh", "hta", "reg", "lnk", "jar", "sh", "so", "dylib");
     private final Path root;
     private final Path dataRoot;
 
@@ -51,6 +60,48 @@ public class WorkspaceService {
             if (Files.notExists(cursor, LinkOption.NOFOLLOW_LINKS)) {
                 break;
             }
+        }
+        return absolute;
+    }
+
+    /**
+     * Resolves a path the assistant wants to write. On top of {@link #resolveSafePath} this refuses Live Desktop's
+     * own folders, every environment file, and executable or loadable file types, so an approved write can never
+     * change code or configuration that runs with the next launch.
+     */
+    public Path resolveWritablePath(String candidate) throws IOException {
+        Path absolute = resolveSafePath(candidate);
+        Path relative = root.relativize(absolute);
+        if (relative.toString().isEmpty()) {
+            throw new IllegalArgumentException("Path must name a file inside the workspace.");
+        }
+        int index = 0;
+        for (Path segment : relative) {
+            String raw = segment.toString();
+            if (raw.indexOf(':') >= 0) {
+                throw new IllegalArgumentException("Alternate data streams are not allowed in workspace writes.");
+            }
+            // Windows ignores trailing dots and spaces, so "start.cmd. " names start.cmd.
+            String name = raw.replaceAll("[. ]+$", "").toLowerCase(Locale.ROOT);
+            if (name.isEmpty() || name.matches(".*~\\d+(\\..*)?")) {
+                throw new IllegalArgumentException("Path is not allowed for workspace writes.");
+            }
+            if (index == 0 && PROTECTED_WRITE_DIRECTORIES.contains(name)) {
+                throw new IllegalArgumentException("Live Desktop's own folders are not available to workspace writes.");
+            }
+            if (name.equals(".git") || name.equals(".env") || name.startsWith(".env.")) {
+                throw new IllegalArgumentException("Environment and repository files are not available to workspace writes.");
+            }
+            index++;
+        }
+        String leaf = relative.getFileName().toString().replaceAll("[. ]+$", "").toLowerCase(Locale.ROOT);
+        int dot = leaf.lastIndexOf('.');
+        if (dot >= 0 && BLOCKED_WRITE_EXTENSIONS.contains(leaf.substring(dot + 1))) {
+            throw new IllegalArgumentException("Executable and script files are not available to workspace writes.");
+        }
+        Path real = canonicalIfPresent(absolute);
+        if (real.startsWith(canonicalIfPresent(dataRoot)) || absolute.startsWith(dataRoot)) {
+            throw new IllegalArgumentException("Profile data is not available to workspace writes.");
         }
         return absolute;
     }

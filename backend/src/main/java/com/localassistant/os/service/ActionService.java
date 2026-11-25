@@ -7,6 +7,9 @@ import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.HexFormat;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -77,10 +80,10 @@ public class ActionService {
         }
     }
 
-    private void validate(String kind, Map<String, Object> arguments) {
+    private void validate(String kind, Map<String, Object> arguments) throws IOException {
         switch (kind) {
             case "workspace_write_file" -> {
-                requireString(arguments.get("path"), "path", 1, 500);
+                workspace.resolveWritablePath(requireString(arguments.get("path"), "path", 1, 500));
                 requireString(arguments.get("content"), "content", 0, 500_000);
             }
             case "browser_open_url" -> parseWebUri(requireString(arguments.get("url"), "url", 1, 2_000));
@@ -104,20 +107,29 @@ public class ActionService {
 
     private boolean hasPreviousApproval(String approvalKey) throws IOException {
         for (AssistantAction action : store.actions()) {
-            if (Set.of("approved", "completed", "failed").contains(action.status())
-                    && approvalKey(action.kind(), action.arguments()).equals(approvalKey)) {
+            if (Set.of("approved", "completed").contains(action.status())
+                    && approvalKeyOrNull(action).equals(approvalKey)) {
                 return true;
             }
         }
         return false;
     }
 
+    private String approvalKeyOrNull(AssistantAction action) {
+        try {
+            return approvalKey(action.kind(), action.arguments());
+        } catch (IOException | RuntimeException error) {
+            // An old action that no longer passes validation can never vouch for a new one.
+            return "";
+        }
+    }
+
     private String approvalKey(String kind, Map<String, Object> arguments) throws IOException {
         return switch (kind) {
             case "workspace_write_file" -> {
-                Path path = workspace.resolveSafePath(String.valueOf(arguments.get("path")));
+                Path path = workspace.resolveWritablePath(String.valueOf(arguments.get("path")));
                 yield kind + ":" + workspace.root().relativize(path).normalize().toString()
-                        .toLowerCase(Locale.ROOT);
+                        .toLowerCase(Locale.ROOT) + ":" + sha256(String.valueOf(arguments.get("content")));
             }
             case "browser_open_url" -> kind + ":"
                     + parseWebUri(String.valueOf(arguments.get("url"))).normalize();
@@ -135,7 +147,7 @@ public class ActionService {
         if (action.kind().equals("workspace_write_file")) {
             String candidate = String.valueOf(action.arguments().get("path"));
             String content = String.valueOf(action.arguments().get("content"));
-            Path path = workspace.resolveSafePath(candidate);
+            Path path = workspace.resolveWritablePath(candidate);
             Files.createDirectories(path.getParent());
             Files.writeString(path, content, StandardCharsets.UTF_8);
             return Map.of("path", workspace.root().relativize(path).toString(), "bytes", content.getBytes(StandardCharsets.UTF_8).length);
@@ -162,6 +174,15 @@ public class ActionService {
         return memories.add(
                 String.valueOf(action.arguments().get("content")),
                 String.valueOf(action.arguments().get("category")));
+    }
+
+    private static String sha256(String value) {
+        try {
+            return HexFormat.of().formatHex(
+                    MessageDigest.getInstance("SHA-256").digest(value.getBytes(StandardCharsets.UTF_8)));
+        } catch (NoSuchAlgorithmException error) {
+            throw new IllegalStateException(error);
+        }
     }
 
     private void requirePending(AssistantAction action) {
