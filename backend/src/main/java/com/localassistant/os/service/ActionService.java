@@ -138,7 +138,8 @@ public class ActionService {
             case "windows_set_control" -> kind + ":"
                     + String.valueOf(arguments.get("control")).toLowerCase(Locale.ROOT);
             case "remember" -> kind + ":"
-                    + String.valueOf(arguments.get("category")).toLowerCase(Locale.ROOT);
+                    + String.valueOf(arguments.get("category")).toLowerCase(Locale.ROOT) + ":"
+                    + sha256(String.valueOf(arguments.get("content")));
             default -> throw new IllegalArgumentException("Unknown action kind.");
         };
     }

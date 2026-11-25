@@ -412,6 +412,7 @@ Workspace tools must preserve:
 - Exclusion of root `.env` variants, except `.env.example`
 - Existing approval and path checks for writes, plus `resolveWritablePath`: no writes to Live Desktop's own folders, `.env` files or executable/loadable types
 - Write approvals keyed on path and content hash; failed actions never count as approvals
+- Memory approvals keyed on category and content hash; recalled memories are returned as untrusted data
 
 These checks do not lock the filesystem against concurrent replacement. Do not claim they provide stronger isolation than they do.
 
