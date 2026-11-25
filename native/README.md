@@ -16,13 +16,13 @@ The build finds CMake in PATH or Visual Studio, requires Windows SDK C++/WinRT a
 
 A current-user workspace mutex deduplicates starts. Suspended children enter a Windows Job Object before execution; supervisor/service failure cleans up owned descendants. Ownership never derives from names, ports or saved PIDs. Initial startup rejects unrelated listeners without terminating them. Restart waits for three clear listener samples 100 ms apart within five seconds after cleanup; TIME_WAIT does not count as listening.
 
-The host serves client assets on loopback 4173 and proxies `/api`/`/health` to loopback 4317. Host/Origin checks, canonical/open-handle path confinement, framing/body limits and header filtering apply. Direct clients of port 4317 still pass the backend local-access filter described in the backend README: per-launch token, loopback `Host`, allowlisted `Origin`, and JSON `POST`/`DELETE`. Stable assets/HTML use weak ETags and `no-cache`; hashed assets use immutable caching. API responses are not shared immutable assets. Sixteen blocking workers and a 64-entry queue use socket timeouts and close each browser connection after response; streaming/reuse need separate capacity work.
+The host serves client assets on loopback 4173 and proxies `/api`/`/health` to loopback 4317. Host/Origin checks, canonical/open-handle path confinement, framing/body limits and header filtering apply. Direct clients of port 4317 still pass the backend local-access filter described in the backend README: per-launch token, loopback `Host`, allowlisted `Origin`, and JSON `POST`/`DELETE`. Stable assets/HTML use weak ETags and `no-cache`; hashed assets use immutable caching. API responses are not shared immutable assets. Upstream calls time out after 120 seconds, except `POST /api/chat`, which gets 300 seconds so it outlasts the backend's 240-second agent deadline. Sixteen blocking workers and a 64-entry queue use socket timeouts and close each browser connection after response; streaming/reuse need separate capacity work.
 
 ## Windows bridge
 
 Java creates a random named pipe and supplies its PID. Current-user ACLs, remote-client rejection and connected-PID verification constrain access; a watcher exits when the backend dies. Broken peers reset without replaying mutations.
 
-Protocol v1: newline-delimited UTF-8 JSON with `requestId`, allowlisted `operation`, object `arguments`; responses echo version/ID, `ok` and result/error. Limits: 16 KiB requests, 8 MiB responses. Java's serialized 15-second deadline includes queue time; native async work shares 9 seconds and radio confirmation waits up to 1.5 seconds.
+Protocol v1: newline-delimited UTF-8 JSON with `requestId`, allowlisted `operation`, object `arguments`; responses echo version/ID, `ok` and result/error. Limits: 16 KiB requests, 8 MiB responses. Java serializes calls with separate 15-second budgets for queue wait and the call itself (a queue timeout returns `BRIDGE_BUSY` and does not restart the bridge); native async work shares 9 seconds and radio confirmation waits up to 1.5 seconds.
 
 | Operations | Capability |
 | --- | --- |
