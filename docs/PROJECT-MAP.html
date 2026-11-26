@@ -328,7 +328,7 @@ footer { padding: 40px 0 56px; color: var(--muted); font-size: 0.88rem; }
       <dt>Thread list</dt><dd>Every saved conversation with its message count and time. <em>New</em> starts a new one. On a phone-sized window it becomes a drop-down.</dd>
       <dt>Chat panel</dt><dd>Your messages and the assistant's replies. Enter sends, Shift+Enter adds a new line. If sending fails, your draft stays in the box. A warning appears when the chosen AI provider has no key saved.</dd>
       <dt>What the assistant can do alone</dt><dd>List and read text files inside the Live Desktop folder (never your saved data or secret settings files), look up memories you saved, and read live dashboard information such as system status, apps, phone, calendar and music.</dd>
-      <dt>What it must ask for</dt><dd>Writing a file in that folder, opening a website in your browser, and saving a new memory. Each of these becomes an approval request.</dd>
+      <dt>What it must ask for</dt><dd>Writing a file in that folder, opening a website in your browser, and saving a new memory. Each of these becomes an approval request. Some files can never be written, even with approval: see Workspace below.</dd>
       <dt>Approval window</dt><dd>If a request appears while you are on this page, a window opens with <em>Allow</em>, <em>Don't Allow</em> and <em>Decide later</em>. A <em>Review requests</em> button reopens it. The same requests are listed on the Approvals page.</dd>
       <dt>Where it goes</dt><dd>Conversation history is saved on this PC. Your message, recent messages from the same chat, and any relevant dashboard details are sent to the chosen AI provider (OpenAI or Anthropic) to produce the reply.</dd>
     </dl>
@@ -420,8 +420,8 @@ footer { padding: 40px 0 56px; color: var(--muted); font-size: 0.88rem; }
         <tr><td><strong>Turn Wi-Fi or Bluetooth on or off</strong></td><td>Controls card</td><td>Any later on or off change of that same control</td></tr>
         <tr><td><strong>Open a Windows page or app</strong><br><span class="small">One of nine fixed destinations: six Settings pages, Phone Link, Windows Calendar, Spotify</span></td><td>Controls shortcuts, Phone card, Calendar card, Music</td><td>Opening that exact destination again</td></tr>
         <tr><td><strong>Open a website in your browser</strong></td><td>The assistant, iCloud Calendar on the web, Apple Music</td><td>Opening that exact web address again</td></tr>
-        <tr><td><strong>Write a file</strong> in the Live Desktop folder</td><td>The assistant</td><td>Any later write to that same file, with any content</td></tr>
-        <tr><td><strong>Save a memory</strong></td><td>The assistant</td><td>Any later memory in the same category</td></tr>
+        <tr><td><strong>Write a file</strong> in the Live Desktop folder</td><td>The assistant</td><td>Writing exactly the same content to that same file again. Different content asks again.</td></tr>
+        <tr><td><strong>Save a memory</strong></td><td>The assistant</td><td>Saving exactly the same memory text in the same category again</td></tr>
       </tbody>
     </table>
   </div>
@@ -515,7 +515,7 @@ footer { padding: 40px 0 56px; color: var(--muted); font-size: 0.88rem; }
       <dt>App-specific password</dt><dd>A one-purpose password you create on Apple's website, so your real Apple password is never typed here.</dd>
       <dt>Profile</dt><dd>A separate set of saved data and looks. Not a login.</dd>
       <dt>Approval</dt><dd>Your yes to one kind of action, remembered for next time.</dd>
-      <dt>Workspace</dt><dd>The Live Desktop folder itself, the only place the assistant can read or write files.</dd>
+      <dt>Workspace</dt><dd>The Live Desktop folder itself, the only place the assistant can read or write files. Writes must go inside a subfolder and be plain text (.txt, .md, .json, .csv, .yaml, .ics and similar). Live Desktop’s own folders, files at the top of the folder, hidden dot-files and dot-folders, and build, editor and coding-agent files can never be written.</dd>
     </dl>
   </div>
 </section>

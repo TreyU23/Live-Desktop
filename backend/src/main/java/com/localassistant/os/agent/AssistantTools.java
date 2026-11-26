@@ -40,7 +40,7 @@ public final class AssistantTools {
     }
 
     @JsonTypeName("propose_write_file")
-    @JsonClassDescription("Requests a workspace file write. The first write to a file waits for user approval; later writes to that approved file run immediately. The path must be inside a folder (not the workspace root, not Live Desktop's own folders or a dot-folder) and end in a plain-text type: txt, md, markdown, json, csv, tsv, yaml, yml, toml, ics or log.")
+    @JsonClassDescription("Requests a workspace file write. It waits for user approval unless the user already approved this exact content for this file; any other content asks again. The path must be inside a folder (not the workspace root, not Live Desktop's own folders or a dot-folder) and end in a plain-text type: txt, md, markdown, json, csv, tsv, yaml, yml, toml, ics or log.")
     public static class ProposeWriteFile {
         public String path;
         public String content;
@@ -55,7 +55,7 @@ public final class AssistantTools {
     }
 
     @JsonTypeName("propose_memory")
-    @JsonClassDescription("Requests a useful durable memory. The first memory in a category waits for approval; later memories in that approved category are saved immediately.")
+    @JsonClassDescription("Requests a useful durable memory. It waits for user approval unless the user already approved this exact text in this category; any other text asks again.")
     public static class ProposeMemory {
         public String content;
         @JsonPropertyDescription("One of preference, project, fact, or instruction.")
