@@ -177,6 +177,29 @@ class AnthropicAgentTest {
     }
 
     @Test
+    void replyCutOffAtMaxTokensSaysSo() throws Exception {
+        // Issue #28: a max_tokens stop is not a finished answer.
+        replies.add(response(200, """
+                {"stop_reason":"max_tokens","content":[{"type":"thinking","thinking":"t","signature":"s"},
+                  {"type":"text","text":"Step one, then step  "}]}"""));
+
+        assertThat(agent.reply(CONVERSATION, KEY, System.nanoTime() + AssistantAgent.AGENT_DEADLINE.toNanos()))
+                .isEqualTo("Step one, then step\n\n" + AnthropicAgent.kTruncatedNote);
+        assertThat(requests).hasSize(1);
+    }
+
+    @Test
+    void cutOffInsideThinkingOrAToolCallDoesNotRunTheTool() throws Exception {
+        replies.add(response(200, """
+                {"stop_reason":"max_tokens","content":[{"type":"thinking","thinking":"t","signature":"s"},
+                  {"type":"tool_use","id":"toolu_2","name":"list_workspace_files","input":{}}]}"""));
+
+        assertThat(agent.reply(CONVERSATION, KEY, System.nanoTime() + AssistantAgent.AGENT_DEADLINE.toNanos()))
+                .isEqualTo(AnthropicAgent.kTruncatedWithoutText);
+        verify(tools, never()).run(anyString(), any());
+    }
+
+    @Test
     void toolDefinitionsMatchTheAnnotatedToolClasses() {
         JsonNode definitions = AssistantToolRunner.anthropicToolDefinitions(JSON);
         assertThat(definitions).hasSize(7);

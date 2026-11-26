@@ -36,6 +36,8 @@ public class AnthropicAgent {
     /** Status codes worth one retry: timeouts, conflicts, rate limits, overload and server errors. */
     private static final Set<Integer> kRetryableStatus = Set.of(408, 409, 429, 500, 502, 503, 504, 529);
     private static final Duration kRetryBackoff = Duration.ofMillis(750);
+    static final String kTruncatedNote = "(This reply was cut off because it reached the length limit. Ask me to continue, or for a shorter answer.)";
+    static final String kTruncatedWithoutText = "My reply reached the length limit before I could finish it, so nothing was done. Try a shorter request or split it into steps.";
 
     /** Sends one request; separated so tests can replace the network. */
     @FunctionalInterface
@@ -116,12 +118,19 @@ public class AnthropicAgent {
             JsonNode content = response.path("content");
             if (!content.isArray()) throw new AnthropicApiException(502, "invalid_response", null);
 
-            if (!"tool_use".equals(response.path("stop_reason").asText())) {
+            String stopReason = response.path("stop_reason").asText();
+            if (!"tool_use".equals(stopReason)) {
                 StringBuilder text = new StringBuilder();
                 for (JsonNode block : content) {
                     if ("text".equals(block.path("type").asText())) text.append(block.path("text").asText());
                 }
-                if (text.isEmpty() && "refusal".equals(response.path("stop_reason").asText())) {
+                if ("max_tokens".equals(stopReason)) {
+                    // Thinking shares the output budget, so the cut can land in thinking, text or a tool call (issue #28).
+                    return text.isEmpty()
+                            ? kTruncatedWithoutText
+                            : text.toString().stripTrailing() + "\n\n" + kTruncatedNote;
+                }
+                if (text.isEmpty() && "refusal".equals(stopReason)) {
                     return "Claude declined to answer this request.";
                 }
                 return text.isEmpty() ? "I could not produce a text response." : text.toString();
