@@ -10,6 +10,7 @@ import java.lang.management.ManagementFactory;
 import java.net.NetworkInterface;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Clock;
 import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.Duration;
@@ -28,6 +29,9 @@ import org.springframework.stereotype.Service;
 @Service
 public class SystemService {
     private static final Duration BATTERY_CACHE_TTL = Duration.ofMinutes(5);
+    // Bridge results never change while the process runs, so a successful read is kept forever.
+    // A failed read (e.g. the bridge is still starting at boot) is retried after this delay.
+    static final Duration WINDOWS_DETAILS_RETRY_AFTER = Duration.ofSeconds(30);
     private static final Map<String, ControlDefinition> CONTROL_DEFINITIONS = Map.of(
             "wifi", new ControlDefinition("wifi", "Wi-Fi", "ms-settings:network-wifi", true),
             "bluetooth", new ControlDefinition("bluetooth", "Bluetooth", "ms-settings:bluetooth", true),
@@ -57,7 +61,9 @@ public class SystemService {
     private final Object batteryLock = new Object();
     private final Object ioRateLock = new Object();
     private final PhoneMetadataCache phoneMetadata = new PhoneMetadataCache();
-    private volatile WindowsDetails cachedWindowsDetails;
+    private volatile CachedWindowsDetails cachedWindowsDetails;
+    // Package-private so tests can move time forward; production always uses the system clock.
+    Clock clock = Clock.systemUTC();
     private volatile CachedBattery cachedBattery;
     private volatile IoCounterSample previousIoCounters;
 
@@ -125,26 +131,30 @@ public class SystemService {
     }
 
     private WindowsDetails windowsDetails(long fallbackMemoryBytes) {
-        WindowsDetails current = cachedWindowsDetails;
-        if (current != null) {
-            return current;
+        CachedWindowsDetails current = cachedWindowsDetails;
+        if (current != null && current.isFresh(clock.instant())) {
+            return current.value();
         }
         synchronized (this) {
-            if (cachedWindowsDetails == null) {
-                cachedWindowsDetails = readWindowsDetails(fallbackMemoryBytes);
+            current = cachedWindowsDetails;
+            Instant now = clock.instant();
+            if (current == null || !current.isFresh(now)) {
+                current = readWindowsDetails(fallbackMemoryBytes, now);
+                cachedWindowsDetails = current;
             }
-            return cachedWindowsDetails;
+            return current.value();
         }
     }
 
-    private WindowsDetails readWindowsDetails(long fallbackMemoryBytes) {
+    private CachedWindowsDetails readWindowsDetails(long fallbackMemoryBytes, Instant now) {
         WindowsDetails fallback = fallbackWindowsDetails(fallbackMemoryBytes);
         if (!isWindows()) {
-            return fallback;
+            return CachedWindowsDetails.permanent(fallback);
         }
+        CachedWindowsDetails retryLater = CachedWindowsDetails.until(fallback, now.plus(WINDOWS_DETAILS_RETRY_AFTER));
         try {
             Map<String, Object> result = bridge.request("system.staticSnapshot", Map.of());
-            if (!result.containsKey("device")) return fallback;
+            if (!result.containsKey("device")) return retryLater;
             JsonNode root = objectMapper.valueToTree(result);
             JsonNode device = root.path("device");
             JsonNode windows = root.path("windows");
@@ -171,9 +181,9 @@ public class SystemService {
                     text(windows, "build", fallback.windows().build()),
                     text(windows, "installedOn", "Unavailable"),
                     text(windows, "architecture", fallback.windows().architecture()));
-            return new WindowsDetails(deviceInfo, windowsInfo);
+            return CachedWindowsDetails.permanent(new WindowsDetails(deviceInfo, windowsInfo));
         } catch (Exception ignored) {
-            return fallback;
+            return retryLater;
         }
     }
 
@@ -686,4 +696,19 @@ public class SystemService {
     private record PhoneDevice(String displayName, String manufacturer, String model, String osName, Instant lastSeenAt) {}
 
     private record WindowsDetails(DeviceInfo device, WindowsInfo windows) {}
+
+    /** {@code expiresAt == null} means the value never expires. */
+    private record CachedWindowsDetails(WindowsDetails value, Instant expiresAt) {
+        static CachedWindowsDetails permanent(WindowsDetails value) {
+            return new CachedWindowsDetails(value, null);
+        }
+
+        static CachedWindowsDetails until(WindowsDetails value, Instant expiresAt) {
+            return new CachedWindowsDetails(value, expiresAt);
+        }
+
+        boolean isFresh(Instant now) {
+            return expiresAt == null || now.isBefore(expiresAt);
+        }
+    }
 }
