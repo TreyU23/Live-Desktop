@@ -7,9 +7,6 @@ import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
-import java.util.HexFormat;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -129,7 +126,7 @@ public class ActionService {
             case "workspace_write_file" -> {
                 Path path = workspace.resolveWritablePath(String.valueOf(arguments.get("path")));
                 yield kind + ":" + workspace.root().relativize(path).normalize().toString()
-                        .toLowerCase(Locale.ROOT) + ":" + sha256(String.valueOf(arguments.get("content")));
+                        .toLowerCase(Locale.ROOT) + ":" + contentHash(arguments);
             }
             case "browser_open_url" -> kind + ":"
                     + parseWebUri(String.valueOf(arguments.get("url"))).normalize();
@@ -139,7 +136,7 @@ public class ActionService {
                     + String.valueOf(arguments.get("control")).toLowerCase(Locale.ROOT);
             case "remember" -> kind + ":"
                     + String.valueOf(arguments.get("category")).toLowerCase(Locale.ROOT) + ":"
-                    + sha256(String.valueOf(arguments.get("content")));
+                    + AssistantAction.sha256(String.valueOf(arguments.get("content")));
             default -> throw new IllegalArgumentException("Unknown action kind.");
         };
     }
@@ -177,13 +174,11 @@ public class ActionService {
                 String.valueOf(action.arguments().get("category")));
     }
 
-    private static String sha256(String value) {
-        try {
-            return HexFormat.of().formatHex(
-                    MessageDigest.getInstance("SHA-256").digest(value.getBytes(StandardCharsets.UTF_8)));
-        } catch (NoSuchAlgorithmException error) {
-            throw new IllegalStateException(error);
-        }
+    /** Finished writes keep only the content hash (see {@link AssistantAction#compacted()}). */
+    private static String contentHash(Map<String, Object> arguments) {
+        return arguments.get("contentSha256") instanceof String hash
+                ? hash
+                : AssistantAction.sha256(String.valueOf(arguments.get("content")));
     }
 
     private void requirePending(AssistantAction action) {
@@ -196,7 +191,7 @@ public class ActionService {
             AssistantAction action, String status, Object result, String error) {
         return new AssistantAction(
                 action.id(), action.kind(), status, action.arguments(), action.reason(), result, error,
-                action.createdAt(), action.updatedAt());
+                action.createdAt(), action.updatedAt()).compacted();
     }
 
     private URI parseWebUri(String value) {

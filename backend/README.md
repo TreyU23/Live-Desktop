@@ -45,6 +45,8 @@ For development, `scripts/run-backend.ps1` checks the built bridge/DLL, selects 
 
 Calendar validates Apple-owned HTTPS destinations/redirects before sending credentials; recurrence/timezones use ical4j. Credentials use current-user DPAPI through JNI, never bridge IPC. Settings returns status; usable keys or the default-profile environment fallback determine availability. Secrets remain in managed memory while used.
 
+State is stored per profile in `assistant-state.json` as compact JSON, written to a temporary file and moved into place, under one lock per profile. A finished file write keeps only its path, content SHA-256 and size (older files are trimmed on load), and at most 1,000 finished actions are kept; pending and approved ones are never dropped.
+
 Workspace canonical checks reject escapes through existing ancestors/junctions. Reads cap at 100 KB, listings at 500 entries and skip build/dependency directories. Read/list tools exclude configured/conventional data directories and root `.env` variants, except `.env.example`. Writes go through `resolveWritablePath`, which also refuses Live Desktop's own folders, every `.env`/`.env.*` file, executable and loadable extensions, trailing-dot/space and 8.3 short names, and alternate data streams. A write approval key is the normalized path plus the SHA-256 of the content, and failed actions never count as prior approvals. Protect the installation against concurrent untrusted replacement.
 
 Focus/Night light/Mic privacy/Battery saver are approved Settings launches, not confirmed state changes. Lifecycle actions need a production supervisor. [Native protocol](../native/README.md), [system inventory](../docs/SYSTEM_INFORMATION.md), [validation/performance](../docs/VALIDATION.md).

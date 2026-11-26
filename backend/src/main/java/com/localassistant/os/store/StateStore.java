@@ -17,7 +17,8 @@ import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.time.Instant;
 import java.util.ArrayList;
-import java.util.HashMap;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.locks.ReentrantLock;
 import java.util.Map;
 import java.util.List;
 import java.util.Optional;
@@ -27,12 +28,37 @@ import org.springframework.stereotype.Component;
 
 @Component
 public class StateStore {
-    private final Gson gson = new GsonBuilder().setPrettyPrinting().create();
+    /** Finished actions kept per profile; older ones are dropped so state and polls stay bounded. */
+    static final int MAX_FINISHED_ACTIONS = 1_000;
+
+    private final Gson gson = new GsonBuilder().create();
     private final ProfilePaths profilePaths;
-    private final Map<String, AppState> states = new HashMap<>();
+    private final Map<String, AppState> states = new ConcurrentHashMap<>();
+    /** One lock per profile, so a slow commit in one profile never blocks requests for another. */
+    private final Map<String, ReentrantLock> locks = new ConcurrentHashMap<>();
 
     public StateStore(ProfilePaths profilePaths) {
         this.profilePaths = profilePaths;
+    }
+
+    private interface IoAction<T> { T run() throws IOException; }
+
+    private <T> T locked(IoAction<T> action) throws IOException {
+        ReentrantLock lock = locks.computeIfAbsent(ProfileContext.currentId(), ignored -> new ReentrantLock());
+        lock.lock();
+        try {
+            return action.run();
+        } finally {
+            lock.unlock();
+        }
+    }
+
+    private <T> T lockedUnchecked(IoAction<T> action) {
+        try {
+            return locked(action);
+        } catch (IOException error) {
+            throw new IllegalStateException("Could not persist assistant state.", error);
+        }
     }
 
     private AppState state() {
@@ -54,21 +80,30 @@ public class StateStore {
             if (parsed == null || parsed.version() != 1) {
                 throw new IllegalStateException("Unsupported or invalid assistant state file.");
             }
-                return parsed;
+                // Older files still hold the full content of finished writes; shed it as the state loads.
+                return new AppState(1, parsed.conversations(), parsed.memories(),
+                        parsed.actions().stream().map(AssistantAction::compacted)
+                                .collect(java.util.stream.Collectors.toCollection(ArrayList::new)));
             }
         } catch (IOException error) {
             throw new IllegalStateException("Could not load assistant state.", error);
         }
     }
 
-    public synchronized AppState snapshot() {
-        return gson.fromJson(gson.toJson(state()), AppState.class);
+    public AppState snapshot() {
+        return lockedUnchecked(() -> {
+            return gson.fromJson(gson.toJson(state()), AppState.class);
+        });
     }
 
-    public synchronized List<Memory> memories() { return List.copyOf(state().memories()); }
+    public List<Memory> memories() {
+        return lockedUnchecked(() -> List.copyOf(state().memories()));
+    }
 
-    public synchronized List<AssistantAction> actions() {
-        return state().actions().stream().map(this::copyAction).toList();
+    public List<AssistantAction> actions() {
+        return lockedUnchecked(() -> {
+            return state().actions().stream().map(this::copyAction).toList();
+        });
     }
 
     private AssistantAction copyAction(AssistantAction action) {
@@ -80,29 +115,38 @@ public class StateStore {
                 conversation.createdAt(), conversation.updatedAt());
     }
 
-    public synchronized Optional<Conversation> conversation(String id) {
-        return state().conversations().stream().filter(item -> item.id().equals(id)).findFirst().map(this::copyConversation);
+    public Optional<Conversation> conversation(String id) {
+        return lockedUnchecked(() -> {
+            return state().conversations().stream().filter(item -> item.id().equals(id)).findFirst().map(this::copyConversation);
+        });
     }
 
-    public synchronized List<Map<String, Object>> conversationSummaries() {
-        return state().conversations().stream().map(item -> Map.<String, Object>of(
-                "id", item.id(), "title", item.title(), "createdAt", item.createdAt(),
-                "updatedAt", item.updatedAt(), "messageCount", item.messages().size())).toList();
+    public List<Map<String, Object>> conversationSummaries() {
+        return lockedUnchecked(() -> {
+            return state().conversations().stream().map(item -> Map.<String, Object>of(
+                    "id", item.id(), "title", item.title(), "createdAt", item.createdAt(),
+                    "updatedAt", item.updatedAt(), "messageCount", item.messages().size())).toList();
+        });
     }
 
-    public synchronized void clearCurrentCache() {
-        states.remove(ProfileContext.currentId());
+    public void clearCurrentCache() {
+        lockedUnchecked(() -> {
+            states.remove(ProfileContext.currentId());
+        return null;
+        });
     }
 
-    public synchronized Conversation getOrCreateConversation(String requestedId) throws IOException {
-        if (requestedId != null && !requestedId.isBlank()) {
-            return state().conversations().stream()
-                    .filter(conversation -> conversation.id().equals(requestedId))
-                    .findFirst()
-                    .map(this::copyConversation)
-                    .orElseGet(() -> createConversation(requestedId));
-        }
-        return createConversation(UUID.randomUUID().toString());
+    public Conversation getOrCreateConversation(String requestedId) throws IOException {
+        return locked(() -> {
+            if (requestedId != null && !requestedId.isBlank()) {
+                return state().conversations().stream()
+                        .filter(conversation -> conversation.id().equals(requestedId))
+                        .findFirst()
+                        .map(this::copyConversation)
+                        .orElseGet(() -> createConversation(requestedId));
+            }
+            return createConversation(UUID.randomUUID().toString());
+        });
     }
 
     private Conversation createConversation(String id) {
@@ -115,89 +159,112 @@ public class StateStore {
         return copyConversation(conversation);
     }
 
-    public synchronized ConversationMessage addMessage(String conversationId, String role, String content)
+    public ConversationMessage addMessage(String conversationId, String role, String content)
             throws IOException {
-        String now = Instant.now().toString();
-        ConversationMessage message = new ConversationMessage(UUID.randomUUID().toString(), role, content, now);
-        var conversations = new ArrayList<Conversation>();
-        boolean found = false;
-        AppState state = state();
-        for (Conversation conversation : state.conversations()) {
-            if (!conversation.id().equals(conversationId)) {
-                conversations.add(conversation);
-                continue;
+        return locked(() -> {
+            String now = Instant.now().toString();
+            ConversationMessage message = new ConversationMessage(UUID.randomUUID().toString(), role, content, now);
+            var conversations = new ArrayList<Conversation>();
+            boolean found = false;
+            AppState state = state();
+            for (Conversation conversation : state.conversations()) {
+                if (!conversation.id().equals(conversationId)) {
+                    conversations.add(conversation);
+                    continue;
+                }
+                found = true;
+                var messages = new ArrayList<>(conversation.messages());
+                messages.add(message);
+                String title = messages.size() == 1
+                        ? content.substring(0, Math.min(72, content.length()))
+                        : conversation.title();
+                conversations.add(new Conversation(
+                        conversation.id(), title, messages, conversation.createdAt(), now));
             }
-            found = true;
-            var messages = new ArrayList<>(conversation.messages());
-            messages.add(message);
-            String title = messages.size() == 1
-                    ? content.substring(0, Math.min(72, content.length()))
-                    : conversation.title();
-            conversations.add(new Conversation(
-                    conversation.id(), title, messages, conversation.createdAt(), now));
-        }
-        if (!found) {
-            throw new IllegalArgumentException("Conversation not found.");
-        }
-        commit(new AppState(1, conversations, state.memories(), state.actions()));
-        return message;
+            if (!found) {
+                throw new IllegalArgumentException("Conversation not found.");
+            }
+            commit(new AppState(1, conversations, state.memories(), state.actions()));
+            return message;
+        });
     }
 
-    public synchronized Memory addMemory(String content, String category) throws IOException {
-        String now = Instant.now().toString();
-        Memory memory = new Memory(UUID.randomUUID().toString(), content, category, now, now);
-        AppState state = state();
-        var memories = new ArrayList<>(state.memories());
-        memories.add(memory);
-        commit(new AppState(1, state.conversations(), memories, state.actions()));
-        return memory;
-    }
-
-    public synchronized boolean deleteMemory(String id) throws IOException {
-        AppState state = state();
-        var memories = new ArrayList<>(state.memories());
-        boolean deleted = memories.removeIf(memory -> memory.id().equals(id));
-        if (deleted) {
+    public Memory addMemory(String content, String category) throws IOException {
+        return locked(() -> {
+            String now = Instant.now().toString();
+            Memory memory = new Memory(UUID.randomUUID().toString(), content, category, now, now);
+            AppState state = state();
+            var memories = new ArrayList<>(state.memories());
+            memories.add(memory);
             commit(new AppState(1, state.conversations(), memories, state.actions()));
-        }
-        return deleted;
+            return memory;
+        });
     }
 
-    public synchronized AssistantAction addAction(
+    public boolean deleteMemory(String id) throws IOException {
+        return locked(() -> {
+            AppState state = state();
+            var memories = new ArrayList<>(state.memories());
+            boolean deleted = memories.removeIf(memory -> memory.id().equals(id));
+            if (deleted) {
+                commit(new AppState(1, state.conversations(), memories, state.actions()));
+            }
+            return deleted;
+        });
+    }
+
+    public AssistantAction addAction(
             String kind, Map<String, Object> arguments, String reason) throws IOException {
-        String now = Instant.now().toString();
-        AssistantAction action = new AssistantAction(
-                UUID.randomUUID().toString(), kind, "pending", Map.copyOf(arguments), reason,
-                null, null, now, now);
-        AppState state = state();
-        var actions = new ArrayList<>(state.actions());
-        actions.add(copyAction(action));
-        commit(new AppState(1, state.conversations(), state.memories(), actions));
-        return copyAction(action);
+        return locked(() -> {
+            String now = Instant.now().toString();
+            AssistantAction action = new AssistantAction(
+                    UUID.randomUUID().toString(), kind, "pending", Map.copyOf(arguments), reason,
+                    null, null, now, now);
+            AppState state = state();
+            var actions = new ArrayList<>(state.actions());
+            actions.add(copyAction(action));
+            pruneFinished(actions);
+            commit(new AppState(1, state.conversations(), state.memories(), actions));
+            return copyAction(action);
+        });
     }
 
-    public synchronized AssistantAction updateAction(String id, UnaryOperator<AssistantAction> update)
+    public AssistantAction updateAction(String id, UnaryOperator<AssistantAction> update)
             throws IOException {
-        var actions = new ArrayList<AssistantAction>();
-        AssistantAction updated = null;
-        AppState state = state();
-        for (AssistantAction action : state.actions()) {
-            if (action.id().equals(id)) {
-                updated = update.apply(copyAction(action));
-                updated = new AssistantAction(
-                        updated.id(), updated.kind(), updated.status(), updated.arguments(), updated.reason(),
-                        updated.result(), updated.error(), updated.createdAt(), Instant.now().toString());
-                updated = copyAction(updated);
-                actions.add(updated);
-            } else {
-                actions.add(action);
+        return locked(() -> {
+            var actions = new ArrayList<AssistantAction>();
+            AssistantAction updated = null;
+            AppState state = state();
+            for (AssistantAction action : state.actions()) {
+                if (action.id().equals(id)) {
+                    updated = update.apply(copyAction(action));
+                    updated = new AssistantAction(
+                            updated.id(), updated.kind(), updated.status(), updated.arguments(), updated.reason(),
+                            updated.result(), updated.error(), updated.createdAt(), Instant.now().toString());
+                    updated = copyAction(updated);
+                    actions.add(updated);
+                } else {
+                    actions.add(action);
+                }
+            }
+            if (updated == null) {
+                throw new IllegalArgumentException("Action not found.");
+            }
+            commit(new AppState(1, state.conversations(), state.memories(), actions));
+            return copyAction(updated);
+        });
+    }
+
+    private static void pruneFinished(List<AssistantAction> actions) {
+        long finished = actions.stream().filter(action -> !"pending".equals(action.status())
+                && !"approved".equals(action.status())).count();
+        for (var iterator = actions.iterator(); finished > MAX_FINISHED_ACTIONS && iterator.hasNext();) {
+            AssistantAction candidate = iterator.next();
+            if (!"pending".equals(candidate.status()) && !"approved".equals(candidate.status())) {
+                iterator.remove();
+                finished--;
             }
         }
-        if (updated == null) {
-            throw new IllegalArgumentException("Action not found.");
-        }
-        commit(new AppState(1, state.conversations(), state.memories(), actions));
-        return copyAction(updated);
     }
 
     private void commitUnchecked(AppState value) {
