@@ -25,11 +25,11 @@ Stop before replacing runtime files. Back up `data/` before upgrades; DPAPI cred
 Source builds require Java 21, Node.js **20.19+ or 22.12+**, pnpm, Visual Studio 2022 Build Tools with Desktop development with C++, CMake and a Windows SDK containing C++/WinRT. The Maven wrapper is included. In PowerShell at the repository root:
 
 ```powershell
-.\scripts\bootstrap-java.ps1
-pnpm --dir frontend install --frozen-lockfile
-.\scripts\build-production.ps1
+.\build.cmd
 .\start.cmd
 ```
+
+`build.cmd` installs project-local Java and frontend dependencies if missing, then runs `scripts\build-production.ps1` (native bridge, backend, CDS, frontend tests and bundle). `.\build.cmd run` stops a running instance, rebuilds, and starts. The individual steps (`scripts\bootstrap-java.ps1`, `pnpm --dir frontend install --frozen-lockfile`) still work on their own.
 
 Bootstrap verifies and installs Temurin into `.tools/jdk-21`. If scripts are blocked, `Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass` affects only that terminal. The production build runs native protocol, Java and frontend tests, extracts Java with libraries, trains CDS using isolated data and builds frontend/Sites assets. [Additional validation](docs/VALIDATION.md).
 
