@@ -14,6 +14,8 @@ import java.nio.file.Path;
 import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.EnabledOnOs;
+import org.junit.jupiter.api.condition.OS;
 import org.junit.jupiter.api.io.TempDir;
 
 class ActionServiceTest {
@@ -138,6 +140,7 @@ class ActionServiceTest {
     }
 
     @Test
+    @EnabledOnOs(value = OS.WINDOWS, disabledReason = "ActionService refuses URI opens off Windows")
     void calendarAndMusicUrisAreAllowlisted() throws Exception {
         when(systemControls.open("windows.openUri", "outlookcal:")).thenReturn(Map.of("opened", "outlookcal:"));
         when(systemControls.open("windows.openUri", "spotify:")).thenReturn(Map.of("opened", "spotify:"));
