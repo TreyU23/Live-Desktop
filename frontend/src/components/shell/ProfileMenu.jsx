@@ -11,6 +11,7 @@ import { List } from '@astryxdesign/core/List';
 import { Text } from '@astryxdesign/core/Text';
 import { TextInput } from '@astryxdesign/core/TextInput';
 import { icons } from '../ui/icons.js';
+import { AvatarError, avatarDataUrl } from '../../profileAvatar.js';
 
 const kDefaultAvatar = '/assets/user-avatar.png';
 
@@ -32,22 +33,24 @@ export function ProfileMenu({ profiles, activeProfile, onSwitch, onManage }) {
       children: activeProfile.name }} />;
 }
 
-export function ProfileDialog({ isOpen, onOpenChange, profiles, activeProfile, onProfilesChange, onSwitch, onDelete }) {
+export function ProfileDialog({ isOpen, onOpenChange, profiles, activeProfile, onProfilesChange, onSwitch, onDelete, onError }) {
   const [name, setName] = useState(activeProfile.name);
   const [photo, setPhoto] = useState(null);
   useEffect(() => setName(activeProfile.name), [activeProfile.id, activeProfile.name]);
   const updateActive = changes => onProfilesChange(profiles.map(profile => profile.id === activeProfile.id ? { ...profile, ...changes } : profile));
-  const choosePhoto = file => {
+  // The photo is cut to a small square avatar first; a full-size data URL would overflow localStorage (issue #29).
+  const choosePhoto = async file => {
     setPhoto(null);
-    if (!file || !file.type.startsWith('image/')) return;
-    const reader = new FileReader();
-    reader.onload = () => updateActive({ avatar: reader.result });
-    reader.readAsDataURL(file);
+    if (!file) return;
+    try {
+      updateActive({ avatar: await avatarDataUrl(file) });
+    } catch (error) {
+      onError?.(error instanceof AvatarError ? error.message : 'That photo could not be used.');
+    }
   };
   const createProfile = () => {
     const id = crypto.randomUUID().replaceAll('-', '_');
-    onProfilesChange([...profiles, { id, name: `Profile ${profiles.length + 1}`, avatar: kDefaultAvatar }]);
-    onSwitch(id);
+    if (onProfilesChange([...profiles, { id, name: `Profile ${profiles.length + 1}`, avatar: kDefaultAvatar }])) onSwitch(id);
   };
   const saveName = () => { if (name.trim() && name.trim() !== activeProfile.name) updateActive({ name: name.trim().slice(0, 48) }); };
   return <Dialog isOpen={isOpen} onOpenChange={onOpenChange} width={480} purpose="form">
@@ -65,7 +68,8 @@ export function ProfileDialog({ isOpen, onOpenChange, profiles, activeProfile, o
           </List>
           <TextInput label="Profile name" value={name} onChange={setName} onEnter={saveName} onKeyDown={undefined}
             description="Saved when you press Enter or leave the field." placeholder="Profile name" autoComplete="off" />
-          <FileInput label="Profile photo" value={photo} onChange={choosePhoto} accept="image/*" placeholder="Change photo" />
+          <FileInput label="Profile photo" value={photo} onChange={choosePhoto} accept="image/*" placeholder="Change photo"
+            description="Cropped to a square and stored small on this device." />
         </VStack>
       </LayoutContent>}
       footer={<LayoutFooter>

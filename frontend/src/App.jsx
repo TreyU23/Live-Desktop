@@ -412,9 +412,16 @@ export function App() {
     window.localStorage.setItem(profileStorageKey(MUSIC_CONNECTION_KEY, profileId), JSON.stringify(musicIntegration));
   }, [musicIntegration, profileId]);
 
+  // Save first and only then show the change, so a full localStorage can't leave unsaved state on screen (issue #29).
   const updateProfiles = (nextProfiles) => {
+    try {
+      window.localStorage.setItem(PROFILES_KEY, JSON.stringify(nextProfiles));
+    } catch {
+      notify("Profile changes couldn't be saved because this browser's storage for Live Desktop is full.", "error");
+      return false;
+    }
     setProfiles(nextProfiles);
-    window.localStorage.setItem(PROFILES_KEY, JSON.stringify(nextProfiles));
+    return true;
   };
 
   const switchProfile = (nextId) => {
@@ -948,6 +955,7 @@ export function App() {
       </VStack>
     </AppShell>
     <ProfileDialog isOpen={profileMenuOpen} onOpenChange={setProfileMenuOpen} profiles={profiles} activeProfile={activeProfile} onProfilesChange={updateProfiles} onSwitch={switchProfile}
+      onError={(message) => notify(message, "error")}
       onDelete={(id) => { setProfileMenuOpen(false); setProfileDelete(profiles.find(profile => profile.id === id)); }} />
     <AlertDialog isOpen={shutdownOpen} onOpenChange={setShutdownOpen} title="Stop Live Desktop?" actionLabel="Stop services"
       description="This stops Live Desktop's frontend and backend services. It does not shut down Windows. Run start.cmd from the application folder to start them again; this page cannot restart stopped services."
