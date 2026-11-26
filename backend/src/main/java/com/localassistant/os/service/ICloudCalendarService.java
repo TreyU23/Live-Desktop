@@ -1,5 +1,6 @@
 package com.localassistant.os.service;
 
+import com.localassistant.os.error.ClientErrors;
 import java.io.StringReader;
 import java.net.URI;
 import java.net.http.HttpClient;
@@ -348,8 +349,8 @@ public class ICloudCalendarService {
     }
 
     private String friendlyError(Exception error) {
-        String message = error.getMessage();
-        return message == null || message.isBlank() ? "iCloud Calendar could not be refreshed." : message;
+        var described = ClientErrors.describe(error);
+        return "internal_error".equals(described.code()) ? "iCloud Calendar could not be refreshed." : described.message();
     }
 
     private record CalendarCollection(String name, URI uri) {}

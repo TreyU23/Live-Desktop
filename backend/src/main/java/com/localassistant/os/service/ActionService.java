@@ -1,5 +1,6 @@
 package com.localassistant.os.service;
 
+import com.localassistant.os.error.ClientErrors;
 import com.localassistant.os.model.AssistantAction;
 import com.localassistant.os.store.StateStore;
 import java.io.IOException;
@@ -73,7 +74,7 @@ public class ActionService {
             Object result = execute(approved);
             return store.updateAction(id, action -> replaceStatus(action, "completed", result, null));
         } catch (Exception error) {
-            return store.updateAction(id, action -> replaceStatus(action, "failed", null, error.getMessage()));
+            return store.updateAction(id, action -> replaceStatus(action, "failed", null, ClientErrors.message(error)));
         }
     }
 

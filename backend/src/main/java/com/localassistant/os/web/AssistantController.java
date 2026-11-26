@@ -1,6 +1,7 @@
 package com.localassistant.os.web;
 
 import com.localassistant.os.agent.OpenAiAgent;
+import com.localassistant.os.error.ClientErrors;
 import com.localassistant.os.model.Conversation;
 import com.localassistant.os.model.ConversationMessage;
 import com.localassistant.os.profile.ProfileLifecycle;
@@ -388,8 +389,7 @@ public class AssistantController {
     }
 
     private Map<String, String> error(Exception error) {
-        String message = error.getMessage() == null ? error.toString() : error.getMessage();
-        return Map.of("error", message);
+        return ClientErrors.body(error);
     }
 
     public record ChatRequest(

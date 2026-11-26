@@ -1,6 +1,7 @@
 package com.localassistant.os.agent;
 
 import com.localassistant.os.config.AssistantProperties;
+import com.localassistant.os.error.ClientErrors;
 import com.localassistant.os.model.Conversation;
 import com.localassistant.os.model.ConversationMessage;
 import com.localassistant.os.profile.ProfileContext;
@@ -201,7 +202,7 @@ public class OpenAiAgent {
                 try {
                     output = callTool(call);
                 } catch (Exception error) {
-                    output = Map.of("error", error.getMessage() == null ? error.toString() : error.getMessage());
+                    output = Map.of("error", ClientErrors.message(error));
                 }
                 inputs.add(ResponseInputItem.ofFunctionCallOutput(
                         ResponseInputItem.FunctionCallOutput.builder()
