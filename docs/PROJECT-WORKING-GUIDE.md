@@ -269,6 +269,7 @@ Desktop layout:
 - Overview: instrument tiles, pending banner, This PC beside Controls, Ask Live Desktop, Calendar/Now playing/Phone, Connections beside Recent activity.
 - System Info uses a Live / Specifications segmented control.
 - Conversations uses a thread panel beside the chat; Settings is a section list beside grouped rows.
+- Conversations has a destructive **Delete** button beside the open thread title. It asks for confirmation, then calls `DELETE /api/conversations/{id}`, which removes the conversation from the state file and memory; the UI clears the open copy and the scheduler's cached copy. Memories and approvals are separate and are not removed with a conversation.
 
 Below 768px:
 

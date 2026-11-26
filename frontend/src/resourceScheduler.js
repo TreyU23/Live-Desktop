@@ -49,6 +49,11 @@ export function createResourceScheduler({ read, visible = () => typeof document 
     entry.controller?.abort();
     await entry.pending?.catch(() => {});
   }
+  // Drops the cached value of a key (for example a deleted conversation) so nothing keeps a copy in memory.
+  function forget(key) {
+    const entry = entries.get(key);
+    if (entry) entry.value = undefined;
+  }
   function visibilityChanged() {
     for (const [key, entry] of entries) {
       clock.clearTimeout(entry.timer);
@@ -63,5 +68,5 @@ export function createResourceScheduler({ read, visible = () => typeof document 
       entry.controller?.abort();
     }
   }
-  return { register, refresh, invalidate, visibilityChanged, stop };
+  return { register, refresh, invalidate, forget, visibilityChanged, stop };
 }

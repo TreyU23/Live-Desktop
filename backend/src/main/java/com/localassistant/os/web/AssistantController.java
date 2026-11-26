@@ -152,6 +152,24 @@ public class AssistantController {
                         .body(Map.of("error", "Conversation not found.")));
     }
 
+    @DeleteMapping("/api/conversations/{id}")
+    public ResponseEntity<?> deleteConversation(@PathVariable String id) {
+        // Claim the conversation like a chat turn does, so a reply that is still being written can't
+        // save into it (or bring it back) while it is being removed.
+        try (var claim = inFlight.tryClaim(ProfileContext.currentId(), id)) {
+            if (claim == null) {
+                return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of(
+                        "error", "This conversation is still answering a message. Wait for the reply, then delete it.",
+                        "code", "conversation_busy"));
+            }
+            return store.deleteConversation(id)
+                    ? ResponseEntity.noContent().build()
+                    : ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("error", "Conversation not found."));
+        } catch (IOException error) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(error(error));
+        }
+    }
+
     @PostMapping("/api/chat")
     public ResponseEntity<?> chat(@Valid @RequestBody ChatRequest request) {
         AssistantProvider provider = agent.provider();

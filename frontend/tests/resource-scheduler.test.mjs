@@ -34,3 +34,20 @@ test('visibility pauses polling and returning while a read is pending does not d
   assert.equal(calls, 1); resolve({}); await scheduler.refresh('phone');
   assert.equal(timers.size, 1); hidden = true; scheduler.visibilityChanged(); assert.equal(timers.size, 0); scheduler.stop();
 });
+
+test('forget drops the cached value of a key', async () => {
+  let fail = false; const statuses = [];
+  const scheduler = createResourceScheduler({
+    read: () => fail ? Promise.reject(new Error('gone')) : Promise.resolve({ id: 'chat' }),
+    status: (key, value) => statuses.push(value),
+  });
+  scheduler.register('conversation', { path: '/c', interval: 0, apply: () => {} });
+  await scheduler.refresh('conversation');
+  fail = true;
+  await scheduler.refresh('conversation').catch(() => {});
+  assert.equal(statuses.at(-1).stale, true);
+  scheduler.forget('conversation'); scheduler.forget('missing');
+  await scheduler.refresh('conversation').catch(() => {});
+  assert.equal(statuses.at(-1).stale, false);
+  scheduler.stop();
+});

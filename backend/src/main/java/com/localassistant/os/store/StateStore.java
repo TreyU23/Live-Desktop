@@ -222,6 +222,21 @@ public class StateStore {
         });
     }
 
+    /**
+     * Permanently removes one conversation and its messages. The rewritten state file replaces the old one
+     * atomically before the cache is updated, so no copy of the conversation stays in the state file or in
+     * memory. Returns false when no conversation has that id.
+     */
+    public boolean deleteConversation(String id) throws IOException {
+        return locked(() -> {
+            AppState state = state();
+            var conversations = new ArrayList<>(state.conversations());
+            if (!conversations.removeIf(conversation -> conversation.id().equals(id))) return false;
+            commit(new AppState(1, conversations, state.memories(), state.actions()));
+            return true;
+        });
+    }
+
     public Memory addMemory(String content, String category) throws IOException {
         return locked(() -> {
             String now = Instant.now().toString();

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { AlertDialog } from '@astryxdesign/core/AlertDialog';
 import { Badge } from '@astryxdesign/core/Badge';
 import { Banner } from '@astryxdesign/core/Banner';
 import { Button } from '@astryxdesign/core/Button';
@@ -25,11 +26,13 @@ function threadTime(value) {
     : date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 }
 
-export function ConversationsView({ conversations, selected, onSelect, onSend, busy, profileName, configured, providerName = 'OpenAI', actions = [], onApprove, onReject, headerActions }) {
+export function ConversationsView({ conversations, selected, onSelect, onSend, onDelete, busy, profileName, configured, providerName = 'OpenAI', actions = [], onApprove, onReject, headerActions }) {
   const isWide = useMediaQuery('(min-width: 768px)');
   const [value, setValue] = useState('');
   const [error, setError] = useState('');
   const [sheetOpen, setSheetOpen] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const chatArea = useRef(null);
   // Closing the approval dialog returns focus to the composer so the draft can be continued.
   const closeSheet = () => {
@@ -87,6 +90,7 @@ export function ConversationsView({ conversations, selected, onSelect, onSend, b
             options={[{ value: kNew, label: 'New conversation' }, ...conversations.map(item => ({ value: item.id, label: item.title }))]} />}
       </StackItem>
       {reviewButton}
+      {selected ? <Button label="Delete" aria-label="Delete conversation" variant="destructive" icon={<Icon icon={icons.Trash} />} isDisabled={busy || deleting} onClick={() => setConfirmDelete(true)} /> : null}
     </HStack>
     {!configured ? <Banner status="warning" title={`${providerName} key not set`} description={`Add it in Settings to send messages. History is stored on this PC; assistant requests and context are sent to ${providerName}.`} /> : null}
     <ChatLayout scrollButton={null}
@@ -107,6 +111,9 @@ export function ConversationsView({ conversations, selected, onSelect, onSend, b
   return <Page title="Conversations" detail={`Ask about this PC or request a change. ${profileName} · stored on this PC.`} actions={headerActions}
     start={isWide ? <LayoutPanel width={300} hasDivider padding={6} label="Conversation threads">{threads}</LayoutPanel> : undefined}>
     {chat}
+    <AlertDialog isOpen={confirmDelete} onOpenChange={open => { if (!open && !deleting) setConfirmDelete(false); }} title="Delete this conversation?" actionLabel="Delete conversation" isActionLoading={deleting}
+      description="This permanently removes the conversation and all its messages from this PC. It can't be undone. Memories and approvals are kept; manage them in their own views."
+      onAction={async () => { setDeleting(true); try { await onDelete?.(selected.id); } finally { setDeleting(false); setConfirmDelete(false); } }} />
     {pending.length ? <ApprovalSheet isOpen={sheetOpen} actions={pending} onApprove={onApprove} onReject={onReject} onClose={closeSheet} /> : null}
   </Page>;
 }

@@ -792,6 +792,25 @@ export function App() {
     }
   };
 
+  // Deletes one conversation for good: the server rewrites its state file without it, and the open copy,
+  // the thread list and the scheduler's cached copy are cleared here so no trace stays in the UI.
+  const deleteConversation = async (id) => {
+    conversationSelection.current += 1;
+    try {
+      await Promise.all(["conversation", "conversations"].map(key => scheduler.current?.invalidate(key)));
+      await api(`/api/conversations/${id}`, { method: "DELETE" });
+      scheduler.current?.forget("conversation");
+      setSelectedConversation(null);
+      notify("Conversation deleted.", "success");
+      await scheduler.current?.refresh("conversations").catch(() => {});
+      return true;
+    } catch (error) {
+      notify(error.message, "error");
+      await scheduler.current?.refresh("conversations").catch(() => {});
+      return false;
+    }
+  };
+
   const sendMessage = async (message, conversationId = selectedConversation?.id) => {
     if (sendPending.current) return false;
     sendPending.current = true;
@@ -956,7 +975,7 @@ export function App() {
 
         {activeView === "approvals" ? boundary("actions", "Approvals", <ApprovalsView actions={actions} onApprove={(id) => updateAction(id, "approve")} onReject={(id) => updateAction(id, "reject")} headerActions={headerActions} />) : null}
         {activeView === "memories" ? boundary("memories", "Memories", <MemoriesView memories={memories} onCreate={createMemory} onDelete={deleteMemory} headerActions={headerActions} />) : null}
-        {activeView === "conversations" ? <ConversationsView conversations={conversations} selected={selectedConversation} onSelect={selectConversation} onSend={sendMessage} busy={assistantBusy} profileName={activeProfile.name} configured={health.configured} providerName={assistantProvider(health.provider).name} actions={actions} onApprove={(id) => updateAction(id, "approve")} onReject={(id) => updateAction(id, "reject")} headerActions={headerActions} /> : null}
+        {activeView === "conversations" ? <ConversationsView conversations={conversations} selected={selectedConversation} onSelect={selectConversation} onSend={sendMessage} onDelete={deleteConversation} busy={assistantBusy} profileName={activeProfile.name} configured={health.configured} providerName={assistantProvider(health.provider).name} actions={actions} onApprove={(id) => updateAction(id, "approve")} onReject={(id) => updateAction(id, "reject")} headerActions={headerActions} /> : null}
         {activeView === "music" ? <MusicView musicProvider={musicProvider} musicProviderId={musicProviderId} onMusicProviderChange={switchMusicProvider} musicConnection={musicConnection} musicPlayer={musicPlayer} onMusicAction={controlMusic} onOpenMusicExternally={openMusicExternally} onOpenSettings={() => setActiveView("settings")} headerActions={headerActions} /> : null}
         {musicMounted && musicConnection.embedUrl ? <MusicFrame providerId={musicProviderId} provider={musicProvider} embedUrl={musicConnection.embedUrl} isActive={activeView === "music"} /> : null}
         {activeView === "settings" ? <SettingsView activeProfile={activeProfile} onManageProfiles={() => setProfileMenuOpen(true)} onOpenApprovals={() => setActiveView("approvals")} onRestart={() => runLifecycle("restart")} onShutdown={() => setShutdownOpen(true)} lifecycleBusy={lifecycleState !== "idle"} phone={phone} onOpenPhone={openPhone} headerActions={headerActions} appearance={appearance} onAppearanceChange={setAppearance} accentId={accent.id} onAccentChange={setAccentId} calendar={calendar} onConnectCalendar={connectICloudCalendar} onDisconnectCalendar={disconnectICloudCalendar} musicProviderId={musicProviderId} musicConnection={musicConnection} musicPlayer={musicPlayer} onMusicProviderChange={switchMusicProvider} onSaveMusic={saveMusicConnection} onDisconnectMusic={disconnectMusic} onRefreshMusic={() => refreshMusicPlayer(true)} onOpenMusic={() => setActiveView("music")} assistantSettings={assistantSettings} onAssistantProviderChange={switchAssistantProvider} onSaveApiKey={saveApiKey} onDeleteApiKey={deleteApiKey} /> : null}

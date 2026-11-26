@@ -66,6 +66,24 @@ class StateStoreTest {
                 .isInstanceOf(StateStore.InvalidConversationIdException.class);
         assertThat(store.conversationSummaries()).hasSize(1);
     }
+    @Test void deletedConversationsLeaveNothingInMemoryOrOnDisk() throws Exception {
+        var store = store();
+        var keep = store.getOrCreateConversation(null);
+        var gone = store.getOrCreateConversation(null);
+        store.addMessage(keep.id(), "user", "keep this");
+        store.addMessage(gone.id(), "user", "unique-secret-phrase");
+        store.addMessage(gone.id(), "assistant", "reply to unique-secret-phrase");
+        assertThat(store.deleteConversation(gone.id())).isTrue();
+        assertThat(store.deleteConversation(gone.id())).isFalse();
+        assertThat(store.conversation(gone.id())).isEmpty();
+        assertThat(store.conversationSummaries()).hasSize(1);
+        Path file = directory.resolve("assistant-state.json");
+        assertThat(java.nio.file.Files.readString(file)).doesNotContain("unique-secret-phrase").doesNotContain(gone.id()).contains("keep this");
+        assertThat(java.nio.file.Files.exists(directory.resolve("assistant-state.json.tmp"))).isFalse();
+        store.clearCurrentCache();
+        assertThat(store.conversation(gone.id())).isEmpty();
+        assertThat(store.conversation(keep.id())).isPresent();
+    }
     @Test void newProfileFoldersStopAtTheLimit() throws Exception {
         var store = store();
         var profiles = java.nio.file.Files.createDirectories(directory.resolve("profiles"));
