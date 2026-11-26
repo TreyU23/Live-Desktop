@@ -97,6 +97,17 @@ public final class ProfileLifecycle {
      * calls that do not touch profile state. Closing throws {@link ProfileDeletedException} if the
      * profile was deleted in the meantime.
      */
+    /**
+     * When a call made under {@link #suspend} fails and the profile was deleted meanwhile, closing the suspension
+     * throws {@link ProfileDeletedException}, which Java attaches to the call's exception as suppressed. Callers rethrow
+     * it before retrying or mapping the error, so the deletion always wins (issue #27).
+     */
+    public static void rethrowIfDeleted(Throwable error) {
+        for (Throwable suppressed : error.getSuppressed()) {
+            if (suppressed instanceof ProfileDeletedException deleted) throw deleted;
+        }
+    }
+
     public static Suspension suspend() {
         Lease current = CURRENT.get();
         if (current == null || !current.held) return () -> {};

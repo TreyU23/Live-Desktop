@@ -194,18 +194,18 @@ public class AnthropicAgent {
             try (var suspended = ProfileLifecycle.suspend()) {
                 response = transport.send(request);
             } catch (HttpTimeoutException error) {
-                rethrowIfProfileDeleted(error);
+                ProfileLifecycle.rethrowIfDeleted(error);
                 if (System.nanoTime() >= deadline) throw new AssistantAgent.AgentDeadlineException();
                 if (attempt < AssistantAgent.MODEL_CALL_ATTEMPTS) continue;
                 throw new AnthropicApiException(0, "timeout", error);
             } catch (IOException error) {
-                rethrowIfProfileDeleted(error);
+                ProfileLifecycle.rethrowIfDeleted(error);
                 if (System.nanoTime() >= deadline) throw new AssistantAgent.AgentDeadlineException();
                 if (attempt < AssistantAgent.MODEL_CALL_ATTEMPTS) { pause(deadline); continue; }
                 throw new AnthropicApiException(0, "connection_error", error);
             } catch (InterruptedException error) {
                 Thread.currentThread().interrupt();
-                rethrowIfProfileDeleted(error);
+                ProfileLifecycle.rethrowIfDeleted(error);
                 throw new AnthropicApiException(0, "interrupted", error);
             }
 
@@ -222,17 +222,6 @@ public class AnthropicAgent {
                 continue;
             }
             throw new AnthropicApiException(status, errorType(response.body()), null);
-        }
-    }
-
-    /**
-     * When the call fails and the profile was deleted meanwhile, closing the suspension throws
-     * {@link ProfileLifecycle.ProfileDeletedException}, which Java attaches to the call's exception as suppressed.
-     * The deletion wins over any retry or error mapping (issue #27).
-     */
-    private static void rethrowIfProfileDeleted(Exception error) {
-        for (Throwable suppressed : error.getSuppressed()) {
-            if (suppressed instanceof ProfileLifecycle.ProfileDeletedException deleted) throw deleted;
         }
     }
 

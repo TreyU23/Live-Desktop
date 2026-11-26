@@ -79,6 +79,8 @@ public class OpenAiAgent {
                 try (var suspended = ProfileLifecycle.suspend()) {
                     response = client.responses().create(params, options);
                 } catch (RuntimeException error) {
+                    // A deletion during the call must not be reported as a timeout or any other error.
+                    ProfileLifecycle.rethrowIfDeleted(error);
                     if (System.nanoTime() >= deadline) throw new AssistantAgent.AgentDeadlineException();
                     throw error;
                 }
