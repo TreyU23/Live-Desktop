@@ -1,4 +1,5 @@
 import { formatBytes, localIsoDate, localDateAtOffset } from './presentation/formatters.js';
+import { removeStoredItem, storeItem } from './browserStorage.js';
 import { SystemInfoView } from './views/SystemInfoView.jsx';
 import { SettingsView } from './views/SettingsView.jsx';
 import { HomeView } from './views/HomeView.jsx';
@@ -179,7 +180,7 @@ function readProfiles() {
     const saved = JSON.parse(window.localStorage.getItem(PROFILES_KEY));
     if (Array.isArray(saved) && saved.length) return saved;
   } catch { /* Use the local default profile. */ }
-  window.localStorage.setItem(PROFILES_KEY, JSON.stringify([DEFAULT_PROFILE]));
+  storeItem(window.localStorage, PROFILES_KEY, JSON.stringify([DEFAULT_PROFILE]));
   return [DEFAULT_PROFILE];
 }
 
@@ -373,6 +374,15 @@ export function App() {
   const [shutdownOpen, setShutdownOpen] = useState(false);
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
   const [toast, setToast] = useState(null);
+  const notify = useCallback((message, tone = "neutral") => {
+    setToast({ message, tone, id: Date.now() });
+  }, []);
+  // Preferences still apply for this session when the browser refuses to store them.
+  const savePreference = useCallback((key, value) => {
+    if (!storeItem(window.localStorage, key, value)) {
+      notify("This setting applies now but couldn't be saved, because this browser's storage for Live Desktop is full.", "error");
+    }
+  }, [notify]);
   const [appearance, setAppearance] = useState(() => readAppearance(profileId));
   const systemDark = useSyncExternalStore(subscribeColorScheme, prefersDark);
   const darkMode = appearance === "dark" || (appearance === "system" && systemDark);
@@ -397,26 +407,24 @@ export function App() {
 
   useEffect(() => {
     document.documentElement.dataset.theme = darkMode ? "dark" : "light";
-    window.localStorage.setItem(profileStorageKey(THEME_KEY, profileId), appearance);
-  }, [appearance, darkMode, profileId]);
+    savePreference(profileStorageKey(THEME_KEY, profileId), appearance);
+  }, [appearance, darkMode, profileId, savePreference]);
 
   // Reduce transparency went with the glass shell; drop the per-profile key it left behind.
-  useEffect(() => { window.localStorage.removeItem(profileStorageKey(TRANSPARENCY_KEY, profileId)); }, [profileId]);
+  useEffect(() => { removeStoredItem(window.localStorage, profileStorageKey(TRANSPARENCY_KEY, profileId)); }, [profileId]);
 
   // The accent is a built theme chosen in <Theme> below; only the preset id is stored.
   useEffect(() => {
-    window.localStorage.setItem(profileStorageKey(ACCENT_COLOR_KEY, profileId), accent.id);
-  }, [accent, profileId]);
+    savePreference(profileStorageKey(ACCENT_COLOR_KEY, profileId), accent.id);
+  }, [accent, profileId, savePreference]);
 
   useEffect(() => {
-    window.localStorage.setItem(profileStorageKey(MUSIC_CONNECTION_KEY, profileId), JSON.stringify(musicIntegration));
-  }, [musicIntegration, profileId]);
+    savePreference(profileStorageKey(MUSIC_CONNECTION_KEY, profileId), JSON.stringify(musicIntegration));
+  }, [musicIntegration, profileId, savePreference]);
 
   // Save first and only then show the change, so a full localStorage can't leave unsaved state on screen (issue #29).
   const updateProfiles = (nextProfiles) => {
-    try {
-      window.localStorage.setItem(PROFILES_KEY, JSON.stringify(nextProfiles));
-    } catch {
+    if (!storeItem(window.localStorage, PROFILES_KEY, JSON.stringify(nextProfiles))) {
       notify("Profile changes couldn't be saved because this browser's storage for Live Desktop is full.", "error");
       return false;
     }
@@ -425,8 +433,12 @@ export function App() {
   };
 
   const switchProfile = (nextId) => {
+    // Reloading without the saved choice would just reopen the current profile.
+    if (!storeItem(window.localStorage, ACTIVE_PROFILE_KEY, nextId)) {
+      notify("Couldn't switch profiles because this browser's storage for Live Desktop is full.", "error");
+      return;
+    }
     scheduler.current?.stop();
-    window.localStorage.setItem(ACTIVE_PROFILE_KEY, nextId);
     window.location.reload();
   };
 
@@ -434,16 +446,12 @@ export function App() {
     if (id === "default" || profiles.length === 1) return;
     try {
       await api("/api/profile/data", { method: "DELETE", profileId: id });
-      for (const base of [MUSIC_CONNECTION_KEY, THEME_KEY, ACCENT_COLOR_KEY, TRANSPARENCY_KEY]) window.localStorage.removeItem(profileStorageKey(base, id));
+      for (const base of [MUSIC_CONNECTION_KEY, THEME_KEY, ACCENT_COLOR_KEY, TRANSPARENCY_KEY]) removeStoredItem(window.localStorage, profileStorageKey(base, id));
       const next = profiles.filter((profile) => profile.id !== id);
       updateProfiles(next);
       switchProfile(next[0].id);
     } catch (error) { notify(error.message, "error"); }
   };
-
-  const notify = useCallback((message, tone = "neutral") => {
-    setToast({ message, tone, id: Date.now() });
-  }, []);
 
   const refreshMusicPlayer = useCallback(async (announce = false) => {
     try {
