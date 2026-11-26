@@ -23,7 +23,7 @@ Coordinates: `com.localassistant:live-desktop-windows-x64:<version>:zip`, regist
 Configure private Maven `settings.xml` with server ID `github` and a classic GitHub token with `read:packages`, following [GitHub's registry instructions](https://docs.github.com/en/packages/working-with-a-github-packages-registry/working-with-the-apache-maven-registry). Never commit credentials. For example, with a published version:
 
 ```powershell
-mvn dependency:copy "-Dartifact=com.localassistant:live-desktop-windows-x64:3.0.3:zip" "-DremoteRepositories=github::default::https://maven.pkg.github.com/treyu23/live-desktop" "-DoutputDirectory=downloads"
+mvn dependency:copy "-Dartifact=com.localassistant:live-desktop-windows-x64:3.0.4:zip" "-DremoteRepositories=github::default::https://maven.pkg.github.com/treyu23/live-desktop" "-DoutputDirectory=downloads"
 ```
 
 Replace the example version with the intended release. Check Actions for checksum, authentication or duplicate-version failures. [Validation scope](VALIDATION.md).
@@ -33,7 +33,7 @@ Replace the example version with the intended release. Check Actions for checksu
 The `.sha256` asset only detects a damaged download: anyone who can change the release can change both files. From 3.0.3 the ZIP's SHA-256 is also written into the annotated release tag (`Live-Desktop-windows-x64.zip SHA-256: <hash>`), and the tag is SSH-signed on the release PC with the maintainer's registered signing key. To check a download against it:
 
 ```powershell
-.\scripts\verify-release.ps1 -Zip .\Live-Desktop-windows-x64.zip -Tag v3.0.3
+.\scripts\verify-release.ps1 -Zip .\Live-Desktop-windows-x64.zip -Tag v3.0.4
 ```
 
 The script requires GitHub to report the tag signature as verified and the hash in the tag to match the file. With a clone and the maintainer's public key in an allowed-signers file, `git tag -v v3.0.3` checks the same signature without trusting GitHub's verification. The publish workflow runs the same tag check before it publishes the Maven package, and its `actions/setup-java` step is pinned to a commit SHA.
