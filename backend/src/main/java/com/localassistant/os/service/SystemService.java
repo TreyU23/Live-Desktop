@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.localassistant.os.config.AssistantProperties;
 import com.sun.management.OperatingSystemMXBean;
 import jakarta.annotation.PostConstruct;
+import jakarta.annotation.PreDestroy;
 import java.io.File;
 import java.lang.management.ManagementFactory;
 import java.net.NetworkInterface;
@@ -23,7 +24,11 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -55,6 +60,11 @@ public class SystemService {
     private final WindowsSystemControlService systemControls;
     private final WindowsBridgeClient bridge;
     private final ObjectMapper objectMapper = new ObjectMapper();
+    // Bridge calls block on the native helper. They run on this small dedicated pool, not the
+    // common ForkJoinPool, so a slow bridge can't starve parallel streams or other async work.
+    static final int BRIDGE_THREADS = 4;
+    private static final int BRIDGE_QUEUE = 32;
+    private final ThreadPoolExecutor bridgeExecutor = newBridgeExecutor();
     private static final Duration IO_RATE_MIN_ELAPSED = Duration.ofSeconds(1);
     private static final Duration IO_RATE_MAX_ELAPSED = Duration.ofMinutes(5);
 
@@ -78,17 +88,43 @@ public class SystemService {
         if (!isWindows()) {
             return;
         }
-        CompletableFuture.runAsync(this::batteryInfo);
+        CompletableFuture.runAsync(this::batteryInfo, bridgeExecutor);
         CompletableFuture.runAsync(() -> {
             OperatingSystemMXBean osBean = (OperatingSystemMXBean) ManagementFactory.getOperatingSystemMXBean();
             windowsDetails(Math.max(0, osBean.getTotalMemorySize()));
-        });
+        }, bridgeExecutor);
+    }
+
+    @PreDestroy
+    void shutdownBridgeExecutor() {
+        bridgeExecutor.shutdownNow();
+    }
+
+    private static ThreadPoolExecutor newBridgeExecutor() {
+        AtomicInteger count = new AtomicInteger();
+        ThreadPoolExecutor executor = new ThreadPoolExecutor(
+                BRIDGE_THREADS,
+                BRIDGE_THREADS,
+                30,
+                TimeUnit.SECONDS,
+                new ArrayBlockingQueue<>(BRIDGE_QUEUE),
+                runnable -> {
+                    Thread thread = new Thread(runnable, "system-bridge-" + count.incrementAndGet());
+                    thread.setDaemon(true);
+                    return thread;
+                },
+                // When the pool and queue are full (or the pool is shutting down), run the task on the
+                // caller's thread. Unlike CallerRunsPolicy this never discards a task, so a join() on
+                // its future can't hang.
+                (runnable, pool) -> runnable.run());
+        executor.allowCoreThreadTimeOut(true);
+        return executor;
     }
 
     public SystemSnapshot snapshot() {
-        CompletableFuture<BatteryInfo> battery = CompletableFuture.supplyAsync(this::batteryInfo);
-        CompletableFuture<List<SystemControl>> controls = CompletableFuture.supplyAsync(this::controls);
-        CompletableFuture<IoRates> ioRates = CompletableFuture.supplyAsync(this::ioRates);
+        CompletableFuture<BatteryInfo> battery = CompletableFuture.supplyAsync(this::batteryInfo, bridgeExecutor);
+        CompletableFuture<List<SystemControl>> controls = CompletableFuture.supplyAsync(this::controls, bridgeExecutor);
+        CompletableFuture<IoRates> ioRates = CompletableFuture.supplyAsync(this::ioRates, bridgeExecutor);
         OperatingSystemMXBean osBean = (OperatingSystemMXBean) ManagementFactory.getOperatingSystemMXBean();
         long totalMemory = Math.max(0, osBean.getTotalMemorySize());
         long freeMemory = Math.max(0, osBean.getFreeMemorySize());
