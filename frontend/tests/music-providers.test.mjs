@@ -48,3 +48,23 @@ test("keeps both provider links when the selected provider changes", () => {
   assert.deepEqual(migrated.connections.apple, APPLE_MUSIC_STARTER);
   assert.equal(migrated.connections.spotify.embedUrl, "https://open.spotify.com/embed/album/123");
 });
+
+test("drops saved embed links that fail the provider allowlist", () => {
+  const saved = createDefaultMusicIntegration();
+  saved.provider = "spotify";
+  saved.connections.apple = { sourceUrl: "https://music.apple.com/us/album/x/1", embedUrl: "https://evil.example/frame" };
+  saved.connections.spotify = { sourceUrl: "javascript:alert(1)", embedUrl: "javascript:alert(1)" };
+  const migrated = migrateMusicIntegration(saved);
+  assert.deepEqual(migrated.connections.apple, APPLE_MUSIC_STARTER);
+  assert.deepEqual(migrated.connections.spotify, { sourceUrl: "", embedUrl: "" });
+
+  const legacy = migrateMusicIntegration({ sourceUrl: "https://music.apple.com/us/album/x/1", embedUrl: "http://embed.music.apple.com/us/album/x/1" });
+  assert.deepEqual(legacy.connections.apple, APPLE_MUSIC_STARTER);
+});
+
+test("keeps a valid embed link but clears a tampered source link", () => {
+  const saved = createDefaultMusicIntegration();
+  saved.connections.spotify = { sourceUrl: "https://evil.example/", embedUrl: "https://open.spotify.com/embed/album/123" };
+  const migrated = migrateMusicIntegration(saved);
+  assert.deepEqual(migrated.connections.spotify, { sourceUrl: "", embedUrl: "https://open.spotify.com/embed/album/123" });
+});

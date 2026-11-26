@@ -74,17 +74,42 @@ export function createDefaultMusicIntegration() {
   };
 }
 
+// Saved links come back from localStorage, which anything running in this origin can rewrite, and the
+// embed URL becomes an iframe src. Re-run the same allowlist used when a link is first saved and fall
+// back when it fails. The source link is only shown in Settings, so an invalid one is just cleared.
+function restoreConnection(providerId, connection, fallback) {
+  if (!connection || typeof connection !== "object" || typeof connection.embedUrl !== "string" || !connection.embedUrl) {
+    return { ...fallback };
+  }
+  let embedUrl;
+  try {
+    embedUrl = normalizeMusicUrl(providerId, connection.embedUrl);
+  } catch {
+    return { ...fallback };
+  }
+  let sourceUrl = "";
+  if (typeof connection.sourceUrl === "string" && connection.sourceUrl) {
+    try {
+      normalizeMusicUrl(providerId, connection.sourceUrl);
+      sourceUrl = connection.sourceUrl;
+    } catch {
+      sourceUrl = "";
+    }
+  }
+  return { sourceUrl, embedUrl };
+}
+
 export function migrateMusicIntegration(saved) {
   const fallback = createDefaultMusicIntegration();
   if (!saved || typeof saved !== "object") return fallback;
 
-  if (saved.provider && saved.connections) {
+  if (saved.provider && saved.connections && typeof saved.connections === "object") {
     const provider = MUSIC_PROVIDER_IDS.includes(saved.provider) ? saved.provider : "apple";
     return {
       provider,
       connections: {
-        apple: saved.connections.apple?.embedUrl ? saved.connections.apple : fallback.connections.apple,
-        spotify: saved.connections.spotify?.embedUrl ? saved.connections.spotify : { ...EMPTY_MUSIC_CONNECTION },
+        apple: restoreConnection("apple", saved.connections.apple, fallback.connections.apple),
+        spotify: restoreConnection("spotify", saved.connections.spotify, EMPTY_MUSIC_CONNECTION),
       },
     };
   }
@@ -93,7 +118,7 @@ export function migrateMusicIntegration(saved) {
   if (saved.embedUrl) {
     return {
       ...fallback,
-      connections: { ...fallback.connections, apple: saved },
+      connections: { ...fallback.connections, apple: restoreConnection("apple", saved, fallback.connections.apple) },
     };
   }
 
