@@ -2,7 +2,7 @@
 
 Current release: **3.0.4** — see the [release notes](docs/RELEASE_3.0.4.md). There is no public 2.x: version 2 was the Apple-style glass design, which was never released.
 
-A local Windows dashboard for PC telemetry, approved controls, conversations, memories, iCloud Calendar, Phone Link and Apple Music/Spotify. React renders the UI, Java owns state/integrations/approval policy, and C++ provides the runtime and Windows APIs. Profiles stay on this PC; OpenAI, iCloud and music use external services.
+A local Windows dashboard for PC telemetry, approved controls, conversations, memories, iCloud Calendar, Phone Link and Apple Music/Spotify. React renders the UI, Java owns state/integrations/approval policy, and C++ provides the runtime and Windows APIs. Profiles stay on this PC; the assistant model provider (OpenAI or Anthropic), iCloud and music use external services.
 
 ## Install and run
 
@@ -47,7 +47,7 @@ The backend needs the built bridge/DLL. The frontend script binds loopback Vite 
 | Feature | Setup and behavior |
 | --- | --- |
 | Profiles | Header picker creates, renames, switches and deletes local profiles. Browser preferences are profile scoped; backend records use `data/profiles/<id>/`, with the original default profile directly in `data/`. Profiles organize data; they are not an authentication boundary. |
-| OpenAI | Save a project API key in Settings. Current-user DPAPI protects stored keys; endpoints return status, not plaintext. Only the default profile uses an environment fallback. API billing is separate from ChatGPT. |
+| Assistant model | Settings → Assistant → **Model** picks the provider per profile: OpenAI (GPT-6.2 Sol, the default) or Anthropic (Claude Sonnet 5.5). Each provider needs its own API key, saved in Settings: an OpenAI project key (`sk-…`) or an Anthropic Console key (`sk-ant-…`). Current-user DPAPI protects stored keys; endpoints return status, not plaintext. Only the default profile uses environment fallbacks. API billing is separate from ChatGPT and Claude subscriptions. Switching providers keeps conversation history; the next message goes to the newly chosen model. |
 | iCloud Calendar | Enter your Apple email and an **app-specific password** generated at [Apple Account](https://account.apple.com/) with two-factor authentication. Credentials stay DPAPI protected. The read-only agenda supports date selection/refresh and expands in Overview. |
 | Music | Choose Apple Music/Spotify and a supported content link in Settings. Visit Music to mount its player; it persists across navigation. Switching preserves separate links. Windows sessions supply metadata/controls. Accounts, subscriptions and browser restrictions apply; no developer credentials are required. |
 | Phone Link | Install/pair Microsoft Phone Link. Available local metadata drives details/platform artwork; messages, notification contents and battery availability are not promised. Opening Phone Link is explicitly external. |
@@ -62,9 +62,13 @@ Settings is the normal credential entry point. Optionally copy `.env.example` to
 | Variable | Default | Purpose |
 | --- | --- | --- |
 | `HOST`, `PORT` | `127.0.0.1`, `4317` | Backend bind; production fixes both on the backend command line, so `.env` cannot change them |
-| `OPENAI_API_KEY` | empty | Default-profile fallback |
-| `OPENAI_MODEL` | `gpt-5.6-sol` | Configured API model identifier |
-| `OPENAI_REASONING_EFFORT` | `medium` | SDK reasoning option |
+| `ASSISTANT_PROVIDER` | `openai` | Provider for profiles that haven't picked one in Settings: `openai` or `anthropic` (anything else means `openai`) |
+| `OPENAI_API_KEY` | empty | Default-profile fallback for the OpenAI key |
+| `OPENAI_MODEL` | `gpt-6.2-sol` | OpenAI model identifier |
+| `OPENAI_REASONING_EFFORT` | `medium` | OpenAI reasoning effort |
+| `ANTHROPIC_API_KEY` | empty | Default-profile fallback for the Anthropic key |
+| `ANTHROPIC_MODEL` | `claude-sonnet-5-5` | Anthropic model identifier |
+| `ANTHROPIC_EFFORT` | `medium` | Claude effort (`low`, `medium`, `high`, `xhigh`, `max`); Claude Sonnet 5.5 always uses adaptive thinking |
 | `DATA_DIR` | `../data` | Production resolves relative paths against `backend/` |
 | `WORKSPACE_ROOT` | `..` | Assistant workspace; production fixes installation root on the command line, so `.env` cannot widen it |
 | `LIVE_DESKTOP_DIAGNOSTICS` | unset | Launch with `1` for bounded backend timing logs |

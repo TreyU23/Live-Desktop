@@ -2,7 +2,7 @@ package com.localassistant.os.error;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.localassistant.os.agent.OpenAiAgent;
+import com.localassistant.os.agent.AssistantAgent;
 import com.localassistant.os.profile.ProfileLifecycle;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -21,7 +21,7 @@ class ClientErrorsTest {
                 .isEqualTo("unavailable");
         assertThat(ClientErrors.describe(new IOException("Native radio bridge disconnected.")).code())
                 .isEqualTo("io_error");
-        assertThat(ClientErrors.describe(new OpenAiAgent.AgentDeadlineException()).code()).isEqualTo("deadline_exceeded");
+        assertThat(ClientErrors.describe(new AssistantAgent.AgentDeadlineException()).code()).isEqualTo("deadline_exceeded");
         assertThat(ClientErrors.describe(new ProfileLifecycle.ProfileDeletedException()).code()).isEqualTo("profile_deleted");
     }
 

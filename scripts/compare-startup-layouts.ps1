@@ -19,7 +19,7 @@ foreach ($pair in 1..$Pairs) {
         if ($Aot) { $options += '-Dspring.aot.enabled=true' }
         if ($layout -eq 'cds') { $options += @('-Xshare:on', '-XX:SharedArchiveFile=application.jsa') }
         $jar = if ($layout -eq 'jar') { '"' + (Join-Path $artifacts 'live-desktop-backend.jar') + '"' } else { 'live-desktop-backend.jar' }
-        $options += @('-jar', $jar, '--spring.config.import=', '--assistant.openai-api-key=', ('"--assistant.data-dir=' + $data + '"'), ('"--assistant.workspace-root=' + $projectRoot + '"'))
+        $options += @('-jar', $jar, '--spring.config.import=', '--assistant.openai-api-key=', '--assistant.anthropic-api-key=', ('"--assistant.data-dir=' + $data + '"'), ('"--assistant.workspace-root=' + $projectRoot + '"'))
         $watch = [Diagnostics.Stopwatch]::StartNew()
         $logPrefix = "$label-$pair-$layout"
         $process = Start-Process -FilePath $java -ArgumentList $options -WorkingDirectory $working -WindowStyle Hidden -PassThru -RedirectStandardOutput (Join-Path $output "$logPrefix.out.log") -RedirectStandardError (Join-Path $output "$logPrefix.err.log")

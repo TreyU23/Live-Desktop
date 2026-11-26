@@ -24,7 +24,7 @@ if ($Cds) {
         $previousErrorAction = $ErrorActionPreference
         $ErrorActionPreference = 'Continue'
         try {
-            & $java '-XX:ArchiveClassesAtExit=application.jsa' '-Dspring.context.exit=onRefresh' -jar live-desktop-backend.jar '--spring.config.import=' '--assistant.openai-api-key=' "--assistant.data-dir=$training" "--assistant.workspace-root=$training" *> (Join-Path $runtime 'cds-training.log')
+            & $java '-XX:ArchiveClassesAtExit=application.jsa' '-Dspring.context.exit=onRefresh' -jar live-desktop-backend.jar '--spring.config.import=' '--assistant.openai-api-key=' '--assistant.anthropic-api-key=' "--assistant.data-dir=$training" "--assistant.workspace-root=$training" *> (Join-Path $runtime 'cds-training.log')
         } finally { $ErrorActionPreference = $previousErrorAction }
         if ($LASTEXITCODE -ne 0) { throw 'Isolated CDS training failed.' }
         $release = Join-Path (Split-Path (Split-Path $java)) 'release'

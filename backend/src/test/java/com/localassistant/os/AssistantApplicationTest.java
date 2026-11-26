@@ -30,7 +30,7 @@ class AssistantApplicationTest {
         String token = response.headers().firstValue("X-Live-Desktop-Token").orElseThrow();
         assertThat(token).matches("[0-9a-f]{64}");
         assertThat(response.body()).contains("\"status\":\"ok\"").doesNotContain(token);
-        assertThat(response.body()).contains("\"openAiConfigured\":false");
+        assertThat(response.body()).contains("\"assistantConfigured\":false").contains("\"provider\":\"openai\"");
     }
 
     @Test
@@ -42,7 +42,7 @@ class AssistantApplicationTest {
                 HttpResponse.BodyHandlers.ofString());
 
         assertThat(response.statusCode()).isEqualTo(503);
-        assertThat(response.body()).contains("OPENAI_API_KEY is not configured");
+        assertThat(response.body()).contains("OPENAI_API_KEY is not configured").contains("assistant_not_configured");
     }
 
     @Test

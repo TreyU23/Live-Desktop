@@ -11,7 +11,7 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
  * request verb or path, so routing quirks cannot bypass it and ordinary DELETEs (a memory, a key,
  * an integration) never queue behind a long chat.
  *
- * <p>Long network calls (the OpenAI agent loop) can {@link #suspend} the current lease so a waiting
+ * <p>Long network calls (the assistant agent loop) can {@link #suspend} the current lease so a waiting
  * deletion does not block every later reader of the profile behind the fair lock. If the profile
  * was deleted while suspended, resuming throws {@link ProfileDeletedException}.
  */

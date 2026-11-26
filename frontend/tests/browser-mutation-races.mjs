@@ -26,7 +26,7 @@ await page.route('**/*', async route => {
     return route.fulfill({ json: { id: 'synthetic-memory', content: 'Keep this unsaved memory' } });
   }
   if (path === '/api/memories' && memorySaved) return route.fulfill({ status: 500, json: { error: 'Synthetic list refresh failure' } });
-  if (path === '/health') body = { status: 'ok', openAiConfigured: false };
+  if (path === '/health') body = { status: 'ok', provider: 'openai', assistantConfigured: false };
   if (path === '/api/system/controls/wifi') {
     mutationStarted = true;
     await mutation.promise;
@@ -37,7 +37,7 @@ await page.route('**/*', async route => {
     body = system;
   }
   if (path === '/api/runtime') body = { backendOnline: true, frontendOnline: true };
-  if (path === '/api/profile/settings') body = { openAiConfigured: false, profileApiKey: false };
+  if (path === '/api/profile/settings') body = { provider: 'openai', assistantConfigured: false, openAiConfigured: false, profileApiKey: false, anthropicConfigured: false, profileAnthropicKey: false, models: { openai: 'gpt-6.2-sol', anthropic: 'claude-sonnet-5-5' } };
   if (path === '/api/integrations/phone-link') body = { installed: false, detail: 'Synthetic phone' };
   if (path === '/api/integrations/icloud-calendar') body = { configured: false, status: 'disconnected', date: '2026-10-10', events: [] };
   if (path === '/api/integrations/media-session') body = { available: false, title: 'Nothing playing', duration: 0, elapsed: 0 };

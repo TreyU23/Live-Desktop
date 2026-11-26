@@ -169,7 +169,7 @@ footer { padding: 40px 0 56px; color: var(--muted); font-size: 0.88rem; }
 
   <figure>
     <div class="diagram">
-      <svg viewBox="0 0 980 540" role="img" aria-label="You use the Screen in a browser. The Screen asks the Brain for data and sends your clicks. The Brain saves data on this PC, talks to OpenAI and iCloud, and asks the Hands to read from or change Windows. A launcher starts and watches all three parts.">
+      <svg viewBox="0 0 980 540" role="img" aria-label="You use the Screen in a browser. The Screen asks the Brain for data and sends your clicks. The Brain saves data on this PC, talks to the AI provider (OpenAI or Anthropic) and iCloud, and asks the Hands to read from or change Windows. A launcher starts and watches all three parts.">
         <defs>
           <marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="currentColor"/></marker>
         </defs>
@@ -179,7 +179,7 @@ footer { padding: 40px 0 56px; color: var(--muted); font-size: 0.88rem; }
 
         <rect class="bx" x="380" y="24" width="220" height="62" rx="10"/>
         <text class="t1" x="396" y="50">Online services</text>
-        <text class="t3" x="396" y="70">OpenAI · iCloud Calendar</text>
+        <text class="t3" x="396" y="70">OpenAI or Anthropic · iCloud</text>
 
         <rect class="bx bx-s" x="40" y="176" width="220" height="112" rx="10"/>
         <text class="t3 ts" x="56" y="198">PART 1</text>
@@ -248,7 +248,7 @@ footer { padding: 40px 0 56px; color: var(--muted); font-size: 0.88rem; }
     <div class="card layer screen stack"><span class="tag">Part 1 · the Screen</span><h3>What you see</h3>
       <p>The web page with its side menu and seven pages. It draws things and collects your clicks. It decides nothing about safety and stores only looks and layout choices (theme, accent color, profile names and photos, your music link).</p></div>
     <div class="card layer brain stack"><span class="tag">Part 2 · the Brain</span><h3>What decides</h3>
-      <p>A program running quietly in the background. It keeps your conversations, memories and approvals, talks to OpenAI and iCloud, checks every action against a fixed allowed list, and makes sure only this PC can talk to it.</p></div>
+      <p>A program running quietly in the background. It keeps your conversations, memories and approvals, talks to the AI provider (OpenAI or Anthropic) and iCloud, checks every action against a fixed allowed list, and makes sure only this PC can talk to it.</p></div>
     <div class="card layer hands stack"><span class="tag">Part 3 · the Hands</span><h3>What acts</h3>
       <p>Four small Windows programs: the <strong>launcher</strong> that starts everything, a <strong>host</strong> that serves the page, the <strong>bridge</strong> that reads from and changes Windows, and a <strong>credential helper</strong> that locks saved passwords to your Windows account.</p></div>
   </div>
@@ -308,7 +308,7 @@ footer { padding: 40px 0 56px; color: var(--muted); font-size: 0.88rem; }
       <dt><span class="n">5</span>Now Playing</dt><dd>Song title, artist, album, cover art and progress for whatever is playing through Windows, with shuffle, previous, play or pause, next and mute. If nothing is playing it offers to open your music service.</dd>
       <dt><span class="n">6</span>Ask Live Desktop</dt><dd>A one-line box to message the assistant. Three example questions sit underneath, and clicking one only fills the box. Pressing send takes you to Conversations to read the reply.</dd>
       <dt><span class="n">7</span>Phone</dt><dd>What Microsoft Phone Link reports about your paired phone: its name, connection status, system and model, battery, and last sync time. Buttons refresh it, copy the phone's name, and open the Phone Link app. It can show that notifications exist, but never their contents.</dd>
-      <dt><span class="n">8</span>Connections</dt><dd>Four status lights: the Brain (Local API), iCloud, the OpenAI key, and Music.</dd>
+      <dt><span class="n">8</span>Connections</dt><dd>Four status lights: the Brain (Local API), iCloud, the key for the chosen AI provider, and Music.</dd>
       <dt><span class="n">9</span>Recent activity</dt><dd>A short table of well-known apps Windows reports as running or installed. It shows four, with <em>Show all</em> for the rest.</dd>
     </dl>
   </article>
@@ -317,7 +317,7 @@ footer { padding: 40px 0 56px; color: var(--muted); font-size: 0.88rem; }
     <div class="page-head"><span class="tile" style="--tc:#636366">2</span><h3>System Info</h3><span class="group-label">Desktop</span><span class="small">Two tabs.</span></div>
     <dl class="parts">
       <dt>Live tab</dt><dd>Bars for processor, memory and storage, then a table of network and disk speeds with a trend line for the last 15 minutes. Beside them: the device (name, processor, memory, system type, and IDs hidden until <em>Show IDs</em>) and Windows (edition, version, build, install date). <em>Copy specifications</em> copies the details.</dd>
-      <dt>Specifications tab</dt><dd><strong>Device:</strong> name, manufacturer, model, processor, installed memory, graphics, system type, plus Device ID and Product ID, which stay hidden until you press <em>Show IDs</em>. <strong>Windows:</strong> edition, version, install date, build and architecture. <strong>Live status:</strong> network, battery, whether the Brain and the OpenAI key are ready, the Java version, and the time of the last reading.</dd>
+      <dt>Specifications tab</dt><dd><strong>Device:</strong> name, manufacturer, model, processor, installed memory, graphics, system type, plus Device ID and Product ID, which stay hidden until you press <em>Show IDs</em>. <strong>Windows:</strong> edition, version, install date, build and architecture. <strong>Live status:</strong> network, battery, whether the Brain and the chosen AI provider's key are ready, the Java version, and the time of the last reading.</dd>
       <dt>Good to know</dt><dd>Everything here is read locally with normal user rights. No administrator access is requested and the Windows product key is never read.</dd>
     </dl>
   </article>
@@ -326,11 +326,11 @@ footer { padding: 40px 0 56px; color: var(--muted); font-size: 0.88rem; }
     <div class="page-head"><span class="tile" style="--tc:#30A14E">3</span><h3>Conversations</h3><span class="group-label">Assistant</span><span class="small">Chat with the AI assistant.</span></div>
     <dl class="parts">
       <dt>Thread list</dt><dd>Every saved conversation with its message count and time. <em>New</em> starts a new one. On a phone-sized window it becomes a drop-down.</dd>
-      <dt>Chat panel</dt><dd>Your messages and the assistant's replies. Enter sends, Shift+Enter adds a new line. If sending fails, your draft stays in the box. A warning appears when no OpenAI key is saved.</dd>
+      <dt>Chat panel</dt><dd>Your messages and the assistant's replies. Enter sends, Shift+Enter adds a new line. If sending fails, your draft stays in the box. A warning appears when the chosen AI provider has no key saved.</dd>
       <dt>What the assistant can do alone</dt><dd>List and read text files inside the Live Desktop folder (never your saved data or secret settings files), look up memories you saved, and read live dashboard information such as system status, apps, phone, calendar and music.</dd>
       <dt>What it must ask for</dt><dd>Writing a file in that folder, opening a website in your browser, and saving a new memory. Each of these becomes an approval request.</dd>
       <dt>Approval window</dt><dd>If a request appears while you are on this page, a window opens with <em>Allow</em>, <em>Don't Allow</em> and <em>Decide later</em>. A <em>Review requests</em> button reopens it. The same requests are listed on the Approvals page.</dd>
-      <dt>Where it goes</dt><dd>Conversation history is saved on this PC. Your message, recent messages from the same chat, and any relevant dashboard details are sent to OpenAI to produce the reply.</dd>
+      <dt>Where it goes</dt><dd>Conversation history is saved on this PC. Your message, recent messages from the same chat, and any relevant dashboard details are sent to the chosen AI provider (OpenAI or Anthropic) to produce the reply.</dd>
     </dl>
   </article>
 
@@ -365,7 +365,7 @@ footer { padding: 40px 0 56px; color: var(--muted); font-size: 0.88rem; }
     <dl class="parts">
       <dt>Profile</dt><dd>Shows the current profile and opens the profile picker.</dd>
       <dt>Appearance</dt><dd><strong>Theme:</strong> light, dark, or System to follow Windows. <strong>Accent:</strong> Neutral (black and white), Blue, Green, Orange or Red. Each choice is a complete, tested color set, so text stays readable in both themes.</dd>
-      <dt>Assistant</dt><dd>Save, replace or remove the OpenAI key that powers the assistant. Once saved it is never shown again. A link opens Approvals.</dd>
+      <dt>Assistant</dt><dd>Pick the model that powers the assistant: GPT-6.2 Sol from OpenAI or Claude Sonnet 5.5 from Anthropic. Save, replace or remove a key for each provider. Once saved a key is never shown again. A link opens Approvals.</dd>
       <dt>Connections</dt><dd><strong>iCloud Calendar:</strong> connect with your Apple email and an app-specific password, or disconnect and erase the saved login. <strong>Music service:</strong> choose Apple Music or Spotify, paste a share link, refresh status, open the full player, or remove the link. <strong>Phone Link:</strong> open the Phone Link app.</dd>
       <dt>Live Desktop services</dt><dd>Restart or shut down Live Desktop itself. Windows keeps running either way.</dd>
     </dl>
@@ -453,13 +453,13 @@ footer { padding: 40px 0 56px; color: var(--muted); font-size: 0.88rem; }
     <div class="card stack"><h3>Stays on this PC</h3>
       <ul>
         <li>Conversations, memories and the approval history, in the <code>data/</code> folder, one drawer per profile.</li>
-        <li>Your OpenAI key and iCloud login, scrambled by Windows so only your Windows account can unlock them.</li>
+        <li>Your OpenAI and Anthropic keys and iCloud login, scrambled by Windows so only your Windows account can unlock them.</li>
         <li>Theme, accent color, profile names and photos, and your music link, kept by the browser.</li>
         <li>All PC readings. System details are shown, not saved.</li>
       </ul></div>
     <div class="card stack"><h3>Goes out to the internet</h3>
       <ul>
-        <li><strong>OpenAI:</strong> what you type to the assistant, recent messages from that chat, and only the dashboard details that relate to your question. Hardware IDs, maker, model and processor name are left out.</li>
+        <li><strong>OpenAI or Anthropic</strong> (whichever you chose): what you type to the assistant, recent messages from that chat, and only the dashboard details that relate to your question. Hardware IDs, maker, model and processor name are left out.</li>
         <li><strong>Apple iCloud:</strong> your calendar login, to fetch events.</li>
         <li><strong>Apple Music or Spotify:</strong> whatever their own web player sends once it loads.</li>
       </ul></div>
@@ -511,7 +511,7 @@ footer { padding: 40px 0 56px; color: var(--muted); font-size: 0.88rem; }
       <dt>Backend</dt><dd>The Brain. The part that works out of sight.</dd>
       <dt>Bridge</dt><dd>The small program that passes requests from the Brain to Windows.</dd>
       <dt>localhost</dt><dd>A web address that means “this same computer”. <code>localhost:4173</code> is the dashboard's address.</dd>
-      <dt>API key</dt><dd>A long password from OpenAI that lets the assistant work. OpenAI bills its use separately.</dd>
+      <dt>API key</dt><dd>A long password from OpenAI or Anthropic that lets the assistant work. Each company bills its use separately from ChatGPT or Claude subscriptions.</dd>
       <dt>App-specific password</dt><dd>A one-purpose password you create on Apple's website, so your real Apple password is never typed here.</dd>
       <dt>Profile</dt><dd>A separate set of saved data and looks. Not a login.</dd>
       <dt>Approval</dt><dd>Your yes to one kind of action, remembered for next time.</dd>

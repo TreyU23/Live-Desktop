@@ -41,10 +41,10 @@ export async function mockDashboard(page, overrides = {}) {
     if (!url.pathname.startsWith('/api/') && url.pathname !== '/health') return route.continue();
     if (overrides.handle && await overrides.handle(route, url)) return;
     const bodies = {
-      '/health': { status: 'ok', openAiConfigured: false },
+      '/health': { status: 'ok', provider: 'openai', assistantConfigured: false },
       '/api/system': system,
       '/api/runtime': { backendOnline: true, frontendOnline: true },
-      '/api/profile/settings': { openAiConfigured: false, profileApiKey: false },
+      '/api/profile/settings': { provider: 'openai', assistantConfigured: false, openAiConfigured: false, profileApiKey: false, anthropicConfigured: false, profileAnthropicKey: false, models: { openai: 'gpt-6.2-sol', anthropic: 'claude-sonnet-5-5' } },
       '/api/system/apps': [{ id: 'code', name: 'Visual Studio Code', detail: 'Synthetic workspace', icon: 'code', running: true }, { id: 'edge', name: 'Microsoft Edge', detail: 'Synthetic browser', icon: 'edge', running: false }],
       '/api/actions': actions,
       '/api/memories': [{ id: 'm1', category: 'project', content: 'Synthetic project notes for layout verification.' }],

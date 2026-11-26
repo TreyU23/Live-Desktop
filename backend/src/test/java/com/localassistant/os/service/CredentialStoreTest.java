@@ -47,6 +47,22 @@ class CredentialStoreTest {
         assertThat(store.loadOpenAiKey()).isEmpty();
     }
 
+    @Test
+    void keepsAnthropicAndOpenAiKeysSeparateAndProtected() throws Exception {
+        ProfileCredentialStore store = new ProfileCredentialStore(new ProfilePaths(properties()));
+        String anthropicKey = "sk-ant-test-profile-key-1234567890";
+
+        store.saveKey(com.localassistant.os.agent.AssistantProvider.ANTHROPIC, anthropicKey);
+
+        assertThat(store.hasKey(com.localassistant.os.agent.AssistantProvider.ANTHROPIC)).isTrue();
+        assertThat(store.hasOpenAiKey()).isFalse();
+        assertThat(new ProfileCredentialStore(new ProfilePaths(properties()))
+                .loadKey(com.localassistant.os.agent.AssistantProvider.ANTHROPIC)).contains(anthropicKey);
+        assertThat(Files.readString(tempDir.resolve("anthropic-credentials.json"))).doesNotContain(anthropicKey);
+        store.clearKey(com.localassistant.os.agent.AssistantProvider.ANTHROPIC);
+        assertThat(store.hasKey(com.localassistant.os.agent.AssistantProvider.ANTHROPIC)).isFalse();
+    }
+
     @Test void dpapiRoundTripHandlesUnicodeAndRejectsCorruption() throws Exception {
         Path workspace = new ProfilePaths(properties()).workspaceRoot();
         String secret = "test-secret-\u03bb-\u4e2d\u6587";

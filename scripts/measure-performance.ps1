@@ -8,6 +8,7 @@ $savedData = $env:DATA_DIR
 $savedJava = $env:JAVA_HOME
 $savedOptions = $env:JAVA_TOOL_OPTIONS
 $savedKey = $env:OPENAI_API_KEY
+$savedAnthropicKey = $env:ANTHROPIC_API_KEY
 $launcher = Join-Path $stage 'native/build/Release/live-desktop-launcher.exe'
 try {
     foreach ($relative in @('native/build/Release', 'backend/target', 'frontend/dist')) {
@@ -20,6 +21,7 @@ try {
     $env:DATA_DIR = Join-Path $stage 'data'
     $env:JAVA_HOME = Join-Path $projectRoot '.tools/jdk-21'
     $env:OPENAI_API_KEY = ''
+    $env:ANTHROPIC_API_KEY = ''
     $env:JAVA_TOOL_OPTIONS = ''
     $raw = @()
     for ($iteration = 1; $iteration -le $Launches; $iteration++) {
@@ -58,7 +60,7 @@ try {
     [ordered]@{ label = $Label; source = (git -C $projectRoot rev-parse HEAD); java = $javaVersion; cpu = (Get-CimInstance Win32_Processor).Name; power = (powercfg /getactivescheme | Out-String); jarSha256 = (Get-FileHash (Join-Path $stage 'backend/target/live-desktop-backend.jar')).Hash; artifactHashes = $artifactHashes; launches = $raw; conditions = 'Fresh processes, warm filesystem cache, isolated synthetic profiles, no credentials; host power state not controlled.' } | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath (Join-Path $output "$Label-startup.json")
 } finally {
     if (Test-Path -LiteralPath $launcher) { & $launcher shutdown --root $stage | Out-Null }
-    $env:DATA_DIR = $savedData; $env:JAVA_HOME = $savedJava; $env:JAVA_TOOL_OPTIONS = $savedOptions; $env:OPENAI_API_KEY = $savedKey
+    $env:DATA_DIR = $savedData; $env:JAVA_HOME = $savedJava; $env:JAVA_TOOL_OPTIONS = $savedOptions; $env:OPENAI_API_KEY = $savedKey; $env:ANTHROPIC_API_KEY = $savedAnthropicKey
     $resolved = [IO.Path]::GetFullPath($stage)
     if ($resolved.StartsWith($output + [IO.Path]::DirectorySeparatorChar, [StringComparison]::OrdinalIgnoreCase)) { Remove-Item -LiteralPath $resolved -Recurse -Force }
 }

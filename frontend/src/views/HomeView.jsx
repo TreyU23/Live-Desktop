@@ -12,6 +12,7 @@ import { PhonePanel } from '../components/dashboard/PhonePanel.jsx';
 import { SectionHeader } from '../components/dashboard/SectionHeader.jsx';
 import { CompactPlayer } from '../components/media/CompactPlayer.jsx';
 import { AssistantComposer } from '../components/dashboard/AssistantComposer.jsx';
+import { assistantProvider } from '../assistantProviders.js';
 import { ResourceBoundary } from '../components/feedback/ResourceBoundary.jsx';
 import { Page } from '../components/shell/Page.jsx';
 
@@ -36,7 +37,7 @@ export function HomeView({ system, systemSeries = [], health, controls, pendingC
         <PcCard system={system} ready={ready} onOpenSystem={() => navigate('system')} />
         <SystemControls controls={controls} pendingControl={pendingControl} onControl={onControl} />
       </Grid>
-      <AssistantComposer onSubmit={onSubmit} busy={busy} />
+      <AssistantComposer onSubmit={onSubmit} busy={busy} providerName={assistantProvider(health.provider).name} />
       <Grid columns={{ minWidth: 280, max: 3 }} gap={8} align="start">
         {boundary('calendar', 'Calendar', <CalendarPanel {...calendarProps} />)}
         <VStack as="section" gap={2} aria-labelledby="now-playing-title">
@@ -46,7 +47,7 @@ export function HomeView({ system, systemSeries = [], health, controls, pendingC
         {boundary('phone', 'Phone', <PhonePanel {...phoneProps} />)}
       </Grid>
       <Grid columns={{ minWidth: 360, max: 2 }} gap={8} align="start">
-        <ConnectionsCard connected={health.connected} configured={health.configured} calendar={calendarProps.calendar} musicPlayer={mediaProps.musicPlayer} />
+        <ConnectionsCard connected={health.connected} configured={health.configured} providerName={assistantProvider(health.provider).name} calendar={calendarProps.calendar} musicPlayer={mediaProps.musicPlayer} />
         {boundary('apps', 'Applications', <RecentApps apps={apps} />)}
       </Grid>
     </VStack>

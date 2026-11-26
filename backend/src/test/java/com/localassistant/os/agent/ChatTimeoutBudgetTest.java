@@ -16,10 +16,10 @@ class ChatTimeoutBudgetTest {
         assertThat(matcher.find()).as("kChatUpstreamTimeoutMs in %s", host).isTrue();
         Duration hostTimeout = Duration.ofMillis(Long.parseLong(matcher.group(1)));
         // Leave headroom for retry backoff and saving the reply after the last model call.
-        assertThat(hostTimeout).isGreaterThanOrEqualTo(OpenAiAgent.AGENT_DEADLINE.plusSeconds(30));
+        assertThat(hostTimeout).isGreaterThanOrEqualTo(AssistantAgent.AGENT_DEADLINE.plusSeconds(30));
     }
 
     @Test void perAttemptTimeoutsFitInsideTheDeadline() {
-        assertThat(OpenAiAgent.MODEL_CALL_ATTEMPTS).isEqualTo(ProfileClientPool.MAX_RETRIES + 1);
+        assertThat(AssistantAgent.MODEL_CALL_ATTEMPTS).isEqualTo(ProfileClientPool.MAX_RETRIES + 1);
     }
 }

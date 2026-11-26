@@ -36,7 +36,7 @@ public class ProfileDataService {
             throw new IllegalStateException("Profile data path is invalid.");
         }
         // Exclusive: waits for in-flight profile work, and chats suspended around
-        // OpenAI calls fail with ProfileDeletedException instead of rewriting data.
+        // model calls fail with ProfileDeletedException instead of rewriting data.
         ProfileLifecycle.exclusive(ProfileContext.currentId(), () -> {
             state.clearCurrentCache();
             calendar.clearCurrentCache();

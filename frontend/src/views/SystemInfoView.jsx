@@ -40,7 +40,7 @@ function SectionHeading({ id, title, children }) {
   </HStack>;
 }
 
-export function SystemInfoView({ system, series = [], connected, configured, onCopy, headerActions }) {
+export function SystemInfoView({ system, series = [], connected, configured, providerName = 'OpenAI', onCopy, headerActions }) {
   const [tab, setTab] = useState('live');
   const [showIds, setShowIds] = useState(false);
   const seriesValues = key => series.map(sample => sample[key]);
@@ -146,7 +146,7 @@ export function SystemInfoView({ system, series = [], connected, configured, onC
             <MetadataListItem label="Network">{network.connected ? `${shown(network.name)}, ${shown(network.address)}` : 'Offline'}</MetadataListItem>
             <MetadataListItem label="Battery">{battery.available ? `${battery.percent}%, ${battery.detail}` : shown(battery.detail)}</MetadataListItem>
             <MetadataListItem label="Backend">{connected ? 'Local API connected' : 'Unavailable'}</MetadataListItem>
-            <MetadataListItem label="OpenAI">{configured ? 'Key configured' : 'API key needed'}</MetadataListItem>
+            <MetadataListItem label={providerName}>{configured ? 'Key configured' : 'API key needed'}</MetadataListItem>
             <MetadataListItem label="Java runtime">{system.host.javaVersion ? `Java ${system.host.javaVersion}` : 'Unavailable'}</MetadataListItem>
             <MetadataListItem label="Last refreshed">{system.capturedAt ? new Date(system.capturedAt).toLocaleString() : 'Not yet received'}</MetadataListItem>
           </MetadataList>

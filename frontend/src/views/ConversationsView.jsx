@@ -25,7 +25,7 @@ function threadTime(value) {
     : date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 }
 
-export function ConversationsView({ conversations, selected, onSelect, onSend, busy, profileName, configured, actions = [], onApprove, onReject, headerActions }) {
+export function ConversationsView({ conversations, selected, onSelect, onSend, busy, profileName, configured, providerName = 'OpenAI', actions = [], onApprove, onReject, headerActions }) {
   const isWide = useMediaQuery('(min-width: 768px)');
   const [value, setValue] = useState('');
   const [error, setError] = useState('');
@@ -88,13 +88,13 @@ export function ConversationsView({ conversations, selected, onSelect, onSend, b
       </StackItem>
       {reviewButton}
     </HStack>
-    {!configured ? <Banner status="warning" title="OpenAI key not set" description="Add it in Settings to send messages. History is stored on this PC; assistant requests and context are sent to OpenAI." /> : null}
+    {!configured ? <Banner status="warning" title={`${providerName} key not set`} description={`Add it in Settings to send messages. History is stored on this PC; assistant requests and context are sent to ${providerName}.`} /> : null}
     <ChatLayout scrollButton={null}
       emptyState={<EmptyState headingLevel={2} title="Start a conversation" description="Ask about your files, system, or current work. Anything that changes your PC asks for approval first." />}
       composer={<VStack gap={2}>
         <ChatComposer value={value} onChange={setValue} onSubmit={submit} placeholder="Message Live Desktop" isDisabled={busy} elevation="none"
           status={error ? { type: 'error', message: error } : undefined} />
-        <Text type="supporting">Anything that changes your PC asks for approval first. History stays on this PC; messages are sent to OpenAI.</Text>
+        <Text type="supporting">Anything that changes your PC asks for approval first. History stays on this PC; messages are sent to {providerName}.</Text>
       </VStack>}>
       {messages.length ? <ChatMessageList align="top" isStreaming={busy}>
         {messages.map(message => message.role === 'user'

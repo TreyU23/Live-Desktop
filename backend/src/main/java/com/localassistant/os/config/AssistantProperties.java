@@ -7,8 +7,12 @@ public class AssistantProperties {
     private String dataDir = "../data";
     private String workspaceRoot = "..";
     private String openaiApiKey = "";
-    private String openaiModel = "gpt-5.6-sol";
+    private String openaiModel = "gpt-6.2-sol";
     private String reasoningEffort = "medium";
+    private String anthropicApiKey = "";
+    private String anthropicModel = "claude-sonnet-5-5";
+    private String anthropicEffort = "medium";
+    private String provider = "openai";
 
     public String getDataDir() {
         String installation = System.getenv("LIVE_DESKTOP_ROOT");
@@ -52,5 +56,38 @@ public class AssistantProperties {
 
     public void setReasoningEffort(String reasoningEffort) {
         this.reasoningEffort = reasoningEffort;
+    }
+
+    public String getAnthropicApiKey() {
+        return anthropicApiKey;
+    }
+
+    public void setAnthropicApiKey(String anthropicApiKey) {
+        this.anthropicApiKey = anthropicApiKey;
+    }
+
+    public String getAnthropicModel() {
+        return anthropicModel;
+    }
+
+    public void setAnthropicModel(String anthropicModel) {
+        this.anthropicModel = anthropicModel;
+    }
+
+    public String getAnthropicEffort() {
+        return anthropicEffort;
+    }
+
+    public void setAnthropicEffort(String anthropicEffort) {
+        this.anthropicEffort = anthropicEffort;
+    }
+
+    /** Default provider for profiles that never chose one in Settings: openai or anthropic. */
+    public String getProvider() {
+        return provider;
+    }
+
+    public void setProvider(String provider) {
+        this.provider = provider;
     }
 }

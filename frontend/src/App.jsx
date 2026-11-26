@@ -33,6 +33,7 @@ import { accentPreset, readAccentPreset } from "./accentColors.js";
 import { applyCompletedControlAction, upsertAction } from "./systemControls.js";
 import { createResourceScheduler } from "./resourceScheduler.js";
 import { recordTiming } from "./performanceDiagnostics.js";
+import { DEFAULT_ASSISTANT_PROVIDER, assistantProvider, providerModel } from "./assistantProviders.js";
 
 const API_BASE = import.meta.env.VITE_API_BASE || "";
 
@@ -129,6 +130,8 @@ const EMPTY_MUSIC_PLAYER = {
   muted: false,
   detail: "Start playback once, then Live Desktop can control it through Windows.",
 };
+
+const kEmptyAssistantSettings = { provider: DEFAULT_ASSISTANT_PROVIDER, assistantConfigured: false, openAiConfigured: false, profileApiKey: false, anthropicConfigured: false, profileAnthropicKey: false, models: {} };
 
 function emptyMusicPlayerFor(providerId) {
   const provider = MUSIC_PROVIDERS[providerId] || MUSIC_PROVIDERS.apple;
@@ -357,7 +360,7 @@ export function App() {
   const [phone, setPhone] = useState({ installed: false, running: false, connected: false, detail: "Checking Phone Link" });
   const [calendar, setCalendar] = useState(EMPTY_ICLOUD_CALENDAR);
   const [runtime, setRuntime] = useState({ backendOnline: false, frontendOnline: true });
-  const [health, setHealth] = useState({ connected: false, configured: false });
+  const [health, setHealth] = useState({ connected: false, configured: false, provider: DEFAULT_ASSISTANT_PROVIDER });
   const [actions, setActions] = useState([]);
   const [memories, setMemories] = useState([]);
   const [conversations, setConversations] = useState([]);
@@ -380,7 +383,7 @@ export function App() {
   const musicProvider = MUSIC_PROVIDERS[musicProviderId];
   const musicConnection = musicIntegration.connections[musicProviderId];
   const [musicPlayer, setMusicPlayer] = useState(() => emptyMusicPlayerFor(musicProviderId));
-  const [openAiSettings, setOpenAiSettings] = useState({ openAiConfigured: false, profileApiKey: false });
+  const [assistantSettings, setAssistantSettings] = useState(kEmptyAssistantSettings);
   const [resourceStatus, setResourceStatus] = useState({});
   const resourceStates = useRef({});
   const scheduler = useRef(null);
@@ -500,7 +503,7 @@ export function App() {
     });
     scheduler.current = resources;
     const definitions = {
-      health: { path: "/health", interval: 30000, apply: value => setHealth({ connected: true, configured: Boolean(value.openAiConfigured) }), error: () => setHealth({ connected: false, configured: false }) },
+      health: { path: "/health", interval: 30000, apply: value => setHealth({ connected: true, configured: Boolean(value.assistantConfigured), provider: assistantProvider(value.provider).id }), error: () => setHealth(current => ({ ...current, connected: false, configured: false })) },
       system: {
         path: "/api/system",
         interval: 15000,
@@ -516,7 +519,7 @@ export function App() {
       conversations: { path: "/api/conversations", apply: setConversations },
       runtime: { path: "/api/runtime", interval: 30000, apply: setRuntime },
       calendar: { path: () => `/api/integrations/icloud-calendar?date=${calendarDate.current}`, interval: 240000, apply: setCalendar, error: message => setCalendar(current => ({ ...current, status: "error", detail: message })) },
-      settings: { path: "/api/profile/settings", apply: setOpenAiSettings },
+      settings: { path: "/api/profile/settings", apply: setAssistantSettings },
       conversation: { path: "/api/conversations", interval: 0, apply: setSelectedConversation },
       media: { path: () => `/api/integrations/media-session?provider=${musicProviderRef.current}`, interval: 5000, apply: value => setMusicPlayer(current => ({ ...current, ...value })) },
     };
@@ -862,24 +865,36 @@ export function App() {
     notify(`${MUSIC_PROVIDERS[providerId].name} now powers the Music widgets.`, "success");
   };
 
-  const saveOpenAiKey = async (apiKey) => {
+  // Settings responses carry the whole assistant state, so one helper keeps health in step.
+  const updateAssistantSettings = async (path, options) => {
     await scheduler.current?.invalidate("settings");
     await scheduler.current?.invalidate("health");
-    const saved = await api("/api/profile/openai-key", { method: "POST", body: JSON.stringify({ apiKey }) });
+    const saved = await api(path, options);
     await Promise.all(["settings", "health"].map(key => scheduler.current?.invalidate(key)));
-    setOpenAiSettings(saved);
-    setHealth((current) => ({ ...current, configured: true }));
-    notify("OpenAI API key saved for this profile.", "success");
+    setAssistantSettings(saved);
+    setHealth((current) => ({ ...current, configured: Boolean(saved.assistantConfigured), provider: assistantProvider(saved.provider).id }));
+    return saved;
   };
 
-  const deleteOpenAiKey = async () => {
-    await scheduler.current?.invalidate("settings");
-    await scheduler.current?.invalidate("health");
-    const saved = await api("/api/profile/openai-key", { method: "DELETE" });
-    await Promise.all(["settings", "health"].map(key => scheduler.current?.invalidate(key)));
-    setOpenAiSettings(saved);
-    setHealth((current) => ({ ...current, configured: saved.openAiConfigured }));
-    notify("This profile’s OpenAI API key was removed.", "success");
+  const saveApiKey = async (providerId, apiKey) => {
+    const provider = assistantProvider(providerId);
+    await updateAssistantSettings(provider.keyRoute, { method: "POST", body: JSON.stringify({ apiKey }) });
+    notify(`${provider.name} API key saved for this profile.`, "success");
+  };
+
+  const deleteApiKey = async (providerId) => {
+    const provider = assistantProvider(providerId);
+    await updateAssistantSettings(provider.keyRoute, { method: "DELETE" });
+    notify(`This profile’s ${provider.name} API key was removed.`, "success");
+  };
+
+  const switchAssistantProvider = async (providerId) => {
+    const provider = assistantProvider(providerId);
+    if (provider.id === assistantSettings.provider) return;
+    try {
+      const saved = await updateAssistantSettings("/api/profile/assistant-provider", { method: "POST", body: JSON.stringify({ provider: provider.id }) });
+      notify(`The assistant now uses ${providerModel(saved, provider.id)} from ${provider.name}.`, "success");
+    } catch (error) { notify(error.message, "error"); }
   };
 
   const retry = async key => {
@@ -922,14 +937,14 @@ export function App() {
           phoneProps={{ phone, onOpen: openPhone, onRefresh: () => refreshPhone(true), onCopy: copyPhoneName, busy: pendingControl === 'phone', refreshing: phoneRefreshing }}
           mediaProps={{ musicProvider, musicPlayer, musicConfigured: Boolean(musicConnection.embedUrl), onOpenMusic: () => setActiveView('music'), onMusicAction: controlMusic, onOpenMusicExternally: openMusicExternally }} /> : null}
 
-        {activeView === "system" ? boundary("system", "System", <SystemInfoView system={system} series={systemSeries} connected={health.connected} configured={health.configured} onCopy={copySystemInfo} headerActions={headerActions} />) : null}
+        {activeView === "system" ? boundary("system", "System", <SystemInfoView system={system} series={systemSeries} connected={health.connected} configured={health.configured} providerName={assistantProvider(health.provider).name} onCopy={copySystemInfo} headerActions={headerActions} />) : null}
 
         {activeView === "approvals" ? boundary("actions", "Approvals", <ApprovalsView actions={actions} onApprove={(id) => updateAction(id, "approve")} onReject={(id) => updateAction(id, "reject")} headerActions={headerActions} />) : null}
         {activeView === "memories" ? boundary("memories", "Memories", <MemoriesView memories={memories} onCreate={createMemory} onDelete={deleteMemory} headerActions={headerActions} />) : null}
-        {activeView === "conversations" ? <ConversationsView conversations={conversations} selected={selectedConversation} onSelect={selectConversation} onSend={sendMessage} busy={assistantBusy} profileName={activeProfile.name} configured={health.configured} actions={actions} onApprove={(id) => updateAction(id, "approve")} onReject={(id) => updateAction(id, "reject")} headerActions={headerActions} /> : null}
+        {activeView === "conversations" ? <ConversationsView conversations={conversations} selected={selectedConversation} onSelect={selectConversation} onSend={sendMessage} busy={assistantBusy} profileName={activeProfile.name} configured={health.configured} providerName={assistantProvider(health.provider).name} actions={actions} onApprove={(id) => updateAction(id, "approve")} onReject={(id) => updateAction(id, "reject")} headerActions={headerActions} /> : null}
         {activeView === "music" ? <MusicView musicProvider={musicProvider} musicProviderId={musicProviderId} onMusicProviderChange={switchMusicProvider} musicConnection={musicConnection} musicPlayer={musicPlayer} onMusicAction={controlMusic} onOpenMusicExternally={openMusicExternally} onOpenSettings={() => setActiveView("settings")} headerActions={headerActions} /> : null}
         {musicMounted && musicConnection.embedUrl ? <MusicFrame providerId={musicProviderId} provider={musicProvider} embedUrl={musicConnection.embedUrl} isActive={activeView === "music"} /> : null}
-        {activeView === "settings" ? <SettingsView activeProfile={activeProfile} onManageProfiles={() => setProfileMenuOpen(true)} onOpenApprovals={() => setActiveView("approvals")} onRestart={() => runLifecycle("restart")} onShutdown={() => setShutdownOpen(true)} lifecycleBusy={lifecycleState !== "idle"} phone={phone} onOpenPhone={openPhone} headerActions={headerActions} appearance={appearance} onAppearanceChange={setAppearance} accentId={accent.id} onAccentChange={setAccentId} calendar={calendar} onConnectCalendar={connectICloudCalendar} onDisconnectCalendar={disconnectICloudCalendar} musicProviderId={musicProviderId} musicConnection={musicConnection} musicPlayer={musicPlayer} onMusicProviderChange={switchMusicProvider} onSaveMusic={saveMusicConnection} onDisconnectMusic={disconnectMusic} onRefreshMusic={() => refreshMusicPlayer(true)} onOpenMusic={() => setActiveView("music")} openAiSettings={openAiSettings} onSaveOpenAiKey={saveOpenAiKey} onDeleteOpenAiKey={deleteOpenAiKey} /> : null}
+        {activeView === "settings" ? <SettingsView activeProfile={activeProfile} onManageProfiles={() => setProfileMenuOpen(true)} onOpenApprovals={() => setActiveView("approvals")} onRestart={() => runLifecycle("restart")} onShutdown={() => setShutdownOpen(true)} lifecycleBusy={lifecycleState !== "idle"} phone={phone} onOpenPhone={openPhone} headerActions={headerActions} appearance={appearance} onAppearanceChange={setAppearance} accentId={accent.id} onAccentChange={setAccentId} calendar={calendar} onConnectCalendar={connectICloudCalendar} onDisconnectCalendar={disconnectICloudCalendar} musicProviderId={musicProviderId} musicConnection={musicConnection} musicPlayer={musicPlayer} onMusicProviderChange={switchMusicProvider} onSaveMusic={saveMusicConnection} onDisconnectMusic={disconnectMusic} onRefreshMusic={() => refreshMusicPlayer(true)} onOpenMusic={() => setActiveView("music")} assistantSettings={assistantSettings} onAssistantProviderChange={switchAssistantProvider} onSaveApiKey={saveApiKey} onDeleteApiKey={deleteApiKey} /> : null}
       </VStack>
     </AppShell>
     <ProfileDialog isOpen={profileMenuOpen} onOpenChange={setProfileMenuOpen} profiles={profiles} activeProfile={activeProfile} onProfilesChange={updateProfiles} onSwitch={switchProfile}

@@ -4,11 +4,11 @@ import { Table } from '@astryxdesign/core/Table';
 import { Text } from '@astryxdesign/core/Text';
 import { SectionHeader } from './SectionHeader.jsx';
 
-export function ConnectionsCard({ connected, configured, calendar, musicPlayer }) {
+export function ConnectionsCard({ connected, configured, providerName = 'OpenAI', calendar, musicPlayer }) {
   const rows = [
     { id: 'api', service: 'Local API', state: connected ? 'Available' : 'Unavailable', tone: connected ? 'success' : 'error' },
     { id: 'icloud', service: 'iCloud Calendar', state: calendar.connected ? calendar.status === 'error' ? 'Sync error' : 'Connected' : 'Not connected', tone: calendar.connected ? calendar.status === 'error' ? 'warning' : 'success' : 'neutral' },
-    { id: 'openai', service: 'OpenAI key', state: configured ? 'Configured' : 'Not set', tone: configured ? 'success' : 'warning' },
+    { id: 'assistant', service: `${providerName} key`, state: configured ? 'Configured' : 'Not set', tone: configured ? 'success' : 'warning' },
     { id: 'music', service: 'Music', state: musicPlayer.available ? musicPlayer.playing ? 'Playing' : 'Session available' : 'Idle', tone: musicPlayer.available ? 'success' : 'neutral' },
   ];
   const columns = [

@@ -62,12 +62,12 @@ Architecture responsibilities:
 | Layer | Responsibility |
 | --- | --- |
 | React/Vite frontend | Presentation, local UI preferences, drafts, navigation, and requests to the local backend |
-| Java backend | Profiles, persistence, integration logic, approval policy, OpenAI orchestration, calendar, and parsing local metadata |
+| Java backend | Profiles, persistence, integration logic, approval policy, assistant orchestration (OpenAI or Anthropic), calendar, and parsing local metadata |
 | C++ Windows components | Windows execution, native APIs, credential protection support, frontend hosting, and production lifecycle management |
 
 Preserve this separation when implementing changes. Approval and profile policy belong in Java; the native bridge executes constrained Windows operations.
 
-"Local" does not mean every feature works offline. Profiles and application state stay on the PC, while OpenAI, iCloud, and music use external services.
+"Local" does not mean every feature works offline. Profiles and application state stay on the PC, while the assistant model provider (OpenAI or Anthropic), iCloud, and music use external services.
 
 Read these files before substantive work:
 
@@ -388,7 +388,7 @@ Credential requirements:
 - Use current-user Windows DPAPI.
 - Return credential availability/status rather than plaintext.
 - Never echo iCloud passwords to the frontend.
-- Only the default profile uses the OpenAI environment-key fallback.
+- Only the default profile uses the OpenAI and Anthropic environment-key fallbacks.
 - Preserve the distinction between protected storage and plaintext held in memory during use.
 - Keep the installation directory private to the Windows account.
 - Back up `data/` before upgrades.
@@ -422,7 +422,7 @@ For ambiguous mutations, refresh or query the current state before retrying. The
 
 | Integration | Required behavior |
 | --- | --- |
-| OpenAI | Settings accepts a project API key; protect stored keys with DPAPI; report availability without exposing keys; API billing is separate from ChatGPT |
+| Assistant model | Profile-scoped provider choice (OpenAI GPT-6.2 Sol by default, or Anthropic Claude Sonnet 5.5); Settings accepts a separate API key per provider; protect stored keys with DPAPI; report availability without exposing keys; never surface provider error bodies; API billing is separate from ChatGPT and Claude subscriptions |
 | iCloud Calendar | Use Apple email and an app-specific password; keep credentials protected; provide read-only agenda, date selection, refresh, and expansion within Overview |
 | Apple Music/Spotify | Profile-scoped provider selection; separate retained links; one persistent selected-provider embed; Windows media sessions supply real metadata and supported commands |
 | Phone Link | Use available local metadata; refresh automatically and on demand; reflect known platform accurately; label opening Phone Link as external |
@@ -459,6 +459,7 @@ When changing integration internals, consult the backend README rather than repl
 | Calendar cache | 4-minute date cache and 30-minute discovery cache |
 | Calendar refresh/error retry | 15-second budget/cache behavior |
 | OpenAI clients | Up to 16 clients keyed by profile/key fingerprint |
+| Anthropic requests | Shared JDK HTTP client, no redirects; key only in the `x-api-key` header; one retry |
 | Artwork | Four native entries, each up to 4 MiB |
 
 Additional constraints:
@@ -628,7 +629,7 @@ AOT-related paths are optional experiments. Rebuild normal production artifacts 
 
 ## 21. Separate automated evidence from manual acceptance
 
-Automated checks do not establish authenticated OpenAI behavior or key rotation, real iCloud reconnect/recurrence, real Apple Music/Spotify audio, actual provider transitions, Phone Link/device availability, physical radio changes, sleep/resume behavior, isolation between independent Windows users, screen-reader behavior, or actual browser zoom.
+Automated checks do not establish authenticated OpenAI or Anthropic behavior or key rotation, real iCloud reconnect/recurrence, real Apple Music/Spotify audio, actual provider transitions, Phone Link/device availability, physical radio changes, sleep/resume behavior, isolation between independent Windows users, screen-reader behavior, or actual browser zoom.
 
 Test those with the appropriate accounts, devices, and environment before claiming them.
 

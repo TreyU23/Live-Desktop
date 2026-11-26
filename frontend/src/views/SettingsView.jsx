@@ -18,6 +18,7 @@ import { icons } from '../components/ui/icons.js';
 import { formatRelativeTime } from '../presentation/formatters.js';
 import { MUSIC_PROVIDERS, normalizeMusicUrl } from '../musicProviders.js';
 import { ACCENT_PRESETS } from '../accentColors.js';
+import { ASSISTANT_PROVIDERS, assistantProvider, providerModel } from '../assistantProviders.js';
 
 const kSections = [
   { id: 'settings-profile', label: 'Profile' },
@@ -31,7 +32,37 @@ function StateLabel({ tone, children }) {
   return <HStack gap={2} vAlign="center"><StatusDot variant={tone} label={String(children)} /><Text type="supporting">{children}</Text></HStack>;
 }
 
-export function SettingsView({ activeProfile, onManageProfiles, onOpenApprovals, onRestart, onShutdown, lifecycleBusy, phone, onOpenPhone, headerActions, appearance, onAppearanceChange, accentId, onAccentChange, calendar, onConnectCalendar, onDisconnectCalendar, musicProviderId, musicConnection, musicPlayer, onMusicProviderChange, onSaveMusic, onDisconnectMusic, onRefreshMusic, onOpenMusic, openAiSettings, onSaveOpenAiKey, onDeleteOpenAiKey }) {
+// One provider's key: saved per profile, protected with Windows data protection, never shown again.
+function ApiKeyRow({ provider, configured, profileKey, active, onSave, onDelete }) {
+  const [value, setValue] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const save = async () => {
+    if (busy || !value.trim()) return;
+    setBusy(true); setError('');
+    try { await onSave(provider.id, value); setValue(''); } catch (keyError) { setError(keyError.message); } finally { setBusy(false); }
+  };
+  const remove = async () => {
+    if (busy) return;
+    setBusy(true); setError('');
+    try { await onDelete(provider.id); } catch (keyError) { setError(keyError.message); } finally { setBusy(false); }
+  };
+  const state = configured ? 'Key configured' : active ? 'Needed for chat' : 'Not set';
+  return <SettingRow title={provider.keyTitle}
+    description="Only this local profile uses it. Protected with Windows data protection and never returned to the browser after saving."
+    details={<HStack gap={2} vAlign="end" wrap="wrap">
+      <StackItem size="fill">
+        <TextInput type="password" label="API key" value={value} onChange={setValue} onEnter={save} autoComplete="off"
+          placeholder={profileKey ? 'Profile key saved' : provider.keyPlaceholder} status={error ? { type: 'error', message: error } : undefined} />
+      </StackItem>
+      <Button label={busy ? 'Saving…' : profileKey ? 'Replace key' : 'Save key'} variant="primary" isLoading={busy} isDisabled={!value.trim()} onClick={save} />
+      {profileKey ? <Button label="Remove key" variant="destructive" isDisabled={busy} onClick={remove} /> : null}
+    </HStack>}>
+    <StateLabel tone={configured ? 'success' : active ? 'warning' : 'neutral'}>{state}</StateLabel>
+  </SettingRow>;
+}
+
+export function SettingsView({ activeProfile, onManageProfiles, onOpenApprovals, onRestart, onShutdown, lifecycleBusy, phone, onOpenPhone, headerActions, appearance, onAppearanceChange, accentId, onAccentChange, calendar, onConnectCalendar, onDisconnectCalendar, musicProviderId, musicConnection, musicPlayer, onMusicProviderChange, onSaveMusic, onDisconnectMusic, onRefreshMusic, onOpenMusic, assistantSettings, onAssistantProviderChange, onSaveApiKey, onDeleteApiKey }) {
   const isWide = useMediaQuery('(min-width: 1024px)');
   const musicProvider = MUSIC_PROVIDERS[musicProviderId];
   const [musicUrl, setMusicUrl] = useState(musicConnection.sourceUrl || '');
@@ -41,9 +72,6 @@ export function SettingsView({ activeProfile, onManageProfiles, onOpenApprovals,
   const [calendarError, setCalendarError] = useState('');
   const [calendarBusy, setCalendarBusy] = useState(false);
   const [calendarFormOpen, setCalendarFormOpen] = useState(false);
-  const [openAiKey, setOpenAiKey] = useState('');
-  const [openAiBusy, setOpenAiBusy] = useState(false);
-  const [openAiError, setOpenAiError] = useState('');
 
   useEffect(() => { setMusicUrl(musicConnection.sourceUrl || ''); setMusicError(''); }, [musicConnection.sourceUrl, musicProviderId]);
 
@@ -68,16 +96,7 @@ export function SettingsView({ activeProfile, onManageProfiles, onOpenApprovals,
     catch (disconnectError) { setCalendarError(disconnectError.message); }
     finally { setCalendarBusy(false); }
   };
-  const saveOpenAi = async () => {
-    if (openAiBusy || !openAiKey.trim()) return;
-    setOpenAiBusy(true); setOpenAiError('');
-    try { await onSaveOpenAiKey(openAiKey); setOpenAiKey(''); } catch (keyError) { setOpenAiError(keyError.message); } finally { setOpenAiBusy(false); }
-  };
-  const removeOpenAiKey = async () => {
-    if (openAiBusy) return;
-    setOpenAiBusy(true); setOpenAiError('');
-    try { await onDeleteOpenAiKey(); } catch (keyError) { setOpenAiError(keyError.message); } finally { setOpenAiBusy(false); }
-  };
+  const activeProvider = assistantProvider(assistantSettings.provider);
   const jumpTo = id => document.getElementById(id)?.scrollIntoView({ block: 'start' });
 
   const sections = <VStack gap={8} maxWidth={720}>
@@ -105,18 +124,17 @@ export function SettingsView({ activeProfile, onManageProfiles, onOpenApprovals,
     </SettingSection>
 
     <SettingSection id="settings-assistant" title="Assistant">
-      <SettingRow title="OpenAI API key"
-        description="Only this local profile uses it. Protected with Windows data protection and never returned to the browser after saving."
-        details={<HStack gap={2} vAlign="end" wrap="wrap">
-          <StackItem size="fill">
-            <TextInput type="password" label="API key" value={openAiKey} onChange={setOpenAiKey} onEnter={saveOpenAi} autoComplete="off"
-              placeholder={openAiSettings.profileApiKey ? 'Profile key saved' : 'sk-…'} status={openAiError ? { type: 'error', message: openAiError } : undefined} />
-          </StackItem>
-          <Button label={openAiBusy ? 'Saving…' : openAiSettings.profileApiKey ? 'Replace key' : 'Save key'} variant="primary" isLoading={openAiBusy} isDisabled={!openAiKey.trim()} onClick={saveOpenAi} />
-          {openAiSettings.profileApiKey ? <Button label="Remove key" variant="destructive" isDisabled={openAiBusy} onClick={removeOpenAiKey} /> : null}
-        </HStack>}>
-        <StateLabel tone={openAiSettings.openAiConfigured ? 'success' : 'warning'}>{openAiSettings.openAiConfigured ? 'Key configured' : 'Not set'}</StateLabel>
+      <SettingRow title="Model"
+        description={`Chat uses ${providerModel(assistantSettings, activeProvider.id)} from ${activeProvider.name}. Saved for this profile; each provider needs its own key below.`}>
+        <SegmentedControl label="Model provider" value={activeProvider.id} onChange={onAssistantProviderChange}>
+          {Object.values(ASSISTANT_PROVIDERS).map(provider => <SegmentedControlItem key={provider.id} value={provider.id}
+            label={providerModel(assistantSettings, provider.id)} />)}
+        </SegmentedControl>
       </SettingRow>
+      <ApiKeyRow provider={ASSISTANT_PROVIDERS.openai} configured={assistantSettings.openAiConfigured} profileKey={assistantSettings.profileApiKey}
+        active={activeProvider.id === 'openai'} onSave={onSaveApiKey} onDelete={onDeleteApiKey} />
+      <ApiKeyRow provider={ASSISTANT_PROVIDERS.anthropic} configured={assistantSettings.anthropicConfigured} profileKey={assistantSettings.profileAnthropicKey}
+        active={activeProvider.id === 'anthropic'} onSave={onSaveApiKey} onDelete={onDeleteApiKey} />
       <SettingRow isLast title="Remembered approvals" description="Allowing an action also allows matching requests later.">
         <Button label="Review approvals" endContent={<Icon icon={icons.ChevronRight} />} onClick={onOpenApprovals} />
       </SettingRow>

@@ -28,10 +28,10 @@ await page.route('**/*', async route => {
   counts.set(url.pathname, (counts.get(url.pathname) || 0) + 1);
   let body = [];
   if (url.pathname === '/api/system/controls/wifi') { await controlGate; body = {id:'synthetic',status:'pending',summary:'Synthetic Wi-Fi approval',arguments:{control:'wifi',enabled:true}}; }
-  if (url.pathname === '/health') body = { status: 'ok', openAiConfigured: false };
+  if (url.pathname === '/health') body = { status: 'ok', provider: 'openai', assistantConfigured: false };
   if (url.pathname === '/api/system') body = system;
   if (url.pathname === '/api/runtime') body = { backendOnline: true, frontendOnline: true };
-  if (url.pathname === '/api/profile/settings') body = { openAiConfigured: false, profileApiKey: false };
+  if (url.pathname === '/api/profile/settings') body = { provider: 'openai', assistantConfigured: false, openAiConfigured: false, profileApiKey: false, anthropicConfigured: false, profileAnthropicKey: false, models: { openai: 'gpt-6.2-sol', anthropic: 'claude-sonnet-5-5' } };
   if (url.pathname === '/api/integrations/phone-link') body = { installed: false, detail: 'Synthetic phone ready' };
   if (url.pathname === '/api/integrations/icloud-calendar') {
     await calendarGate;

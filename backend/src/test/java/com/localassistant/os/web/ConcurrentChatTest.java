@@ -9,7 +9,8 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import com.localassistant.os.agent.OpenAiAgent;
+import com.localassistant.os.agent.AssistantAgent;
+import com.localassistant.os.agent.AssistantProvider;
 import com.localassistant.os.model.Conversation;
 import com.localassistant.os.model.ConversationMessage;
 import com.localassistant.os.service.ActionService;
@@ -37,14 +38,15 @@ class ConcurrentChatTest {
     private static final Conversation CONVERSATION = new Conversation(ID, "Test", List.of(), "now", "now");
 
     private StateStore store;
-    private OpenAiAgent agent;
+    private AssistantAgent agent;
     private AssistantController controller;
 
     @BeforeEach
     void setUp() throws Exception {
         store = mock(StateStore.class);
-        agent = mock(OpenAiAgent.class);
-        when(agent.configured()).thenReturn(true);
+        agent = mock(AssistantAgent.class);
+        when(agent.provider()).thenReturn(AssistantProvider.OPENAI);
+        when(agent.configured(AssistantProvider.OPENAI)).thenReturn(true);
         when(store.getOrCreateConversation(any())).thenReturn(CONVERSATION);
         when(store.conversation(ID)).thenReturn(Optional.of(CONVERSATION));
         when(store.addMessage(eq(ID), any(), any()))

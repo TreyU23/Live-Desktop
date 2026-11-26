@@ -1,6 +1,7 @@
 package com.localassistant.os.error;
 
-import com.localassistant.os.agent.OpenAiAgent;
+import com.localassistant.os.agent.AnthropicAgent;
+import com.localassistant.os.agent.AssistantAgent;
 import com.localassistant.os.profile.ProfileLifecycle;
 import com.openai.errors.OpenAIIoException;
 import com.openai.errors.OpenAIRetryableException;
@@ -20,7 +21,7 @@ import org.slf4j.LoggerFactory;
  * <p>Only messages Live Desktop wrote itself pass through: a plain IllegalArgumentException,
  * IllegalStateException or IOException (or one of our own subclasses) thrown from a
  * {@code com.localassistant} frame. Those are the curated validation and status messages. Anything
- * else (JDK file-system errors that name paths, OpenAI SDK errors that echo the request or key,
+ * else (JDK file-system errors that name paths, model provider errors that echo the request or key,
  * parser and network errors) becomes a stable code and a generic message, and the detail goes to
  * the backend log under a short reference the user can quote.
  */
@@ -38,7 +39,7 @@ public final class ClientErrors {
     private ClientErrors() {}
 
     public static ClientError describe(Throwable error) {
-        if (error instanceof OpenAiAgent.AgentDeadlineException) return new ClientError("deadline_exceeded", error.getMessage());
+        if (error instanceof AssistantAgent.AgentDeadlineException) return new ClientError("deadline_exceeded", error.getMessage());
         if (error instanceof ProfileLifecycle.ProfileDeletedException) return new ClientError("profile_deleted", error.getMessage());
         if (error instanceof UnauthorizedException) {
             return logged("openai_unauthorized", "OpenAI rejected the API key. Check it in Settings.", error);
@@ -54,6 +55,16 @@ public final class ClientErrors {
         }
         if (error instanceof OpenAIIoException || error instanceof OpenAIRetryableException) {
             return logged("openai_unreachable", "Live Desktop couldn't reach OpenAI.", error);
+        }
+        if (error instanceof AnthropicAgent.AnthropicApiException anthropic) {
+            return switch (anthropic.statusCode()) {
+                case 0 -> logged("anthropic_unreachable", "Live Desktop couldn't reach Anthropic.", error);
+                case 401 -> logged("anthropic_unauthorized", "Anthropic rejected the API key. Check it in Settings.", error);
+                case 403 -> logged("anthropic_forbidden", "Anthropic refused this request for the configured key.", error);
+                case 429 -> logged("anthropic_rate_limited", "Anthropic's rate limit was reached. Try again shortly.", error);
+                case 529 -> logged("anthropic_overloaded", "Anthropic is overloaded right now. Try again shortly.", error);
+                default -> logged("anthropic_error", "Anthropic returned an error (HTTP " + anthropic.statusCode() + ").", error);
+            };
         }
         if (authoredHere(error)) {
             String code = error instanceof IllegalArgumentException ? "invalid_request"

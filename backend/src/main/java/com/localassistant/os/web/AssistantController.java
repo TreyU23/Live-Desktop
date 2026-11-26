@@ -1,6 +1,7 @@
 package com.localassistant.os.web;
 
-import com.localassistant.os.agent.OpenAiAgent;
+import com.localassistant.os.agent.AssistantAgent;
+import com.localassistant.os.agent.AssistantProvider;
 import com.localassistant.os.error.ClientErrors;
 import com.localassistant.os.model.Conversation;
 import com.localassistant.os.model.ConversationMessage;
@@ -35,7 +36,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 public class AssistantController {
     private final StateStore store;
-    private final OpenAiAgent agent;
+    private final AssistantAgent agent;
     private final ActionService actions;
     private final MemoryService memories;
     private final SystemService system;
@@ -48,7 +49,7 @@ public class AssistantController {
 
     public AssistantController(
             StateStore store,
-            OpenAiAgent agent,
+            AssistantAgent agent,
             ActionService actions,
             MemoryService memories,
             SystemService system,
@@ -71,29 +72,58 @@ public class AssistantController {
 
     @GetMapping("/health")
     public Map<String, Object> health() {
-        return Map.of("status", "ok", "openAiConfigured", agent.configured());
+        AssistantProvider provider = agent.provider();
+        return Map.of("status", "ok", "provider", provider.id(), "assistantConfigured", agent.configured(provider));
     }
 
     @GetMapping("/api/profile/settings")
     public Map<String, Object> profileSettings() {
-        return Map.of("openAiConfigured", agent.configured(), "profileApiKey", agent.profileKeyConfigured());
+        return agent.settings();
     }
 
-    @PostMapping("/api/profile/openai-key")
-    public ResponseEntity<?> saveProfileOpenAiKey(@RequestBody OpenAiKeyRequest request) {
+    @PostMapping("/api/profile/assistant-provider")
+    public ResponseEntity<?> saveAssistantProvider(@RequestBody AssistantProviderRequest request) {
         try {
-            profileCredentials.saveOpenAiKey(request.apiKey());
-            return ResponseEntity.ok(Map.of("openAiConfigured", true, "profileApiKey", true));
+            profileCredentials.saveProvider(AssistantProvider.fromId(request.provider()));
+            return ResponseEntity.ok(agent.settings());
         } catch (Exception error) {
             return ResponseEntity.badRequest().body(error(error));
         }
     }
 
+    @PostMapping("/api/profile/openai-key")
+    public ResponseEntity<?> saveProfileOpenAiKey(@RequestBody ApiKeyRequest request) {
+        return saveProfileKey(AssistantProvider.OPENAI, request);
+    }
+
     @DeleteMapping("/api/profile/openai-key")
     public ResponseEntity<?> deleteProfileOpenAiKey() {
+        return deleteProfileKey(AssistantProvider.OPENAI);
+    }
+
+    @PostMapping("/api/profile/anthropic-key")
+    public ResponseEntity<?> saveProfileAnthropicKey(@RequestBody ApiKeyRequest request) {
+        return saveProfileKey(AssistantProvider.ANTHROPIC, request);
+    }
+
+    @DeleteMapping("/api/profile/anthropic-key")
+    public ResponseEntity<?> deleteProfileAnthropicKey() {
+        return deleteProfileKey(AssistantProvider.ANTHROPIC);
+    }
+
+    private ResponseEntity<?> saveProfileKey(AssistantProvider provider, ApiKeyRequest request) {
         try {
-            profileCredentials.clearOpenAiKey();
-            return ResponseEntity.ok(Map.of("openAiConfigured", agent.configured(), "profileApiKey", false));
+            profileCredentials.saveKey(provider, request == null ? null : request.apiKey());
+            return ResponseEntity.ok(agent.settings());
+        } catch (Exception error) {
+            return ResponseEntity.badRequest().body(error(error));
+        }
+    }
+
+    private ResponseEntity<?> deleteProfileKey(AssistantProvider provider) {
+        try {
+            profileCredentials.clearKey(provider);
+            return ResponseEntity.ok(agent.settings());
         } catch (Exception error) {
             return ResponseEntity.badRequest().body(error(error));
         }
@@ -124,9 +154,10 @@ public class AssistantController {
 
     @PostMapping("/api/chat")
     public ResponseEntity<?> chat(@Valid @RequestBody ChatRequest request) {
-        if (!agent.configured()) {
+        AssistantProvider provider = agent.provider();
+        if (!agent.configured(provider)) {
             return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
-                    .body(Map.of("error", "OPENAI_API_KEY is not configured."));
+                    .body(Map.of("error", AssistantAgent.missingKeyMessage(provider), "code", "assistant_not_configured"));
         }
         try {
             Conversation conversation = store.getOrCreateConversation(request.conversationId());
@@ -148,7 +179,7 @@ public class AssistantController {
             return ResponseEntity.badRequest().body(error(error));
         } catch (ProfileLifecycle.ProfileDeletedException error) {
             return ResponseEntity.status(HttpStatus.CONFLICT).body(error(error));
-        } catch (OpenAiAgent.AgentDeadlineException error) {
+        } catch (AssistantAgent.AgentDeadlineException error) {
             return ResponseEntity.status(HttpStatus.GATEWAY_TIMEOUT).body(error(error));
         } catch (Exception error) {
             return ResponseEntity.status(HttpStatus.BAD_GATEWAY).body(error(error));
@@ -411,7 +442,8 @@ public class AssistantController {
     public record MemoryRequest(String content, String category) {}
 
     public record ICloudCalendarRequest(String email, String appSpecificPassword) {}
-    public record OpenAiKeyRequest(String apiKey) {}
+    public record ApiKeyRequest(String apiKey) {}
+    public record AssistantProviderRequest(String provider) {}
     public record SystemControlRequest(Boolean enabled) {}
 
 }

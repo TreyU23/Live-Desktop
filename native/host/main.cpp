@@ -158,7 +158,7 @@ std::set<std::string> hopHeaders(const std::map<std::string, std::string>& heade
     return result;
 }
 // /api/chat runs the whole agent loop (several model turns and tool calls). Its upstream timeout
-// must exceed the backend's overall agent deadline (OpenAiAgent.AGENT_DEADLINE, 240s) so the UI
+// must exceed the backend's overall agent deadline (AssistantAgent.AGENT_DEADLINE, 240s) so the UI
 // gets the backend's real answer or error, never a proxy 502 while the reply is still being saved.
 constexpr int kApiUpstreamTimeoutMs = 120000;
 constexpr int kChatUpstreamTimeoutMs = 300000;

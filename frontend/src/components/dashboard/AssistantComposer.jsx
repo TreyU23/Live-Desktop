@@ -10,7 +10,7 @@ import { icons } from '../ui/icons.js';
 // Suggestions only fill the field; nothing is sent until the user presses Send.
 const kSuggestions = ['How is my PC doing?', 'Turn off Bluetooth', 'What’s on my calendar today?'];
 
-export function AssistantComposer({ onSubmit, busy }) {
+export function AssistantComposer({ onSubmit, busy, providerName = 'OpenAI' }) {
   const [value, setValue] = useState('');
   const sending = useRef(false);
   const submit = async () => {
@@ -31,6 +31,6 @@ export function AssistantComposer({ onSubmit, busy }) {
     <HStack gap={2} wrap="wrap" role="group" aria-label="Suggestions">
       {kSuggestions.map(text => <Button key={text} label={text} size="sm" onClick={() => setValue(text)} />)}
     </HStack>
-    <Text type="supporting">Anything that changes your PC asks for approval first. History stays in this local profile; assistant requests are sent to OpenAI.</Text>
+    <Text type="supporting">Anything that changes your PC asks for approval first. History stays in this local profile; assistant requests are sent to {providerName}.</Text>
   </VStack>;
 }
