@@ -71,11 +71,18 @@ class WorkspaceServiceTest {
                 // Root files and build, editor and agent files run code on the next build or editor open (#25).
                 "pom.xml", "mvnw", "mvnw.cmd", "AGENTS.md", "CLAUDE.md", "package.json", "todo.md",
                 ".vscode/settings.json", ".vscode/tasks.json", ".idea/workspace.xml", "notes/.vscode/tasks.json",
-                "tools/pom.xml", "web/package.json", "sub/AGENTS.md", "docs/Makefile", "notes/.hidden.txt" }) {
+                "tools/pom.xml", "web/package.json", "sub/AGENTS.md", "docs/Makefile", "notes/.hidden.txt",
+                // Only plain-text types are writable; Windows runs or acts on these when opened or browsed (#26).
+                "notes/run.js", "notes/a.url", "notes/a.scf", "notes/a.pif", "notes/a.msc", "notes/a.chm",
+                "notes/a.wsc", "notes/a.sct", "notes/a.inf", "notes/a.appref-ms", "notes/a.settingcontent-ms",
+                "notes/a.library-ms", "notes/page.html", "notes/a.svg", "notes/noextension", "notes/RUN.JS." }) {
             assertThatThrownBy(() -> workspace.resolveWritablePath(path))
                     .as(path).isInstanceOf(IllegalArgumentException.class);
         }
-        assertThat(workspace.resolveWritablePath("notes/todo.md")).isEqualTo(root.resolve("notes/todo.md"));
+        for (String path : new String[] {
+                "notes/todo.md", "notes/data.json", "notes/list.csv", "notes/plan.TXT", "notes/cal.ics", "notes/a.yaml" }) {
+            assertThat(workspace.resolveWritablePath(path)).as(path).isEqualTo(root.resolve(path));
+        }
     }
 
     @Test

@@ -40,7 +40,7 @@ public final class AssistantTools {
     }
 
     @JsonTypeName("propose_write_file")
-    @JsonClassDescription("Requests a workspace file write. The first write to a file waits for user approval; later writes to that approved file run immediately.")
+    @JsonClassDescription("Requests a workspace file write. The first write to a file waits for user approval; later writes to that approved file run immediately. The path must be inside a folder (not the workspace root, not Live Desktop's own folders or a dot-folder) and end in a plain-text type: txt, md, markdown, json, csv, tsv, yaml, yml, toml, ics or log.")
     public static class ProposeWriteFile {
         public String path;
         public String content;

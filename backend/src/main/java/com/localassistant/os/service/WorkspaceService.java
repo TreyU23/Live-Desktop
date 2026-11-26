@@ -24,10 +24,13 @@ public class WorkspaceService {
     private static final Set<String> PROTECTED_WRITE_DIRECTORIES = Set.of(
             "data", "native", "backend", "frontend", "scripts",
             ".tools", ".git", ".github", ".mvn");
-    /** Executable, script and loadable-library extensions that the assistant may not create or overwrite. */
-    private static final Set<String> BLOCKED_WRITE_EXTENSIONS = Set.of(
-            "cmd", "bat", "ps1", "psm1", "psd1", "ps1xml", "exe", "dll", "com", "scr", "msi", "msp", "sys",
-            "cpl", "vbs", "vbe", "jse", "wsf", "wsh", "hta", "reg", "lnk", "jar", "sh", "so", "dylib");
+    /**
+     * Plain-text types the assistant may create or overwrite. Everything else is refused, including extensionless
+     * files, so types Windows runs or acts on when opened or browsed (.js, .url, .scf, .pif, .msc, .chm, .inf, ...)
+     * can't be written.
+     */
+    private static final Set<String> ALLOWED_WRITE_EXTENSIONS = Set.of(
+            "txt", "md", "markdown", "json", "csv", "tsv", "yaml", "yml", "toml", "ics", "log");
     /**
      * Build, editor and coding-agent files that run or steer code on the next build or editor open, wherever they
      * sit in a source checkout.
@@ -76,8 +79,8 @@ public class WorkspaceService {
     /**
      * Resolves a path the assistant wants to write. On top of {@link #resolveSafePath} this refuses Live Desktop's
      * own folders, every file at the workspace root, every dot-file and dot-folder (`.vscode`, `.idea`, `.env`, ...),
-     * build, editor and coding-agent files by name, and executable or loadable file types, so an approved write can
-     * never change code or configuration that runs with the next launch, build or editor open.
+     * build, editor and coding-agent files by name, and every type outside a small plain-text allowlist, so an
+     * approved write can never change code or configuration that runs with the next launch, build or editor open.
      */
     public Path resolveWritablePath(String candidate) throws IOException {
         Path absolute = resolveSafePath(candidate);
@@ -115,8 +118,9 @@ public class WorkspaceService {
             throw new IllegalArgumentException("Build, editor and agent files are not available to workspace writes.");
         }
         int dot = leaf.lastIndexOf('.');
-        if (dot >= 0 && BLOCKED_WRITE_EXTENSIONS.contains(leaf.substring(dot + 1))) {
-            throw new IllegalArgumentException("Executable and script files are not available to workspace writes.");
+        if (dot < 0 || !ALLOWED_WRITE_EXTENSIONS.contains(leaf.substring(dot + 1))) {
+            throw new IllegalArgumentException("Workspace writes are limited to plain-text files ("
+                    + String.join(", ", ALLOWED_WRITE_EXTENSIONS.stream().sorted().toList()) + ").");
         }
         Path real = canonicalIfPresent(absolute);
         if (real.startsWith(canonicalIfPresent(dataRoot)) || absolute.startsWith(dataRoot)) {
