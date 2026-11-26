@@ -23,7 +23,7 @@ add_executable(live-desktop-launcher launcher/main.cpp)
 target_compile_features(live-desktop-launcher PRIVATE cxx_std_20)
 target_compile_definitions(live-desktop-launcher PRIVATE UNICODE _UNICODE WIN32_LEAN_AND_MEAN NOMINMAX _WIN32_WINNT=0x0A00)
 target_compile_options(live-desktop-launcher PRIVATE /W4 /EHsc /permissive-)
-target_link_libraries(live-desktop-launcher PRIVATE advapi32 ws2_32 winhttp iphlpapi)
+target_link_libraries(live-desktop-launcher PRIVATE advapi32 bcrypt ws2_32 winhttp iphlpapi)
 install(TARGETS live-desktop-launcher RUNTIME DESTINATION bin)
 
 add_executable(live-desktop-host host/main.cpp)

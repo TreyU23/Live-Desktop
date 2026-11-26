@@ -176,7 +176,12 @@ void proxy(SOCKET socket, const Request& req) {
     if (!WinHttpSetOption(request.value, WINHTTP_OPTION_DISABLE_FEATURE, &disabled, sizeof(disabled))) throw HttpError{502, "Unable to configure API proxy"};
     std::string headers; auto hop = hopHeaders(req.headers);
     for (const auto& [name, value] : req.headers) {
-        if (!hop.contains(name) && name != "host" && name != "content-length" && name != "expect") headers += name + ": " + value + "\r\n";
+        // Browsers never get to set the bridge header; only this host adds it, and only for /health.
+        if (!hop.contains(name) && name != "host" && name != "content-length" && name != "expect" && name != "x-live-desktop-bridge") headers += name + ": " + value + "\r\n";
+    }
+    if (req.target.substr(0, req.target.find('?')) == "/health") {
+        char secret[256]; DWORD secretLength = GetEnvironmentVariableA("LIVE_DESKTOP_BRIDGE_SECRET", secret, sizeof(secret));
+        if (secretLength > 0 && secretLength < sizeof(secret)) headers += "X-Live-Desktop-Bridge: " + std::string(secret, secretLength) + "\r\n";
     }
     auto wh = wide(headers);
     if (!WinHttpSendRequest(request.value, wh.c_str(), static_cast<DWORD>(wh.size()), req.body.empty() ? nullptr : const_cast<char*>(req.body.data()), static_cast<DWORD>(req.body.size()), static_cast<DWORD>(req.body.size()), 0)

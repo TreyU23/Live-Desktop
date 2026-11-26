@@ -12,6 +12,7 @@ import java.util.Enumeration;
 import java.util.HexFormat;
 import java.util.Locale;
 import java.util.Set;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
 import org.springframework.http.MediaType;
@@ -28,6 +29,8 @@ import org.springframework.web.filter.OncePerRequestFilter;
 @Order(Ordered.HIGHEST_PRECEDENCE)
 public class LocalAccessFilter extends OncePerRequestFilter {
     public static final String TOKEN_HEADER = "X-Live-Desktop-Token";
+    /** Sent only by the native host (and the launcher's own probes) when it proxies {@code GET /health}. */
+    public static final String BRIDGE_HEADER = "X-Live-Desktop-Bridge";
     static final int DASHBOARD_PORT = 4173;
 
     private static final byte[] REJECTION =
@@ -37,6 +40,16 @@ public class LocalAccessFilter extends OncePerRequestFilter {
             "127.0.0.1", "localhost", "::1", "0:0:0:0:0:0:0:1");
 
     private final String token = HexFormat.of().formatHex(randomToken());
+    private final byte[] bridgeSecret;
+
+    /**
+     * @param bridgeSecret per-launch secret shared by the launcher, the native host and this backend. When it is
+     *     set, {@code /health} hands out the API token only to a caller that presents it, so another local web
+     *     page cannot read the token. Empty (development) keeps the loopback-only behavior.
+     */
+    public LocalAccessFilter(@Value("${LIVE_DESKTOP_BRIDGE_SECRET:}") String bridgeSecret) {
+        this.bridgeSecret = bridgeSecret == null ? new byte[0] : bridgeSecret.getBytes(StandardCharsets.UTF_8);
+    }
 
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain)
@@ -71,7 +84,9 @@ public class LocalAccessFilter extends OncePerRequestFilter {
             return;
         }
         if (health) {
-            if (isLoopbackPeer(request)) response.setHeader(TOKEN_HEADER, token);
+            if (isLoopbackPeer(request) && bridgeAuthorized(singleHeader(request, BRIDGE_HEADER))) {
+                response.setHeader(TOKEN_HEADER, token);
+            }
             response.setHeader("Cache-Control", "no-store");
         }
         chain.doFilter(request, response);
@@ -80,6 +95,11 @@ public class LocalAccessFilter extends OncePerRequestFilter {
     static boolean isLoopbackPeer(HttpServletRequest request) {
         String address = request.getRemoteAddr();
         return address != null && LOOPBACK_PEERS.contains(address);
+    }
+
+    private boolean bridgeAuthorized(String provided) {
+        if (bridgeSecret.length == 0) return true;
+        return provided != null && MessageDigest.isEqual(bridgeSecret, provided.getBytes(StandardCharsets.UTF_8));
     }
 
     private boolean authorized(String provided) {

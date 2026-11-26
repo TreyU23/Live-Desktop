@@ -27,7 +27,8 @@ try {
         if ($LASTEXITCODE -ne 0) { throw "Benchmark launch $iteration failed." }
         $raw += [ordered]@{ label = $Label; iteration = $iteration; metrics = @(Get-Content -LiteralPath (Join-Path $stage '.startup-metrics.jsonl') | ForEach-Object { $_ | ConvertFrom-Json })[-1] }
         if ($iteration -eq 1) {
-            $health = Invoke-WebRequest -UseBasicParsing 'http://127.0.0.1:4317/health' -TimeoutSec 5
+            # Production withholds the token from direct backend calls; the native host adds the bridge secret on 4173.
+            $health = Invoke-WebRequest -UseBasicParsing 'http://127.0.0.1:4173/health' -TimeoutSec 5
             $token = [string]@($health.Headers['X-Live-Desktop-Token'])[0]
             if ([string]::IsNullOrWhiteSpace($token)) { throw 'Local access token was not issued.' }
             $routeHeaders = @{ 'X-Profile-Id' = 'perf-synthetic'; 'X-Live-Desktop-Token' = $token }

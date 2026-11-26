@@ -475,7 +475,7 @@ Additional constraints:
 - Validate PNG/JPEG/GIF/WebP signatures.
 - Use private artwork caching and nosniff.
 - Snapshots contain artwork references rather than Base64 payloads.
-- Local API access stays on `LocalAccessFilter`, ahead of profile handling. Each launch issues a token on loopback `GET /health`; every other route requires `X-Live-Desktop-Token`. A non-loopback peer receives health status without the token. `Host` must be `127.0.0.1` or `localhost` on the accepting port. A present `Origin` must be `http://127.0.0.1` or `http://localhost` on port 4173 or the backend port. Every `POST` and `DELETE` requires `Content-Type: application/json`. The filter reads `Host` and `Origin` directly.
+- Local API access stays on `LocalAccessFilter`, ahead of profile handling. Each launch issues a token on loopback `GET /health`; every other route requires `X-Live-Desktop-Token`. A non-loopback peer, or in production a caller without the per-launch bridge secret, receives health status without the token. `Host` must be `127.0.0.1` or `localhost` on the accepting port. A present `Origin` must be `http://127.0.0.1` or `http://localhost` on port 4173 or the backend port. Every `POST` and `DELETE` requires `Content-Type: application/json`. The filter reads `Host` and `Origin` directly.
 
 ## 16. Preserve the native runtime's ownership and security model
 

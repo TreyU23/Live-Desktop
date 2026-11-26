@@ -3,6 +3,7 @@
 #include <windows.h>
 #include <winhttp.h>
 #include <iphlpapi.h>
+#include <bcrypt.h>
 #include <sddl.h>
 #include <filesystem>
 #include <iostream>
@@ -207,6 +208,16 @@ bool httpReady(INTERNET_PORT port, const wchar_t* path, const std::string& expec
     if (connection) WinHttpCloseHandle(connection);
     WinHttpCloseHandle(session); return ok;
 }
+// Per-launch secret shared by the backend and the native host. The backend hands out its API token on /health only to
+// callers that present it, so another local web page cannot read the token.
+std::wstring randomHexSecret() {
+    unsigned char bytes[32];
+    require(BCryptGenRandom(nullptr, bytes, sizeof(bytes), BCRYPT_USE_SYSTEM_PREFERRED_RNG) >= 0, "Cannot generate launch secret");
+    static const wchar_t digits[] = L"0123456789abcdef";
+    std::wstring result;
+    for (unsigned char byte : bytes) { result += digits[byte >> 4]; result += digits[byte & 15]; }
+    return result;
+}
 int supervise(const fs::path& root, Objects& objects) {
     if (objects.running()) return 0;
     MutexLock owner(objects.instance.value, 0);
@@ -225,6 +236,7 @@ int supervise(const fs::path& root, Objects& objects) {
         // Backend working directory preserves ../.env and ../data semantics.
         SetEnvironmentVariableW(L"WORKSPACE_ROOT", root.c_str());
         SetEnvironmentVariableW(L"LIVE_DESKTOP_ROOT", root.generic_wstring().c_str());
+        SetEnvironmentVariableW(L"LIVE_DESKTOP_BRIDGE_SECRET", randomHexSecret().c_str());
         SetEnvironmentVariableW(L"HOST", L"127.0.0.1"); SetEnvironmentVariableW(L"PORT", L"4317");
         std::vector<std::wstring> javaArgs;
         auto deployment = root / L"backend/target/runtime";
