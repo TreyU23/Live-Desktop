@@ -60,7 +60,6 @@ export default defineConfig({
     headers: kFramingHeaders,
     host: kViteHost,
     port: kVitePort,
-    allowedHosts: ["terminal.local"],
     proxy: {
       "/api": { target: kBackend, changeOrigin: true },
       "/health": { target: kBackend, changeOrigin: true, configure: stripTokenForRemotePeers },
