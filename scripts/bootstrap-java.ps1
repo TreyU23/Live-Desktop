@@ -43,4 +43,4 @@ Remove-Item -LiteralPath $archive
 
 $env:JAVA_HOME = $jdkTarget
 & (Join-Path $jdkTarget "bin\java.exe") -version
-Write-Host "Java is ready. Run scripts/run-backend.ps1 to start the service."
+Write-Host "Java is ready. Run start.cmd to start Live Desktop."
