@@ -28,6 +28,15 @@ public class WorkspaceService {
     private static final Set<String> BLOCKED_WRITE_EXTENSIONS = Set.of(
             "cmd", "bat", "ps1", "psm1", "psd1", "ps1xml", "exe", "dll", "com", "scr", "msi", "msp", "sys",
             "cpl", "vbs", "vbe", "jse", "wsf", "wsh", "hta", "reg", "lnk", "jar", "sh", "so", "dylib");
+    /**
+     * Build, editor and coding-agent files that run or steer code on the next build or editor open, wherever they
+     * sit in a source checkout.
+     */
+    private static final Set<String> PROTECTED_WRITE_FILE_NAMES = Set.of(
+            "pom.xml", "mvnw", "mvnw.cmd", "package.json", "package-lock.json", "npm-shrinkwrap.json",
+            "yarn.lock", "pnpm-lock.yaml", "pnpm-workspace.yaml", "build.gradle", "build.gradle.kts",
+            "settings.gradle", "settings.gradle.kts", "gradlew", "gradlew.bat", "makefile", "dockerfile",
+            "agents.md", "claude.md", "desktop.ini", "autorun.inf");
     private final Path root;
     private final Path dataRoot;
 
@@ -66,14 +75,18 @@ public class WorkspaceService {
 
     /**
      * Resolves a path the assistant wants to write. On top of {@link #resolveSafePath} this refuses Live Desktop's
-     * own folders, every environment file, and executable or loadable file types, so an approved write can never
-     * change code or configuration that runs with the next launch.
+     * own folders, every file at the workspace root, every dot-file and dot-folder (`.vscode`, `.idea`, `.env`, ...),
+     * build, editor and coding-agent files by name, and executable or loadable file types, so an approved write can
+     * never change code or configuration that runs with the next launch, build or editor open.
      */
     public Path resolveWritablePath(String candidate) throws IOException {
         Path absolute = resolveSafePath(candidate);
         Path relative = root.relativize(absolute);
         if (relative.toString().isEmpty()) {
             throw new IllegalArgumentException("Path must name a file inside the workspace.");
+        }
+        if (relative.getNameCount() == 1) {
+            throw new IllegalArgumentException("Files at the workspace root are not available to workspace writes; use a folder such as notes/.");
         }
         int index = 0;
         for (Path segment : relative) {
@@ -92,9 +105,15 @@ public class WorkspaceService {
             if (name.equals(".git") || name.equals(".env") || name.startsWith(".env.")) {
                 throw new IllegalArgumentException("Environment and repository files are not available to workspace writes.");
             }
+            if (name.startsWith(".")) {
+                throw new IllegalArgumentException("Dot-files and dot-folders are not available to workspace writes.");
+            }
             index++;
         }
         String leaf = relative.getFileName().toString().replaceAll("[. ]+$", "").toLowerCase(Locale.ROOT);
+        if (PROTECTED_WRITE_FILE_NAMES.contains(leaf)) {
+            throw new IllegalArgumentException("Build, editor and agent files are not available to workspace writes.");
+        }
         int dot = leaf.lastIndexOf('.');
         if (dot >= 0 && BLOCKED_WRITE_EXTENSIONS.contains(leaf.substring(dot + 1))) {
             throw new IllegalArgumentException("Executable and script files are not available to workspace writes.");

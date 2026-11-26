@@ -410,7 +410,7 @@ Workspace tools must preserve:
 - Directory listing limits of 500 entries
 - Exclusion of configured/conventional profile data directories
 - Exclusion of root `.env` variants, except `.env.example`
-- Existing approval and path checks for writes, plus `resolveWritablePath`: no writes to Live Desktop's own folders, `.env` files or executable/loadable types
+- Existing approval and path checks for writes, plus `resolveWritablePath`: no writes to Live Desktop's own folders, workspace-root files, dot-files and dot-folders, build/editor/agent files (`pom.xml`, `mvnw`, `.vscode`, `AGENTS.md`, ...) or executable/loadable types
 - Write approvals keyed on path and content hash; failed actions never count as approvals
 - Memory approvals keyed on category and content hash; recalled memories are returned as untrusted data
 

@@ -67,7 +67,11 @@ class WorkspaceServiceTest {
                 ".env", ".env.local", "backend/target/.env", "sub/.env", "data/state.json", "native/main.cpp",
                 "backend/pom.xml", "frontend/app.js", "scripts/run.txt", ".tools/jdk-21/conf/security/java.security",
                 ".git/config", ".github/workflows/x.yml", ".mvn/maven.config", "BACKEND/pom.xml",
-                "notes/PROGRA~1.txt", "notes/file.txt:stream", "." }) {
+                "notes/PROGRA~1.txt", "notes/file.txt:stream", ".",
+                // Root files and build, editor and agent files run code on the next build or editor open (#25).
+                "pom.xml", "mvnw", "mvnw.cmd", "AGENTS.md", "CLAUDE.md", "package.json", "todo.md",
+                ".vscode/settings.json", ".vscode/tasks.json", ".idea/workspace.xml", "notes/.vscode/tasks.json",
+                "tools/pom.xml", "web/package.json", "sub/AGENTS.md", "docs/Makefile", "notes/.hidden.txt" }) {
             assertThatThrownBy(() -> workspace.resolveWritablePath(path))
                     .as(path).isInstanceOf(IllegalArgumentException.class);
         }
