@@ -67,15 +67,16 @@ public class SystemService {
     private final ThreadPoolExecutor bridgeExecutor = newBridgeExecutor();
     private static final Duration IO_RATE_MIN_ELAPSED = Duration.ofSeconds(1);
     private static final Duration IO_RATE_MAX_ELAPSED = Duration.ofMinutes(5);
+    // How long a computed rate may be handed to another caller who samples too soon to get its own.
+    static final Duration IO_RATE_SHARE_FOR = Duration.ofSeconds(5);
 
     private final Object batteryLock = new Object();
-    private final Object ioRateLock = new Object();
     private final PhoneMetadataCache phoneMetadata = new PhoneMetadataCache();
     private volatile CachedWindowsDetails cachedWindowsDetails;
     // Package-private so tests can move time forward; production always uses the system clock.
     Clock clock = Clock.systemUTC();
     private volatile CachedBattery cachedBattery;
-    private volatile IoCounterSample previousIoCounters;
+    private final IoRateTracker ioRateTracker = new IoRateTracker();
 
     public SystemService(AssistantProperties properties, WindowsSystemControlService systemControls) {
         workspaceRoot = Path.of(properties.getWorkspaceRoot()).toAbsolutePath().normalize();
@@ -534,16 +535,43 @@ public class SystemService {
             }
             Instant now = Instant.now();
             IoCounterSample current = new IoCounterSample(now, networkIn, networkOut, diskRead, diskWrite, diskAvailable);
-            synchronized (ioRateLock) {
-                IoCounterSample previous = previousIoCounters;
-                previousIoCounters = current;
-                if (previous == null) {
-                    return IoRates.unavailable();
-                }
-                return computeIoRates(previous, current);
-            }
+            return ioRateTracker.next(current);
         } catch (Exception ignored) {
             return IoRates.unavailable();
+        }
+    }
+
+    /**
+     * Turns cumulative counter samples from every caller (dashboard windows, the agent) into rates.
+     * The baseline only moves forward once a sample is at least {@link #IO_RATE_MIN_ELAPSED} past it,
+     * and a caller that samples sooner gets the most recent computed rates. Before, each call replaced
+     * one shared baseline, so two pollers less than a second apart made each other read "unavailable".
+     */
+    static final class IoRateTracker {
+        private IoCounterSample baseline;
+        private IoRates lastRates;
+        private Instant lastRatesAt;
+
+        synchronized IoRates next(IoCounterSample current) {
+            if (baseline == null) {
+                baseline = current;
+                return IoRates.unavailable();
+            }
+            Duration sinceBaseline = Duration.between(baseline.capturedAt(), current.capturedAt());
+            if (sinceBaseline.compareTo(IO_RATE_MIN_ELAPSED) < 0) {
+                // Too close to the last sample to measure; keep the baseline and share the last result.
+                if (lastRates != null
+                        && Duration.between(lastRatesAt, current.capturedAt()).compareTo(IO_RATE_SHARE_FOR) <= 0) {
+                    return lastRates;
+                }
+                return IoRates.unavailable();
+            }
+            IoRates rates = computeIoRates(baseline, current);
+            baseline = current;
+            boolean anyAvailable = rates.networkAvailable() || rates.diskActivity().available();
+            lastRates = anyAvailable ? rates : null;
+            lastRatesAt = current.capturedAt();
+            return rates;
         }
     }
 
