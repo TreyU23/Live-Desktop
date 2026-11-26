@@ -64,6 +64,9 @@ This package contains no saved user data, .env, logs, node_modules, or build too
         }
     } finally { $zip.Dispose(); $zipStream.Dispose() }
     Write-Output "Packaged $archive"
+    # The release tag message carries this line so the hash is covered by the tag signature (issue #12).
+    $archiveHash = (Get-FileHash -LiteralPath $archive -Algorithm SHA256).Hash.ToLowerInvariant()
+    Write-Output "Tag message line: Live-Desktop-windows-x64.zip SHA-256: $archiveHash"
 } finally {
     $resolvedStage = [IO.Path]::GetFullPath($stage)
     if ($resolvedStage.StartsWith([IO.Path]::GetFullPath($distribution) + '\', [StringComparison]::OrdinalIgnoreCase)) {

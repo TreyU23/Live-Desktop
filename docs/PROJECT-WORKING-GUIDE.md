@@ -665,6 +665,8 @@ $releaseHash = (
     Set-Content .\dist\Live-Desktop-windows-x64.zip.sha256 -Encoding ascii
 ```
 
+From 3.0.3, the annotated release tag must record the same hash on its own line, `Live-Desktop-windows-x64.zip SHA-256: <hash>`, and be signed on the release PC (`git tag -s`). The publish workflow refuses to publish when the tag is unsigned, unverified, or records a different hash, and `scripts\verify-release.ps1` lets users run the same check (issue #12). Build the ZIP before creating the tag, because the tag message needs its hash.
+
 The package must include required native components, extracted backend deployment, frontend assets, documentation, `.env.example`, and hash manifest. Java-inclusive packages must contain Java 21.
 
 It must exclude saved user data, credentials, real `.env` files, logs, dependency caches, and `node_modules`.
@@ -675,7 +677,7 @@ For publication: verify the final merged main tag; upload the exact ZIP and chec
 
 The package workflow uses `com.localassistant:live-desktop-windows-x64:<version>:zip`. It is an application distribution ZIP, not a Java library dependency.
 
-The documented GitHub workflow publishes already attached release bytes after checksum verification; it does not rebuild or test the application. Attach the ZIP and checksum before relying on that workflow.
+The documented GitHub workflow publishes already attached release bytes after checksum and signed-tag verification; it does not rebuild or test the application. Attach the ZIP and checksum before relying on that workflow.
 
 ## 23. Troubleshoot using the documented runtime boundaries
 
