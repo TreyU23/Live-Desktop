@@ -4,6 +4,7 @@ import com.localassistant.os.agent.OpenAiAgent;
 import com.localassistant.os.error.ClientErrors;
 import com.localassistant.os.model.Conversation;
 import com.localassistant.os.model.ConversationMessage;
+import com.localassistant.os.profile.ProfileContext;
 import com.localassistant.os.profile.ProfileLifecycle;
 import com.localassistant.os.service.ActionService;
 import com.localassistant.os.service.MemoryService;
@@ -43,6 +44,7 @@ public class AssistantController {
     private final WindowsMediaSessionService mediaSession;
     private final ProfileCredentialStore profileCredentials;
     private final ProfileDataService profileData;
+    private final InFlightConversations inFlight = new InFlightConversations();
 
     public AssistantController(
             StateStore store,
@@ -128,12 +130,20 @@ public class AssistantController {
         }
         try {
             Conversation conversation = store.getOrCreateConversation(request.conversationId());
-            store.addMessage(conversation.id(), "user", request.message().trim());
-            Conversation current = store.conversation(conversation.id())
-                    .orElseThrow();
-            ConversationMessage message = store.addMessage(
-                    conversation.id(), "assistant", agent.reply(current));
-            return ResponseEntity.ok(Map.of("conversationId", conversation.id(), "message", message));
+            // One turn per conversation at a time: append user message, get the reply, append it.
+            try (var claim = inFlight.tryClaim(ProfileContext.currentId(), conversation.id())) {
+                if (claim == null) {
+                    return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of(
+                            "error", "This conversation is still answering another message. Wait for that reply, then send again.",
+                            "code", "conversation_busy"));
+                }
+                store.addMessage(conversation.id(), "user", request.message().trim());
+                Conversation current = store.conversation(conversation.id())
+                        .orElseThrow();
+                ConversationMessage message = store.addMessage(
+                        conversation.id(), "assistant", agent.reply(current));
+                return ResponseEntity.ok(Map.of("conversationId", conversation.id(), "message", message));
+            }
         } catch (StateStore.InvalidConversationIdException error) {
             return ResponseEntity.badRequest().body(error(error));
         } catch (ProfileLifecycle.ProfileDeletedException error) {
