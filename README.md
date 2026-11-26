@@ -1,6 +1,6 @@
 # Live Desktop
 
-Current release: **3.0.4** — see the [release notes](docs/RELEASE_3.0.4.md). There is no public 2.x: version 2 was the Apple-style glass design, which was never released.
+Current release: **3.1.0** — see the [release notes](docs/RELEASE_3.1.0.md). There is no public 2.x: version 2 was the Apple-style glass design, which was never released.
 
 A local Windows dashboard for PC telemetry, approved controls, conversations, memories, iCloud Calendar, Phone Link and Apple Music/Spotify. React renders the UI, Java owns state/integrations/approval policy, and C++ provides the runtime and Windows APIs. Profiles stay on this PC; the assistant model provider (OpenAI or Anthropic), iCloud and music use external services.
 
@@ -97,7 +97,7 @@ Readiness checks native `/_live/ready`, direct/proxied `/health` and dashboard `
 - [Backend](backend/README.md), [frontend](frontend/README.md), [native runtime](native/README.md): implementation contracts.
 - [Validation/performance](docs/VALIDATION.md): checks, diagnostics and evidence limits.
 - [System information](docs/SYSTEM_INFORMATION.md), [Windows controls](docs/WINDOWS_CONTROL_CAPABILITIES.md): sources and capability boundaries.
-- [Release notes 3.0.4](docs/RELEASE_3.0.4.md), [3.0.3](docs/RELEASE_3.0.3.md), [3.0.2](docs/RELEASE_3.0.2.md), [3.0.1](docs/RELEASE_3.0.1.md), [3.0.0](docs/RELEASE_3.0.0.md), [1.1.0](docs/RELEASE_1.1.0.md), [1.0.0](docs/RELEASE_1.0.0.md).
+- [Release notes 3.1.0](docs/RELEASE_3.1.0.md), [3.0.4](docs/RELEASE_3.0.4.md), [3.0.3](docs/RELEASE_3.0.3.md), [3.0.2](docs/RELEASE_3.0.2.md), [3.0.1](docs/RELEASE_3.0.1.md), [3.0.0](docs/RELEASE_3.0.0.md), [1.1.0](docs/RELEASE_1.1.0.md), [1.0.0](docs/RELEASE_1.0.0.md).
 - [Product](PRODUCT.md), [design system](DESIGN.md), [selected reference](docs/redesign/README.md).
 
 Update affected READMEs whenever setup/behavior changes. Synthetic tests do not establish authenticated accounts, hardware changes, real audio, sleep/resume or independent-user isolation. Shipping to `main` requires project security review and a separate release decision.
