@@ -42,6 +42,9 @@ import org.w3c.dom.NodeList;
 public class ICloudCalendarService {
     private static final URI ICLOUD_CALDAV = URI.create("https://caldav.icloud.com/");
     private static final Duration CACHE_TTL = Duration.ofMinutes(4);
+    // The owner's fetch is bounded by a 15 s deadline, so a waiter that is still waiting after this
+    // long is stuck behind a broken refresh. Package-private so tests can shorten it.
+    Duration waiterTimeout = Duration.ofSeconds(20);
     private static final DateTimeFormatter CALDAV_UTC = DateTimeFormatter.ofPattern("yyyyMMdd'T'HHmmss'Z'")
             .withZone(ZoneId.of("UTC"));
     private final ICloudCredentialStore credentials;
@@ -95,7 +98,42 @@ public class ICloudCalendarService {
             if (owner && state.pending.size() >= 8) return new CalendarSnapshot(true, account.email(), "error", "Calendar refresh is busy. Try again shortly.", date, List.of(), Instant.now());
             if (owner) { future = new java.util.concurrent.CompletableFuture<>(); state.pending.put(date, future); }
         }
-        if (!owner) return future.join();
+        if (!owner) return awaitRefresh(future, account, date, previous);
+        boolean settled = false;
+        try {
+            CalendarSnapshot result = refreshAsOwner(profile, account, date, state, previous, future);
+            settled = true;
+            return result;
+        } finally {
+            // An Error (e.g. OutOfMemoryError) skips the normal completion below. Release the pending
+            // slot and fail the shared future so waiters return instead of blocking forever.
+            if (!settled) {
+                synchronized (cache) { state.pending.remove(date, future); }
+                future.completeExceptionally(new IllegalStateException("Calendar refresh failed."));
+            }
+        }
+    }
+
+    private CalendarSnapshot awaitRefresh(java.util.concurrent.CompletableFuture<CalendarSnapshot> future,
+            ICloudCredentialStore.Credentials account, LocalDate date, CalendarSnapshot previous) {
+        String detail;
+        try {
+            return future.get(waiterTimeout.toMillis(), java.util.concurrent.TimeUnit.MILLISECONDS);
+        } catch (InterruptedException interrupted) {
+            Thread.currentThread().interrupt();
+            detail = "Calendar refresh was interrupted. Try again shortly.";
+        } catch (java.util.concurrent.TimeoutException timedOut) {
+            detail = "Calendar refresh is taking too long. Try again shortly.";
+        } catch (java.util.concurrent.ExecutionException failed) {
+            detail = "iCloud Calendar could not be refreshed.";
+        }
+        return new CalendarSnapshot(true, account.email(), "error", detail, date,
+                previous == null ? List.of() : previous.events(), Instant.now());
+    }
+
+    private CalendarSnapshot refreshAsOwner(String profile, ICloudCredentialStore.Credentials account, LocalDate date,
+            ProfileCalendar state, CalendarSnapshot previous,
+            java.util.concurrent.CompletableFuture<CalendarSnapshot> future) {
         CalendarSnapshot result;
         boolean permit = false;
         fetchDeadline.set(System.nanoTime() + Duration.ofSeconds(15).toNanos());
