@@ -65,8 +65,10 @@ void sendAll(SOCKET s, const char* data, size_t size) {
     }
 }
 void sendAll(SOCKET s, const std::string& data) { sendAll(s, data.data(), data.size()); }
+// Real response headers: browsers ignore frame-ancestors in a <meta> CSP, so framing has to be refused here.
+const char* const kFramingHeaders = "X-Frame-Options: DENY\r\nContent-Security-Policy: frame-ancestors 'none'\r\n";
 void response(SOCKET s, int status, const std::string& body, bool head = false) {
-    sendAll(s, "HTTP/1.1 " + std::to_string(status) + " Response\r\nConnection: close\r\nContent-Type: text/plain; charset=utf-8\r\nX-Content-Type-Options: nosniff\r\nContent-Length: " + std::to_string(body.size()) + "\r\n\r\n");
+    sendAll(s, "HTTP/1.1 " + std::to_string(status) + " Response\r\nConnection: close\r\nContent-Type: text/plain; charset=utf-8\r\nX-Content-Type-Options: nosniff\r\n" + std::string(kFramingHeaders) + "Content-Length: " + std::to_string(body.size()) + "\r\n\r\n");
     if (!head) sendAll(s, body);
 }
 struct Reader {
@@ -273,11 +275,11 @@ void serve(SOCKET socket, const Request& req, const fs::path& root) {
             token = trim(token);
             if (token.starts_with("W/")) token.erase(0, 2);
             if (token == "*" || token == etag.substr(2)) {
-                sendAll(socket, "HTTP/1.1 304 Not Modified\r\nConnection: close\r\n" + cacheHeaders + "\r\n"); return;
+                sendAll(socket, "HTTP/1.1 304 Not Modified\r\nConnection: close\r\n" + cacheHeaders + kFramingHeaders + "\r\n"); return;
             }
         }
     }
-    sendAll(socket, "HTTP/1.1 200 OK\r\nConnection: close\r\nContent-Type: " + type + "\r\nContent-Length: " + std::to_string(fileSize.QuadPart) + "\r\n" + cacheHeaders + "X-Content-Type-Options: nosniff\r\n\r\n");
+    sendAll(socket, "HTTP/1.1 200 OK\r\nConnection: close\r\nContent-Type: " + type + "\r\nContent-Length: " + std::to_string(fileSize.QuadPart) + "\r\n" + cacheHeaders + "X-Content-Type-Options: nosniff\r\n" + kFramingHeaders + "\r\n");
     if (req.method == "HEAD") return;
     char buffer[65536]; DWORD read = 0;
     while (ReadFile(file.value, buffer, sizeof(buffer), &read, nullptr) && read) sendAll(socket, buffer, read);

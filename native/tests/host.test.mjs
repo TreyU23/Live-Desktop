@@ -56,6 +56,8 @@ test('native host: assets, proxy, confinement, and upstream failures', { timeout
     await t.test('revalidates stable files and caches only hashed build assets', async () => {
       const asset = await request('/app.js');
       assert.equal(asset.headers['cache-control'], 'no-cache');
+      assert.equal(asset.headers['x-frame-options'], 'DENY');
+      assert.equal(asset.headers['content-security-policy'], "frame-ancestors 'none'");
       const cached = await request('/app.js', { 'if-none-match': asset.headers.etag });
       assert.equal(cached.status, 304); assert.equal(cached.body, '');
       assert.equal((await request('/app.js', { 'if-none-match': '"other", ' + asset.headers.etag })).status, 304);

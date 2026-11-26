@@ -38,6 +38,9 @@ export const kContentSecurityPolicy = [
   "form-action 'self'",
 ].join("; ");
 
+// Browsers ignore frame-ancestors in a <meta> CSP, so framing is refused with real headers (the native host does the same).
+const kFramingHeaders = { "X-Frame-Options": "DENY", "Content-Security-Policy": "frame-ancestors 'none'" };
+
 function contentSecurityPolicy() {
   return {
     name: "live-desktop-csp",
@@ -54,6 +57,7 @@ export default defineConfig({
     include: ["react", "react-dom/client"],
   },
   server: {
+    headers: kFramingHeaders,
     host: kViteHost,
     port: kVitePort,
     allowedHosts: ["terminal.local"],
