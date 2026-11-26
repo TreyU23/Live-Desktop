@@ -76,6 +76,30 @@ class ProfileLifecycleTest {
     }
 
     @Test
+    void deletionStaysVisibleToLaterResumesAfterTheFirstIsLost() throws Exception {
+        // Issue #27: a caller that lost the first ProfileDeletedException (suppressed on a retried I/O error)
+        // must still see the deletion on its next resume.
+        try (var lease = ProfileLifecycle.acquire("s27")) {
+            var first = ProfileLifecycle.suspend();
+            executor.submit(() -> {
+                ProfileLifecycle.exclusive("s27", () -> {});
+                return null;
+            }).get(1, TimeUnit.SECONDS);
+            assertThatThrownBy(first::close).isInstanceOf(ProfileLifecycle.ProfileDeletedException.class);
+            var second = ProfileLifecycle.suspend();
+            assertThatThrownBy(second::close).isInstanceOf(ProfileLifecycle.ProfileDeletedException.class);
+        }
+    }
+
+    @Test
+    void ownDeletionDoesNotFailTheDeletingRequest() throws Exception {
+        try (var lease = ProfileLifecycle.acquire("t27")) {
+            ProfileLifecycle.exclusive("t27", () -> {});
+            ProfileLifecycle.suspend().close();
+        }
+    }
+
+    @Test
     void ordinaryRequestsShareTheLease() throws Exception {
         try (var first = ProfileLifecycle.acquire("r6")) {
             executor.submit(() -> {

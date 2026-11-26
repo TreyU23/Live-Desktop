@@ -110,6 +110,12 @@ public final class ProfileLifecycle {
         private long generation;
         private boolean held = true;
         private boolean closed;
+        /**
+         * Sticky once a resume has seen a deletion. {@link #relock} advances {@link #generation} before it throws, so
+         * without this a caller that swallowed or lost the first exception (a retry after an I/O error) would resume
+         * cleanly on its next suspension and keep writing to the deleted profile (issue #27).
+         */
+        private boolean deleted;
 
         private Lease(String profile, Entry entry, long generation) {
             this.profile = profile;
@@ -127,7 +133,10 @@ public final class ProfileLifecycle {
             held = true;
             long seen = generation;
             generation = entry.generation;
-            if (failIfDeleted && seen != entry.generation) throw new ProfileDeletedException();
+            if (failIfDeleted && (deleted || seen != entry.generation)) {
+                deleted = true;
+                throw new ProfileDeletedException();
+            }
         }
 
         @Override

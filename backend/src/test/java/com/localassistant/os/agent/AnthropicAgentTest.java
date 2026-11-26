@@ -16,7 +16,9 @@ import com.localassistant.os.config.AssistantProperties;
 import com.localassistant.os.error.ClientErrors;
 import com.localassistant.os.model.Conversation;
 import com.localassistant.os.model.ConversationMessage;
+import com.localassistant.os.profile.ProfileLifecycle;
 import com.localassistant.os.service.DashboardContextService;
+import java.io.IOException;
 import java.net.http.HttpClient;
 import java.net.http.HttpHeaders;
 import java.net.http.HttpRequest;
@@ -27,7 +29,13 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.Flow;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicInteger;
 import javax.net.ssl.SSLSession;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -134,6 +142,38 @@ class AnthropicAgentTest {
 
         assertThat(agent.reply(CONVERSATION, KEY, System.nanoTime() + AssistantAgent.AGENT_DEADLINE.toNanos())).isEqualTo("ok");
         assertThat(requests).hasSize(2);
+    }
+
+    @Test
+    void profileDeletedDuringAFailedCallIsNotLostToTheRetry() throws Exception {
+        // Issue #27: the deletion arrives as a suppressed exception on the I/O error and must not be retried away.
+        DashboardContextService dashboard = mock(DashboardContextService.class);
+        when(dashboard.contextForPrompt(anyString())).thenReturn("");
+        AtomicInteger calls = new AtomicInteger();
+        ExecutorService deleter = Executors.newSingleThreadExecutor();
+        try {
+            AnthropicAgent deleting = new AnthropicAgent(new AssistantProperties(), dashboard, tools, request -> {
+                if (calls.incrementAndGet() == 1) {
+                    try {
+                        deleter.submit(() -> {
+                            ProfileLifecycle.exclusive("a27", () -> {});
+                            return null;
+                        }).get(5, TimeUnit.SECONDS);
+                    } catch (ExecutionException | TimeoutException error) {
+                        throw new AssertionError(error);
+                    }
+                    throw new IOException("connection reset");
+                }
+                return response(200, "{\"stop_reason\":\"end_turn\",\"content\":[{\"type\":\"text\",\"text\":\"ok\"}]}");
+            });
+            try (var lease = ProfileLifecycle.acquire("a27")) {
+                assertThatThrownBy(() -> deleting.reply(CONVERSATION, KEY, System.nanoTime() + AssistantAgent.AGENT_DEADLINE.toNanos()))
+                        .isInstanceOf(ProfileLifecycle.ProfileDeletedException.class);
+            }
+            assertThat(calls).hasValue(1);
+        } finally {
+            deleter.shutdownNow();
+        }
     }
 
     @Test
