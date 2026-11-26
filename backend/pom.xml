@@ -13,7 +13,7 @@
 
     <groupId>com.localassistant</groupId>
     <artifactId>assistant-backend</artifactId>
-    <version>3.0.1</version>
+    <version>3.0.2</version>
     <name>Local Assistant OS Backend</name>
 
     <properties>
