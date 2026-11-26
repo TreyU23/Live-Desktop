@@ -25,7 +25,7 @@ public class ICloudCredentialStore {
 
     public synchronized void save(String email, String appSpecificPassword) throws IOException {
         Path credentialFile = credentialFile();
-        Files.createDirectories(credentialFile.getParent());
+        profilePaths.prepareCurrentDirectory();
         String protectedPassword = protect(appSpecificPassword);
         objectMapper.writeValue(credentialFile.toFile(), Map.of(
                 "email", email.trim(),
@@ -40,7 +40,8 @@ public class ICloudCredentialStore {
         if (cachedCredentials.containsKey(profileId)) return cachedCredentials.get(profileId);
         Path credentialFile = credentialFile();
         if (Files.notExists(credentialFile)) {
-            cachedCredentials.put(profileId, Optional.empty());
+            // Only cache profiles that exist, so lookups for made-up ids leave nothing behind (issue #18).
+            if (profilePaths.currentExists()) cachedCredentials.put(profileId, Optional.empty());
             return Optional.empty();
         }
         Optional<Credentials> loaded;

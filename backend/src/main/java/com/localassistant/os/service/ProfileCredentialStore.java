@@ -28,7 +28,7 @@ public class ProfileCredentialStore {
             throw new IllegalArgumentException("Enter a valid OpenAI API key.");
         }
         Path file = profilePaths.file("openai-credentials.json");
-        Files.createDirectories(file.getParent());
+        profilePaths.prepareCurrentDirectory();
         mapper.writeValue(file.toFile(), Map.of("protectedApiKey", protect(cleaned)));
         cachedKeys.put(ProfileContext.currentId(), Optional.of(cleaned));
         if (clients != null) clients.invalidate(ProfileContext.currentId());
@@ -44,7 +44,8 @@ public class ProfileCredentialStore {
                 return Optional.empty();
             }
         });
-        cachedKeys.put(profileId, loaded);
+        // Only cache profiles that exist, so lookups for made-up ids leave nothing behind (issue #18).
+        if (profilePaths.currentExists()) cachedKeys.put(profileId, loaded);
         return loaded;
     }
 

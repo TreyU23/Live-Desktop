@@ -9,6 +9,9 @@ import java.util.concurrent.*;
 import org.junit.jupiter.api.Test;
 
 class CalendarConcurrencyTest {
+    private static final String SLOW = "00000000_0000_4000_8000_000000000001";
+    private static final String FAST = "00000000_0000_4000_8000_000000000002";
+
     @Test void deduplicatesReadsAndDisconnectDiscardsPendingResult() throws Exception {
         var credentials = mock(ICloudCredentialStore.class);
         var saved = new java.util.concurrent.atomic.AtomicReference<>(Optional.of(new ICloudCredentialStore.Credentials("synthetic@example.invalid", "synthetic-password")));
@@ -36,13 +39,13 @@ class CalendarConcurrencyTest {
         var service = spy(new ICloudCalendarService(credentials));
         var entered = new CountDownLatch(1); var release = new CountDownLatch(1); var date = LocalDate.now();
         doAnswer(call -> {
-            if (ProfileContext.currentId().equals("slow")) { entered.countDown(); if (!release.await(5, TimeUnit.SECONDS)) throw new AssertionError("test deadline"); }
+            if (ProfileContext.currentId().equals(SLOW)) { entered.countDown(); if (!release.await(5, TimeUnit.SECONDS)) throw new AssertionError("test deadline"); }
             return new ICloudCalendarService.CalendarSnapshot(true, "synthetic@example.invalid", "connected", "test", date, java.util.List.of(), java.time.Instant.now());
         }).when(service).fetch(any(), any(), any());
         try (var executor = Executors.newVirtualThreadPerTaskExecutor()) {
-            var slow = executor.submit(() -> { ProfileContext.set("slow"); try { return service.snapshot(date, true); } finally { ProfileContext.clear(); } });
+            var slow = executor.submit(() -> { ProfileContext.set(SLOW); try { return service.snapshot(date, true); } finally { ProfileContext.clear(); } });
             assertThat(entered.await(3, TimeUnit.SECONDS)).isTrue();
-            var fast = executor.submit(() -> { ProfileContext.set("fast"); try { return service.snapshot(date, true); } finally { ProfileContext.clear(); } });
+            var fast = executor.submit(() -> { ProfileContext.set(FAST); try { return service.snapshot(date, true); } finally { ProfileContext.clear(); } });
             assertThat(fast.get(1, TimeUnit.SECONDS).connected()).isTrue(); release.countDown(); slow.get(3, TimeUnit.SECONDS);
         } finally { release.countDown(); service.close(); }
     }

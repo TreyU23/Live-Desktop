@@ -36,6 +36,15 @@ public class StateStore {
     private final Map<String, AppState> states = new ConcurrentHashMap<>();
     /** One lock per profile, so a slow commit in one profile never blocks requests for another. */
     private final Map<String, ReentrantLock> locks = new ConcurrentHashMap<>();
+    /** Taken while deciding about a profile that has no lock yet; see {@link #locked}. */
+    private final ReentrantLock newProfileLock = new ReentrantLock();
+
+    /** Thrown for a conversation id the client may not use; maps to HTTP 400. */
+    public static final class InvalidConversationIdException extends IllegalArgumentException {
+        public InvalidConversationIdException() {
+            super("Conversation not found.");
+        }
+    }
 
     public StateStore(ProfilePaths profilePaths) {
         this.profilePaths = profilePaths;
@@ -44,7 +53,20 @@ public class StateStore {
     private interface IoAction<T> { T run() throws IOException; }
 
     private <T> T locked(IoAction<T> action) throws IOException {
-        ReentrantLock lock = locks.computeIfAbsent(ProfileContext.currentId(), ignored -> new ReentrantLock());
+        String profile = ProfileContext.currentId();
+        ReentrantLock lock = locks.get(profile);
+        if (lock == null) {
+            // Profiles without a folder run under one shared lock, so ids that never save anything
+            // don't each add a lock (issue #18). Deciding under that lock also means a profile's
+            // first write finishes before any later request switches to its own lock.
+            newProfileLock.lock();
+            try {
+                if (!profilePaths.currentExists()) return action.run();
+                lock = locks.computeIfAbsent(profile, ignored -> new ReentrantLock());
+            } finally {
+                newProfileLock.unlock();
+            }
+        }
         lock.lock();
         try {
             return action.run();
@@ -62,6 +84,10 @@ public class StateStore {
     }
 
     private AppState state() {
+        AppState cached = states.get(ProfileContext.currentId());
+        if (cached != null) return cached;
+        // Nothing is saved for a profile without a folder; don't cache it, so made-up ids can't grow this map.
+        if (!profilePaths.currentExists()) return AppState.empty();
         return states.computeIfAbsent(ProfileContext.currentId(), ignored -> load());
     }
 
@@ -69,11 +95,8 @@ public class StateStore {
         Path filePath = profilePaths.file("assistant-state.json");
         AppState empty = AppState.empty();
         try {
-        Files.createDirectories(filePath.getParent());
-        if (Files.notExists(filePath)) {
-                persist(empty);
-                return empty;
-        }
+        // Reading creates nothing on disk; the first write does.
+        if (Files.notExists(filePath)) return empty;
 
         try (var reader = Files.newBufferedReader(filePath, StandardCharsets.UTF_8)) {
             AppState parsed = gson.fromJson(reader, AppState.class);
@@ -139,15 +162,25 @@ public class StateStore {
     public Conversation getOrCreateConversation(String requestedId) throws IOException {
         return locked(() -> {
             if (requestedId != null && !requestedId.isBlank()) {
-                return state().conversations().stream()
+                var existing = state().conversations().stream()
                         .filter(conversation -> conversation.id().equals(requestedId))
                         .findFirst()
-                        .map(this::copyConversation)
-                        .orElseGet(() -> createConversation(requestedId));
+                        .map(this::copyConversation);
+                if (existing.isPresent()) return existing.get();
+                if (!isConversationId(requestedId)) throw new InvalidConversationIdException();
             }
+            // Unknown and missing ids both start a conversation under a server-made id, so a client
+            // can't choose the ids stored in state (issue #18). The response carries the new id.
             return createConversation(UUID.randomUUID().toString());
         });
     }
+
+    static boolean isConversationId(String value) {
+        return value.length() == 36 && CONVERSATION_ID.matcher(value).matches();
+    }
+
+    private static final java.util.regex.Pattern CONVERSATION_ID =
+            java.util.regex.Pattern.compile("[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}");
 
     private Conversation createConversation(String id) {
         String now = Instant.now().toString();
@@ -279,7 +312,7 @@ public class StateStore {
 
     private void persist(AppState state) throws IOException {
         Path filePath = profilePaths.file("assistant-state.json");
-        Files.createDirectories(filePath.getParent());
+        profilePaths.prepareCurrentDirectory();
         Path temporary = filePath.resolveSibling(filePath.getFileName() + ".tmp");
         Files.writeString(temporary, gson.toJson(state), StandardCharsets.UTF_8);
         try {

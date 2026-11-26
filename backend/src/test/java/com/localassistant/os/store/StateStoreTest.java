@@ -18,8 +18,9 @@ class StateStoreTest {
     }
     @Test void targetedReadsAreDefensiveAndSurviveReload() throws Exception {
         var store = store();
-        var conversation = store.getOrCreateConversation("one");
-        store.addMessage("one", "user", "hello");
+        var conversation = store.getOrCreateConversation(null);
+        String id = conversation.id();
+        store.addMessage(id, "user", "hello");
         var nested = new ArrayList<>(java.util.List.of("original"));
         store.addAction("remember", Map.of("nested", nested), "test");
         nested.add("outside mutation");
@@ -27,17 +28,55 @@ class StateStoreTest {
         ((java.util.List<Object>) returned.getFirst().arguments().get("nested")).add("returned mutation");
         assertThat(store.actions().getFirst().arguments().get("nested")).isEqualTo(java.util.List.of("original"));
         assertThat(conversation.messages()).isEmpty();
-        assertThatThrownBy(() -> store.conversation("one").orElseThrow().messages().clear()).isInstanceOf(UnsupportedOperationException.class);
+        assertThatThrownBy(() -> store.conversation(id).orElseThrow().messages().clear()).isInstanceOf(UnsupportedOperationException.class);
         assertThat(store.conversationSummaries().getFirst()).containsEntry("messageCount", 1);
         store.clearCurrentCache();
-        assertThat(store.conversation("one").orElseThrow().messages()).hasSize(1);
+        assertThat(store.conversation(id).orElseThrow().messages()).hasSize(1);
     }
     @Test void targetedReadsDoNotCrossProfiles() throws Exception {
         var store = store();
         try {
-            ProfileContext.set("first"); store.addMemory("first only", "fact");
-            ProfileContext.set("second"); assertThat(store.memories()).isEmpty();
-            ProfileContext.set("first"); assertThat(store.memories()).hasSize(1);
+            ProfileContext.set(FIRST); store.addMemory("first only", "fact");
+            ProfileContext.set(SECOND); assertThat(store.memories()).isEmpty();
+            ProfileContext.set(FIRST); assertThat(store.memories()).hasSize(1);
+        } finally { ProfileContext.clear(); }
+    }
+    private static final String FIRST = "00000000_0000_4000_8000_00000000000a";
+    private static final String SECOND = "00000000_0000_4000_8000_00000000000b";
+
+    @Test void readsForAProfileWithoutAFolderLeaveNothingBehind() throws Exception {
+        var store = store();
+        try {
+            ProfileContext.set(SECOND);
+            assertThat(store.memories()).isEmpty();
+            assertThat(store.conversationSummaries()).isEmpty();
+            assertThat(java.nio.file.Files.exists(directory.resolve("profiles"))).isFalse();
+            store.addMemory("now it exists", "fact");
+            assertThat(java.nio.file.Files.isRegularFile(directory.resolve("profiles").resolve(SECOND).resolve("assistant-state.json"))).isTrue();
+        } finally { ProfileContext.clear(); }
+        store.memories();
+        assertThat(java.nio.file.Files.exists(directory.resolve("assistant-state.json"))).isFalse();
+    }
+    @Test void clientsCannotChooseConversationIds() throws Exception {
+        var store = store();
+        var made = store.getOrCreateConversation("00000000-0000-4000-8000-000000000123");
+        assertThat(made.id()).isNotEqualTo("00000000-0000-4000-8000-000000000123");
+        assertThat(store.getOrCreateConversation(made.id()).id()).isEqualTo(made.id());
+        assertThatThrownBy(() -> store.getOrCreateConversation("../../evil"))
+                .isInstanceOf(StateStore.InvalidConversationIdException.class);
+        assertThat(store.conversationSummaries()).hasSize(1);
+    }
+    @Test void newProfileFoldersStopAtTheLimit() throws Exception {
+        var store = store();
+        var profiles = java.nio.file.Files.createDirectories(directory.resolve("profiles"));
+        for (int i = 0; i < ProfilePaths.MAX_PROFILES; i++) {
+            java.nio.file.Files.createDirectory(profiles.resolve(String.format("00000000_0000_4000_8000_%012x", i)));
+        }
+        try {
+            ProfileContext.set("ffffffff_0000_4000_8000_000000000000");
+            assertThatThrownBy(() -> store.addMemory("one too many", "fact")).hasMessageContaining("at most");
+            ProfileContext.set("00000000_0000_4000_8000_000000000000");
+            store.addMemory("existing profiles still save", "fact");
         } finally { ProfileContext.clear(); }
     }
     @Test void failedPersistenceDoesNotPublishUncommittedState() throws Exception {

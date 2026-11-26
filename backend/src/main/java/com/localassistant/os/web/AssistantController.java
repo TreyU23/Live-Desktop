@@ -134,6 +134,8 @@ public class AssistantController {
             ConversationMessage message = store.addMessage(
                     conversation.id(), "assistant", agent.reply(current));
             return ResponseEntity.ok(Map.of("conversationId", conversation.id(), "message", message));
+        } catch (StateStore.InvalidConversationIdException error) {
+            return ResponseEntity.badRequest().body(error(error));
         } catch (ProfileLifecycle.ProfileDeletedException error) {
             return ResponseEntity.status(HttpStatus.CONFLICT).body(error(error));
         } catch (OpenAiAgent.AgentDeadlineException error) {
