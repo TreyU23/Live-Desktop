@@ -5,6 +5,7 @@ import com.localassistant.os.store.StateStore;
 import java.io.IOException;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Locale;
 import java.util.Set;
 import org.springframework.stereotype.Service;
 
@@ -24,7 +25,7 @@ public class MemoryService {
     public List<Memory> search(String query, int requestedLimit) {
         List<String> terms = query == null
                 ? List.of()
-                : List.of(query.toLowerCase().trim().split("\\s+"));
+                : List.of(query.toLowerCase(Locale.ROOT).trim().split("\\s+"));
         int limit = Math.max(1, Math.min(requestedLimit, 25));
         return list().stream()
                 .map(memory -> new ScoredMemory(memory, score(memory, terms)))
@@ -52,7 +53,7 @@ public class MemoryService {
     }
 
     private int score(Memory memory, List<String> terms) {
-        String searchable = (memory.category() + " " + memory.content()).toLowerCase();
+        String searchable = (memory.category() + " " + memory.content()).toLowerCase(Locale.ROOT);
         return (int) terms.stream().filter(term -> term.length() > 1 && searchable.contains(term)).count();
     }
 

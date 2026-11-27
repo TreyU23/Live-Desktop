@@ -153,14 +153,14 @@ public class ActionService {
         }
         if (action.kind().equals("browser_open_url")) {
             URI uri = parseWebUri(String.valueOf(action.arguments().get("url")));
-            if (!System.getProperty("os.name", "").toLowerCase().contains("windows")) {
+            if (!System.getProperty("os.name", "").toLowerCase(Locale.ROOT).contains("windows")) {
                 throw new IllegalStateException("The browser launcher is currently implemented for Windows only.");
             }
             return systemControls.open("browser.openUrl", uri.toString());
         }
         if (action.kind().equals("windows_open_uri")) {
             String uri = parseWindowsUri(String.valueOf(action.arguments().get("uri")));
-            if (!System.getProperty("os.name", "").toLowerCase().contains("windows")) {
+            if (!System.getProperty("os.name", "").toLowerCase(Locale.ROOT).contains("windows")) {
                 throw new IllegalStateException("Windows settings are available on Windows only.");
             }
             return systemControls.open("windows.openUri", uri);

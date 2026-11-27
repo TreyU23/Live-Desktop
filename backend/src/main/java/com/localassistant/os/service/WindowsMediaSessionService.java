@@ -1,6 +1,7 @@
 package com.localassistant.os.service;
 
 import java.util.LinkedHashMap;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import org.springframework.stereotype.Service;
@@ -40,7 +41,7 @@ public class WindowsMediaSessionService {
     }
 
     public Map<String, Object> control(String action, String provider) {
-        String normalized = action == null ? "" : action.trim().toLowerCase();
+        String normalized = action == null ? "" : action.trim().toLowerCase(Locale.ROOT);
         if (!ACTIONS.contains(normalized) || normalized.equals("snapshot")) {
             throw new IllegalArgumentException("Media action must be play, pause, next, previous, shuffle, or mute.");
         }
@@ -48,7 +49,7 @@ public class WindowsMediaSessionService {
     }
 
     private String normalizeProvider(String provider) {
-        String normalized = provider == null ? "music" : provider.trim().toLowerCase();
+        String normalized = provider == null ? "music" : provider.trim().toLowerCase(Locale.ROOT);
         if (!Set.of("apple", "spotify", "music").contains(normalized)) {
             throw new IllegalArgumentException("Music provider must be apple or spotify.");
         }

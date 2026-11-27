@@ -21,6 +21,7 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 import java.io.IOException;
 import java.time.LocalDate;
+import java.util.Locale;
 import java.util.Map;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -376,7 +377,7 @@ public class AssistantController {
     public ResponseEntity<?> openMusicExternally(
             @RequestParam(required = false, defaultValue = "apple") String provider) {
         try {
-            String normalized = provider == null ? "apple" : provider.trim().toLowerCase();
+            String normalized = provider == null ? "apple" : provider.trim().toLowerCase(Locale.ROOT);
             if ("spotify".equals(normalized)) {
                 var action = actions.propose(
                         "windows_open_uri",
