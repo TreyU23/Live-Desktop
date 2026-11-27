@@ -38,6 +38,7 @@ public class StateStore {
     private static final Logger kLog = LoggerFactory.getLogger(StateStore.class);
     /** Finished actions kept per profile; older ones are dropped so state and polls stay bounded. */
     static final int MAX_FINISHED_ACTIONS = 1_000;
+    static final String kInterruptedMessage = "Interrupted before it finished; the outcome is unknown.";
 
     private final Gson gson = new GsonBuilder().create();
     private final ProfilePaths profilePaths;
@@ -122,8 +123,21 @@ public class StateStore {
         // A hand-edited file may leave out a list; treat it as empty. Older files still hold the full
         // content of finished writes; shed it as the state loads.
         return new AppState(1, nonNull(parsed.conversations()), nonNull(parsed.memories()),
-                nonNull(parsed.actions()).stream().map(AssistantAction::compacted)
+                nonNull(parsed.actions()).stream().map(StateStore::interruptedIfApproved).map(AssistantAction::compacted)
                         .collect(java.util.stream.Collectors.toCollection(ArrayList::new)));
+    }
+
+    /**
+     * An action is saved as "approved" before it runs and as "completed" or "failed" after. The state is
+     * loaded once per profile per process, before anything here has approved an action, so an "approved"
+     * action found in the file was cut off by a crash or shutdown and its outcome is unknown. Show it as
+     * failed, so it is visible and can be pruned. It never runs again, and as a failed action it no longer
+     * counts as a prior approval, so the same request asks again.
+     */
+    private static AssistantAction interruptedIfApproved(AssistantAction action) {
+        if (!"approved".equals(action.status())) return action;
+        return new AssistantAction(action.id(), action.kind(), "failed", action.arguments(), action.reason(),
+                null, kInterruptedMessage, action.createdAt(), action.updatedAt());
     }
 
     private static <T> ArrayList<T> nonNull(List<T> values) {

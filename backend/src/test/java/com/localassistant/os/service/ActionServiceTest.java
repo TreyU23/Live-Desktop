@@ -7,6 +7,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.localassistant.os.config.AssistantProperties;
+import com.localassistant.os.model.AssistantAction;
 import com.localassistant.os.profile.ProfilePaths;
 import com.localassistant.os.store.StateStore;
 import java.nio.file.Files;
@@ -218,6 +219,28 @@ class ActionServiceTest {
         assertThat(Files.readString(root.resolve("notes/reusable.txt"))).isEqualTo("first");
         assertThat(different.status()).isEqualTo("pending");
         assertThat(root.resolve("notes/different.txt")).doesNotExist();
+    }
+
+    @Test
+    void anActionCutOffWhileRunningAsksAgainAndNeverRunsAfterARestart() throws Exception {
+        var arguments = Map.<String, Object>of("path", "notes/cutoff.txt", "content", "x");
+        StateStore interruptedStore = new StateStore(new ProfilePaths(properties));
+        var action = interruptedStore.addAction("workspace_write_file", arguments, "Cut off by a restart.");
+        // The state the backend leaves behind if it stops after saving "approved" and before the write finishes.
+        interruptedStore.updateAction(action.id(), a -> new AssistantAction(
+                a.id(), a.kind(), "approved", a.arguments(), a.reason(), null, null, a.createdAt(), a.updatedAt()));
+
+        StateStore reloadedStore = new StateStore(new ProfilePaths(properties));
+        ActionService reloadedActions = new ActionService(
+                reloadedStore, new WorkspaceService(properties), new MemoryService(reloadedStore), systemControls);
+
+        assertThat(reloadedStore.actions()).singleElement().satisfies(loaded -> {
+            assertThat(loaded.status()).isEqualTo("failed");
+            assertThat(loaded.error()).contains("outcome is unknown");
+        });
+        assertThat(reloadedActions.propose("workspace_write_file", arguments, "Try again.").status())
+                .isEqualTo("pending");
+        assertThat(root.resolve("notes/cutoff.txt")).doesNotExist();
     }
 
     @Test

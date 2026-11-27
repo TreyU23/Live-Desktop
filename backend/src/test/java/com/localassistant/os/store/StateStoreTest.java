@@ -223,6 +223,24 @@ class StateStoreTest {
         assertThat(asideFiles()).isEmpty();
     }
 
+    @Test void actionsLeftApprovedByAnInterruptedRunLoadAsFailed() throws Exception {
+        var first = store();
+        var pending = first.addAction("remember", Map.of("content", "p", "category", "fact"), "stays pending");
+        var interrupted = first.addAction("remember", Map.of("content", "i", "category", "fact"), "was running");
+        first.updateAction(interrupted.id(), a -> new com.localassistant.os.model.AssistantAction(
+                a.id(), a.kind(), "approved", a.arguments(), a.reason(), null, null, a.createdAt(), a.updatedAt()));
+        var done = first.addAction("remember", Map.of("content", "d", "category", "fact"), "finished");
+        first.updateAction(done.id(), a -> new com.localassistant.os.model.AssistantAction(
+                a.id(), a.kind(), "completed", a.arguments(), a.reason(), "ok", null, a.createdAt(), a.updatedAt()));
+
+        var restarted = store().actions();
+
+        assertThat(restarted).extracting(a -> a.id() + ":" + a.status())
+                .containsExactly(pending.id() + ":pending", interrupted.id() + ":failed", done.id() + ":completed");
+        assertThat(restarted.get(1).error()).isEqualTo(StateStore.kInterruptedMessage);
+        assertThat(restarted.get(1).result()).isNull();
+    }
+
     @Test void savingLeavesNoTemporaryFile() throws Exception {
         store().addMemory("saved", "fact");
         assertThat(stateFile()).exists();
