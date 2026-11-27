@@ -168,4 +168,64 @@ class StateStoreTest {
         assertThat(all.stream().filter(a -> !a.status().equals("pending")).count()).isEqualTo(StateStore.MAX_FINISHED_ACTIONS);
         assertThat(all).extracting(a -> a.id()).contains(pending.id());
     }
+
+    // A damaged assistant-state.json must not take the profile down (issue #38).
+    private Path stateFile() { return directory.resolve("assistant-state.json"); }
+    private java.util.List<Path> asideFiles() throws Exception {
+        try (var files = java.nio.file.Files.list(directory)) {
+            return files.filter(path -> path.getFileName().toString().startsWith("assistant-state.json.corrupt-")).toList();
+        }
+    }
+
+    @Test void missingListsLoadAsEmpty() throws Exception {
+        java.nio.file.Files.writeString(stateFile(), "{\"version\":1,\"memories\":[{\"id\":\"m1\",\"content\":\"kept\",\"category\":\"fact\",\"createdAt\":\"t\",\"updatedAt\":\"t\"}]}");
+        var store = store();
+        assertThat(store.memories()).hasSize(1);
+        assertThat(store.actions()).isEmpty();
+        assertThat(store.conversationSummaries()).isEmpty();
+        store.addAction("remember", Map.of("content", "x", "category", "fact"), "still works");
+        assertThat(asideFiles()).isEmpty();
+    }
+
+    @Test void damagedFilesAreSetAsideAndTheProfileStartsEmpty() throws Exception {
+        byte[][] damaged = {
+            "{\"version\":1,\"conversations\":[".getBytes(java.nio.charset.StandardCharsets.UTF_8),
+            new byte[0],
+            "not json at all".getBytes(java.nio.charset.StandardCharsets.UTF_8),
+            "{\"version\":1,\"actions\":\"oops\"}".getBytes(java.nio.charset.StandardCharsets.UTF_8),
+            new byte[]{'{', '"', (byte) 0xC3, (byte) 0x28, '"', '}'},
+        };
+        for (byte[] content : damaged) {
+            for (Path old : asideFiles()) java.nio.file.Files.delete(old);
+            java.nio.file.Files.write(stateFile(), content);
+            var store = store();
+
+            assertThat(store.memories()).isEmpty();
+            assertThat(stateFile()).doesNotExist();
+            assertThat(asideFiles()).hasSize(1);
+            assertThat(java.nio.file.Files.readAllBytes(asideFiles().getFirst())).isEqualTo(content);
+            // The failure is not repeated on every request, and the next write starts a clean file.
+            store.addMemory("fresh start", "fact");
+            assertThat(store().memories()).extracting(m -> m.content()).containsExactly("fresh start");
+            assertThat(asideFiles()).hasSize(1);
+            java.nio.file.Files.delete(stateFile());
+        }
+    }
+
+    @Test void aFileFromAnotherVersionIsNeverMovedOrOverwritten() throws Exception {
+        String future = "{\"version\":2,\"conversations\":[],\"memories\":[],\"actions\":[]}";
+        java.nio.file.Files.writeString(stateFile(), future);
+        var store = store();
+
+        assertThatThrownBy(store::memories).isInstanceOf(IllegalStateException.class);
+        assertThatThrownBy(() -> store.addMemory("must not overwrite", "fact")).isInstanceOf(IllegalStateException.class);
+        assertThat(java.nio.file.Files.readString(stateFile())).isEqualTo(future);
+        assertThat(asideFiles()).isEmpty();
+    }
+
+    @Test void savingLeavesNoTemporaryFile() throws Exception {
+        store().addMemory("saved", "fact");
+        assertThat(stateFile()).exists();
+        assertThat(directory.resolve("assistant-state.json.tmp")).doesNotExist();
+    }
 }

@@ -2,6 +2,7 @@ package com.localassistant.os.store;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
+import com.google.gson.JsonParseException;
 import com.localassistant.os.profile.ProfileContext;
 import com.localassistant.os.profile.ProfilePaths;
 import com.localassistant.os.model.AppState;
@@ -10,11 +11,15 @@ import com.localassistant.os.model.Conversation;
 import com.localassistant.os.model.ConversationMessage;
 import com.localassistant.os.model.Memory;
 import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.nio.channels.FileChannel;
+import java.nio.charset.CharacterCodingException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.nio.file.StandardOpenOption;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.concurrent.ConcurrentHashMap;
@@ -24,10 +29,13 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.function.UnaryOperator;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
 @Component
 public class StateStore {
+    private static final Logger kLog = LoggerFactory.getLogger(StateStore.class);
     /** Finished actions kept per profile; older ones are dropped so state and polls stay bounded. */
     static final int MAX_FINISHED_ACTIONS = 1_000;
 
@@ -93,24 +101,54 @@ public class StateStore {
 
     private AppState load() {
         Path filePath = profilePaths.file("assistant-state.json");
-        AppState empty = AppState.empty();
-        try {
         // Reading creates nothing on disk; the first write does.
-        if (Files.notExists(filePath)) return empty;
+        if (Files.notExists(filePath)) return AppState.empty();
 
-        try (var reader = Files.newBufferedReader(filePath, StandardCharsets.UTF_8)) {
-            AppState parsed = gson.fromJson(reader, AppState.class);
-            if (parsed == null || parsed.version() != 1) {
-                throw new IllegalStateException("Unsupported or invalid assistant state file.");
-            }
-                // Older files still hold the full content of finished writes; shed it as the state loads.
-                return new AppState(1, parsed.conversations(), parsed.memories(),
-                        parsed.actions().stream().map(AssistantAction::compacted)
-                                .collect(java.util.stream.Collectors.toCollection(ArrayList::new)));
-            }
+        AppState parsed;
+        try {
+            parsed = gson.fromJson(Files.readString(filePath, StandardCharsets.UTF_8), AppState.class);
+        } catch (CharacterCodingException | JsonParseException damaged) {
+            // Truncated or garbled (for example after a power loss): keep it for inspection and start empty.
+            return moveAsideAndStartEmpty(filePath, damaged);
         } catch (IOException error) {
+            // Not a damaged file but one that can't be read right now (locked, permissions): retry later.
             throw new IllegalStateException("Could not load assistant state.", error);
         }
+        if (parsed == null) return moveAsideAndStartEmpty(filePath, null);
+        if (parsed.version() != 1) {
+            // Possibly written by a newer Live Desktop; never move it aside or overwrite it.
+            throw new IllegalStateException("Unsupported assistant state file version.");
+        }
+        // A hand-edited file may leave out a list; treat it as empty. Older files still hold the full
+        // content of finished writes; shed it as the state loads.
+        return new AppState(1, nonNull(parsed.conversations()), nonNull(parsed.memories()),
+                nonNull(parsed.actions()).stream().map(AssistantAction::compacted)
+                        .collect(java.util.stream.Collectors.toCollection(ArrayList::new)));
+    }
+
+    private static <T> ArrayList<T> nonNull(List<T> values) {
+        var result = new ArrayList<T>();
+        if (values != null) for (T value : values) if (value != null) result.add(value);
+        return result;
+    }
+
+    /**
+     * Renames an unreadable state file to assistant-state.json.corrupt-&lt;UTC time&gt; so the next save cannot
+     * overwrite it, and starts the profile empty. If it can't be moved, loading fails instead: starting empty
+     * would let the next write destroy the only copy.
+     */
+    private AppState moveAsideAndStartEmpty(Path filePath, Exception cause) {
+        String stamp = java.time.format.DateTimeFormatter.ofPattern("yyyyMMdd'T'HHmmssSSS'Z'")
+                .withZone(java.time.ZoneOffset.UTC).format(Instant.now());
+        Path aside = filePath.resolveSibling(filePath.getFileName() + ".corrupt-" + stamp);
+        try {
+            Files.move(filePath, aside);
+        } catch (IOException error) {
+            throw new IllegalStateException("Assistant state is damaged and could not be set aside.", error);
+        }
+        kLog.warn("Assistant state for profile {} was unreadable; moved it to {} and started empty.",
+                ProfileContext.currentId(), aside.getFileName(), cause);
+        return AppState.empty();
     }
 
     public AppState snapshot() {
@@ -391,7 +429,13 @@ public class StateStore {
         Path filePath = profilePaths.file("assistant-state.json");
         profilePaths.prepareCurrentDirectory();
         Path temporary = filePath.resolveSibling(filePath.getFileName() + ".tmp");
-        Files.writeString(temporary, gson.toJson(state), StandardCharsets.UTF_8);
+        // Flush to disk before the move, so a power loss leaves the old file or the whole new one, not a stub.
+        try (FileChannel channel = FileChannel.open(temporary, StandardOpenOption.CREATE,
+                StandardOpenOption.TRUNCATE_EXISTING, StandardOpenOption.WRITE)) {
+            ByteBuffer bytes = ByteBuffer.wrap(gson.toJson(state).getBytes(StandardCharsets.UTF_8));
+            while (bytes.hasRemaining()) channel.write(bytes);
+            channel.force(true);
+        }
         try {
             Files.move(temporary, filePath, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
         } catch (AtomicMoveNotSupportedException ignored) {
