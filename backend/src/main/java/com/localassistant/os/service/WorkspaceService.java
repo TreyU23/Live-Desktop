@@ -32,14 +32,26 @@ public class WorkspaceService {
     private static final Set<String> ALLOWED_WRITE_EXTENSIONS = Set.of(
             "txt", "md", "markdown", "json", "csv", "tsv", "yaml", "yml", "toml", "ics", "log");
     /**
-     * Build, editor and coding-agent files that run or steer code on the next build or editor open, wherever they
-     * sit in a source checkout.
+     * Build, CI, container, runtime, editor and coding-agent files that run or steer code on the next build or editor
+     * open, wherever they sit in a source checkout. This is a denylist of known names: it cannot name every tool's
+     * config file, so the approval sheet remains the final control.
      */
     private static final Set<String> PROTECTED_WRITE_FILE_NAMES = Set.of(
             "pom.xml", "mvnw", "mvnw.cmd", "package.json", "package-lock.json", "npm-shrinkwrap.json",
             "yarn.lock", "pnpm-lock.yaml", "pnpm-workspace.yaml", "build.gradle", "build.gradle.kts",
             "settings.gradle", "settings.gradle.kts", "gradlew", "gradlew.bat", "makefile", "dockerfile",
-            "agents.md", "claude.md", "desktop.ini", "autorun.inf");
+            "agents.md", "claude.md", "desktop.ini", "autorun.inf",
+            // Config in the allowed plain-text types that build, CI, container or runtime tooling executes (#40).
+            "compose.yml", "compose.yaml", "pyproject.toml", "cargo.toml", "rust-toolchain.toml", "composer.json",
+            "global.json", "deno.json", "deno.jsonc", "bunfig.toml", "netlify.toml", "vercel.json", "wrangler.toml",
+            "renovate.json", "serverless.yml", "serverless.yaml", "action.yml", "action.yaml", "appveyor.yml",
+            "bitbucket-pipelines.yml", "azure-pipelines.yml", "azure-pipelines.yaml", "cloudbuild.yaml",
+            "cloudbuild.yml", "pubspec.yaml", "mkdocs.yml", "launch.json", "tasks.json", "nx.json", "turbo.json",
+            "lerna.json", "app.yaml");
+    /** Name prefixes of the same kind of config, which come in many variants (`application-prod.yml`, ...). */
+    private static final List<String> PROTECTED_WRITE_FILE_PREFIXES = List.of(
+            "docker-compose", "tsconfig", "jsconfig", "application", "bootstrap", "skaffold", "devcontainer",
+            "azure-pipelines", "buildspec");
     private final Path root;
     private final Path dataRoot;
 
@@ -79,8 +91,10 @@ public class WorkspaceService {
     /**
      * Resolves a path the assistant wants to write. On top of {@link #resolveSafePath} this refuses Live Desktop's
      * own folders, every file at the workspace root, every dot-file and dot-folder (`.vscode`, `.idea`, `.env`, ...),
-     * build, editor and coding-agent files by name, and every type outside a small plain-text allowlist, so an
-     * approved write can never change code or configuration that runs with the next launch, build or editor open.
+     * build, CI, runtime, editor and coding-agent config files by known name or name prefix, and every type outside a
+     * small plain-text allowlist. That blocks the common ways an approved write could change code or configuration that
+     * runs with the next launch, build or editor open; configuration files of tools not on the list are not recognized,
+     * so every write still needs the user's approval.
      */
     public Path resolveWritablePath(String candidate) throws IOException {
         Path absolute = resolveSafePath(candidate);
@@ -114,7 +128,9 @@ public class WorkspaceService {
             index++;
         }
         String leaf = relative.getFileName().toString().replaceAll("[. ]+$", "").toLowerCase(Locale.ROOT);
-        if (PROTECTED_WRITE_FILE_NAMES.contains(leaf)) {
+        if (PROTECTED_WRITE_FILE_NAMES.contains(leaf)
+                || PROTECTED_WRITE_FILE_PREFIXES.stream().anyMatch(leaf::startsWith)
+                || leaf.endsWith(".config.json")) {
             throw new IllegalArgumentException("Build, editor and agent files are not available to workspace writes.");
         }
         int dot = leaf.lastIndexOf('.');

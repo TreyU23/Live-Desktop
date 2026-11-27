@@ -75,7 +75,12 @@ class WorkspaceServiceTest {
                 // Only plain-text types are writable; Windows runs or acts on these when opened or browsed (#26).
                 "notes/run.js", "notes/a.url", "notes/a.scf", "notes/a.pif", "notes/a.msc", "notes/a.chm",
                 "notes/a.wsc", "notes/a.sct", "notes/a.inf", "notes/a.appref-ms", "notes/a.settingcontent-ms",
-                "notes/a.library-ms", "notes/page.html", "notes/a.svg", "notes/noextension", "notes/RUN.JS." }) {
+                "notes/a.library-ms", "notes/page.html", "notes/a.svg", "notes/noextension", "notes/RUN.JS.",
+                // Build, CI, container and runtime config in allowed types runs on the next build (#40).
+                "myapp/application.yml", "myapp/application-prod.yaml", "myapp/docker-compose.yml",
+                "myapp/docker-compose.override.yml", "myapp/tsconfig.json", "myapp/tsconfig.base.json",
+                "ci/azure-pipelines.yml", "web/deno.json", "py/pyproject.toml", "rs/Cargo.toml", "web/vercel.json",
+                "web/babel.config.json", "app/compose.yaml" }) {
             assertThatThrownBy(() -> workspace.resolveWritablePath(path))
                     .as(path).isInstanceOf(IllegalArgumentException.class);
         }

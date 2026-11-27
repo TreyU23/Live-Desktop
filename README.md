@@ -31,7 +31,7 @@ Source builds require Java 21, Node.js **20.19+ or 22.12+**, pnpm, Visual Studio
 
 `build.cmd` installs project-local Java and frontend dependencies if missing, then runs `scripts\build-production.ps1` (native bridge, backend, CDS, frontend tests and bundle). `.\build.cmd run` stops a running instance, rebuilds, and starts. The individual steps (`scripts\bootstrap-java.ps1`, `pnpm --dir frontend install --frozen-lockfile`) still work on their own.
 
-Bootstrap verifies and installs Temurin into `.tools/jdk-21`. If scripts are blocked, `Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass` affects only that terminal. The production build runs native protocol, Java and frontend tests, extracts Java with libraries, trains CDS using isolated data and builds frontend/Sites assets. [Additional validation](docs/VALIDATION.md).
+Bootstrap downloads the pinned Temurin release (version and SHA-256 are fixed in `scripts/bootstrap-java.ps1`, not read from a server), verifies it and installs it into `.tools/jdk-21`. If scripts are blocked, `Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass` affects only that terminal. The production build runs native protocol, Java and frontend tests, extracts Java with libraries, trains CDS using isolated data and builds frontend/Sites assets. [Additional validation](docs/VALIDATION.md).
 
 For development, run these in separate terminals:
 

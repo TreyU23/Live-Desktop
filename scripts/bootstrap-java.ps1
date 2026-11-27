@@ -14,20 +14,23 @@ if (Test-Path (Join-Path $jdkTarget "bin\java.exe")) {
 
 New-Item -ItemType Directory -Force -Path $downloadRoot | Out-Null
 
-$assetsUrl = "https://api.adoptium.net/v3/assets/latest/21/hotspot?architecture=x64&heap_size=normal&image_type=jdk&jvm_impl=hotspot&os=windows&vendor=eclipse"
-$asset = (Invoke-RestMethod $assetsUrl)[0]
-$downloadUrl = $asset.binary.package.link
-$expectedHash = $asset.binary.package.checksum.ToLowerInvariant()
+# Pinned Temurin release. Update the version, URL and hash together and deliberately, after checking the hash
+# against the release's .sha256.txt on github.com/adoptium/temurin21-binaries. The hash is never read from a
+# server at run time, so a spoofed or compromised metadata endpoint cannot choose both the file and its checksum.
+$jdkRelease = "jdk-21.0.13.1+2"
+$downloadUrl = "https://github.com/adoptium/temurin21-binaries/releases/download/jdk-21.0.13.1%2B2/OpenJDK21U-jdk_x64_windows_hotspot_21.0.13.1_2.zip"
+$expectedHash = "bbebea1469996b276683c9299c227b294f85c847039c82633218186a4ad4fbf2"
 
-Write-Host "Downloading $($asset.release_name)..."
-curl.exe -L --fail --output $archive $downloadUrl
+Write-Host "Downloading Temurin $jdkRelease..."
+curl.exe -L --fail --proto "=https" --output $archive $downloadUrl
 if ($LASTEXITCODE -ne 0) {
     throw "The Java download failed."
 }
 
 $actualHash = (Get-FileHash -Algorithm SHA256 -LiteralPath $archive).Hash.ToLowerInvariant()
 if ($actualHash -ne $expectedHash) {
-    throw "The Java archive checksum did not match the Adoptium release metadata."
+    Remove-Item -LiteralPath $archive -Force
+    throw "The Java archive checksum did not match the SHA-256 pinned in bootstrap-java.ps1."
 }
 
 New-Item -ItemType Directory -Force -Path $extractRoot | Out-Null
