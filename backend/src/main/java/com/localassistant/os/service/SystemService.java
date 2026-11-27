@@ -29,10 +29,13 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import org.springframework.stereotype.Service;
 
 @Service
 public class SystemService {
+    private static final Pattern kPercent = Pattern.compile("(?<![\\d.])(\\d{1,3})%");
     private static final Duration BATTERY_CACHE_TTL = Duration.ofMinutes(5);
     static final Duration BATTERY_RETRY_AFTER = Duration.ofSeconds(30);
     // Bridge results never change while the process runs, so a successful read is kept forever.
@@ -379,18 +382,36 @@ public class SystemService {
     }
 
     private Optional<Integer> readBatteryPercent(JsonNode root) {
+        return batteryPercent(root);
+    }
+
+    /**
+     * Phone Link writes an Adaptive Card, not a data record. The phone's battery is the only
+     * Container whose tooltip names a percentage ("Battery 78% remaining") and whose child
+     * TextBlock shows that same percentage. Anything under a notification "preview" is message
+     * text and is never read, so a "50%" in a message cannot pass as the battery level.
+     * Returns empty (shown as unavailable) when the card has no such container.
+     */
+    static Optional<Integer> batteryPercent(JsonNode root) {
         try {
             ArrayDeque<JsonNode> queue = new ArrayDeque<>();
             queue.add(root);
             while (!queue.isEmpty()) {
                 JsonNode current = queue.removeFirst();
-                if (current.isTextual()) {
-                    String value = current.asText().trim();
-                    if (value.matches("\\d{1,3}%")) {
-                        int percent = Integer.parseInt(value.substring(0, value.length() - 1));
-                        return Optional.of(Math.max(0, Math.min(100, percent)));
+                if (current.isObject()) {
+                    Matcher tooltip = kPercent.matcher(current.path("tooltip").asText(""));
+                    if (tooltip.find()) {
+                        for (JsonNode child : current.path("items")) {
+                            String text = child.path("text").asText("").trim();
+                            if (text.equals(tooltip.group(1) + "%") && Integer.parseInt(tooltip.group(1)) <= 100) {
+                                return Optional.of(Integer.parseInt(tooltip.group(1)));
+                            }
+                        }
                     }
-                } else if (current.isContainerNode()) {
+                    current.properties().forEach(entry -> {
+                        if (!"preview".equalsIgnoreCase(entry.getKey())) queue.addLast(entry.getValue());
+                    });
+                } else if (current.isArray()) {
                     current.elements().forEachRemaining(queue::addLast);
                 }
             }
