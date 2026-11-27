@@ -34,6 +34,7 @@ import org.springframework.stereotype.Service;
 @Service
 public class SystemService {
     private static final Duration BATTERY_CACHE_TTL = Duration.ofMinutes(5);
+    static final Duration BATTERY_RETRY_AFTER = Duration.ofSeconds(30);
     // Bridge results never change while the process runs, so a successful read is kept forever.
     // A failed read (e.g. the bridge is still starting at boot) is retried after this delay.
     static final Duration WINDOWS_DETAILS_RETRY_AFTER = Duration.ofSeconds(30);
@@ -624,29 +625,33 @@ public class SystemService {
 
     private BatteryInfo batteryInfo() {
         CachedBattery current = cachedBattery;
-        Instant now = Instant.now();
+        Instant now = clock.instant();
         if (current != null && now.isBefore(current.expiresAt())) {
             return current.value();
         }
         synchronized (batteryLock) {
             current = cachedBattery;
-            now = Instant.now();
+            now = clock.instant();
             if (current != null && now.isBefore(current.expiresAt())) {
                 return current.value();
             }
-            BatteryInfo value = readBatteryInfo();
-            cachedBattery = new CachedBattery(value, now.plus(BATTERY_CACHE_TTL));
-            return value;
+            current = readBatteryInfo(now);
+            cachedBattery = current;
+            return current.value();
         }
     }
 
-    private BatteryInfo readBatteryInfo() {
-        if (!isWindows()) return new BatteryInfo(false, null, "Unavailable");
+    private CachedBattery readBatteryInfo(Instant now) {
+        if (!isWindows()) return new CachedBattery(new BatteryInfo(false, null, "Unavailable"), now.plus(BATTERY_CACHE_TTL));
         Map<String, Object> result = bridge.request("power.snapshot", Map.of());
         boolean available = Boolean.TRUE.equals(result.get("available"));
         Object percent = result.get("percent");
-        return new BatteryInfo(available, percent instanceof Number value ? value.intValue() : null,
+        BatteryInfo value = new BatteryInfo(available, percent instanceof Number number ? number.intValue() : null,
                 String.valueOf(result.getOrDefault("detail", "Unavailable")));
+        // A real reading always carries a "percent" key (null on a desktop). A bridge that is still
+        // starting, busy or failed answers without one; retry that soon instead of pinning it for minutes.
+        Duration keepFor = result.containsKey("percent") ? BATTERY_CACHE_TTL : BATTERY_RETRY_AFTER;
+        return new CachedBattery(value, now.plus(keepFor));
     }
 
     private boolean isWindows() {

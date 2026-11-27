@@ -90,6 +90,54 @@ class SystemServiceWindowsDetailsTest {
         assertThat(system.snapshot().device().manufacturer()).isEqualTo("Contoso");
     }
 
+    @Test
+    void failedBatteryReadIsRetriedAfterAShortDelay() {
+        when(bridge.request(eq("power.snapshot"), anyMap()))
+                .thenReturn(Map.of("available", false, "detail", "Windows bridge is unavailable."))
+                .thenReturn(batteryReading(80));
+
+        assertThat(system.snapshot().resources().battery().available()).isFalse();
+        clock.advance(SystemService.BATTERY_RETRY_AFTER.minusSeconds(1));
+        assertThat(system.snapshot().resources().battery().available()).isFalse();
+        verify(bridge, times(1)).request(eq("power.snapshot"), anyMap());
+
+        clock.advance(Duration.ofSeconds(2));
+        assertThat(system.snapshot().resources().battery().percent()).isEqualTo(80);
+        verify(bridge, times(2)).request(eq("power.snapshot"), anyMap());
+    }
+
+    @Test
+    void realBatteryReadingIsCachedForFiveMinutes() {
+        when(bridge.request(eq("power.snapshot"), anyMap())).thenReturn(batteryReading(80));
+
+        assertThat(system.snapshot().resources().battery().percent()).isEqualTo(80);
+        clock.advance(Duration.ofMinutes(4));
+        system.snapshot();
+        verify(bridge, times(1)).request(eq("power.snapshot"), anyMap());
+
+        clock.advance(Duration.ofMinutes(2));
+        system.snapshot();
+        verify(bridge, times(2)).request(eq("power.snapshot"), anyMap());
+    }
+
+    @Test
+    void desktopWithoutABatteryIsAnAnswerNotAFailure() {
+        Map<String, Object> desktop = new java.util.HashMap<>();
+        desktop.put("available", false);
+        desktop.put("percent", null);
+        desktop.put("detail", "Desktop power");
+        when(bridge.request(eq("power.snapshot"), anyMap())).thenReturn(desktop);
+
+        assertThat(system.snapshot().resources().battery().detail()).isEqualTo("Desktop power");
+        clock.advance(Duration.ofMinutes(1));
+        system.snapshot();
+        verify(bridge, times(1)).request(eq("power.snapshot"), anyMap());
+    }
+
+    private static Map<String, Object> batteryReading(int percent) {
+        return Map.of("available", true, "percent", percent, "detail", "Discharging");
+    }
+
     private static final class MutableClock extends Clock {
         private Instant now;
 
