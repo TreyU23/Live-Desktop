@@ -22,7 +22,7 @@ public class AssistantAgent {
      * above this, so the UI always receives the backend's real outcome (issue #11).
      */
     public static final Duration AGENT_DEADLINE = Duration.ofSeconds(240);
-    /** Matches ProfileClientPool's maxRetries; each attempt gets an equal share of what is left. */
+    /** Matches ProfileClientPool's maxRetries. The OpenAI path still splits what is left between attempts (issue #49). */
     static final int MODEL_CALL_ATTEMPTS = ProfileClientPool.MAX_RETRIES + 1;
     /** Model calls allowed in one request before it stops with a tool-call limit error. */
     static final int MAX_MODEL_TURNS = 8;

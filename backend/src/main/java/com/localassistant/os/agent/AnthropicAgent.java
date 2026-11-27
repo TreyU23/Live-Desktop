@@ -33,7 +33,7 @@ public class AnthropicAgent {
     static final String API_VERSION = "2023-06-01";
     /** Output budget per model call. Thinking counts toward it, so it is generous. */
     static final int MAX_OUTPUT_TOKENS = 32_000;
-    /** Status codes worth one retry: timeouts, conflicts, rate limits, overload and server errors. */
+    /** Status codes worth one retry: request timeouts, conflicts, rate limits, overload and server errors. */
     private static final Set<Integer> kRetryableStatus = Set.of(408, 409, 429, 500, 502, 503, 504, 529);
     private static final Duration kRetryBackoff = Duration.ofMillis(750);
     static final String kTruncatedNote = "(This reply was cut off because it reached the length limit. Ask me to continue, or for a shorter answer.)";
@@ -181,9 +181,10 @@ public class AnthropicAgent {
         for (int attempt = 1; ; attempt++) {
             long remaining = deadline - System.nanoTime();
             if (remaining <= 0) throw new AssistantAgent.AgentDeadlineException();
-            int attemptsLeft = AssistantAgent.MODEL_CALL_ATTEMPTS - attempt + 1;
+            // A timed-out call is never re-sent (below), so retries only follow quick failures and
+            // every attempt may use all the time left; a long, slow reply is not cut at half (issue #37).
             HttpRequest request = HttpRequest.newBuilder(MESSAGES_ENDPOINT)
-                    .timeout(Duration.ofNanos(Math.max(1, remaining / attemptsLeft)))
+                    .timeout(Duration.ofNanos(Math.max(1, remaining)))
                     .header("x-api-key", key)
                     .header("anthropic-version", API_VERSION)
                     .header("content-type", "application/json")
@@ -196,7 +197,8 @@ public class AnthropicAgent {
             } catch (HttpTimeoutException error) {
                 ProfileLifecycle.rethrowIfDeleted(error);
                 if (System.nanoTime() >= deadline) throw new AssistantAgent.AgentDeadlineException();
-                if (attempt < AssistantAgent.MODEL_CALL_ATTEMPTS) continue;
+                // The model may still be generating, and billing, the abandoned call; sending the whole
+                // request again would pay for it twice, so a timeout is reported, not retried.
                 throw new AnthropicApiException(0, "timeout", error);
             } catch (IOException error) {
                 ProfileLifecycle.rethrowIfDeleted(error);

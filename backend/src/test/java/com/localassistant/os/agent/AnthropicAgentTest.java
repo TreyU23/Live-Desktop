@@ -145,6 +145,34 @@ class AnthropicAgentTest {
     }
 
     @Test
+    void aTimedOutCallIsReportedNotSentAgain() throws Exception {
+        DashboardContextService dashboard = mock(DashboardContextService.class);
+        when(dashboard.contextForPrompt(anyString())).thenReturn("");
+        AtomicInteger calls = new AtomicInteger();
+        AnthropicAgent slow = new AnthropicAgent(new AssistantProperties(), dashboard, tools, request -> {
+            calls.incrementAndGet();
+            throw new java.net.http.HttpTimeoutException("request timed out");
+        });
+
+        assertThatThrownBy(() -> slow.reply(CONVERSATION, KEY, System.nanoTime() + AssistantAgent.AGENT_DEADLINE.toNanos()))
+                .isInstanceOfSatisfying(AnthropicAgent.AnthropicApiException.class, error -> {
+                    assertThat(error.statusCode()).isZero();
+                    assertThat(error.errorType()).isEqualTo("timeout");
+                });
+        assertThat(calls).hasValue(1);
+    }
+
+    @Test
+    void theFirstCallMayUseAlmostTheWholeBudget() throws Exception {
+        replies.add(response(200, "{\"stop_reason\":\"end_turn\",\"content\":[{\"type\":\"text\",\"text\":\"ok\"}]}"));
+
+        agent.reply(CONVERSATION, KEY, System.nanoTime() + AssistantAgent.AGENT_DEADLINE.toNanos());
+
+        assertThat(requests.getFirst().timeout().orElseThrow())
+                .isGreaterThan(AssistantAgent.AGENT_DEADLINE.minusSeconds(10));
+    }
+
+    @Test
     void profileDeletedDuringAFailedCallIsNotLostToTheRetry() throws Exception {
         // Issue #27: the deletion arrives as a suppressed exception on the I/O error and must not be retried away.
         DashboardContextService dashboard = mock(DashboardContextService.class);
