@@ -3,6 +3,7 @@ package com.localassistant.os.service;
 import com.localassistant.os.model.Memory;
 import com.localassistant.os.store.StateStore;
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
@@ -23,9 +24,13 @@ public class MemoryService {
     }
 
     public List<Memory> search(String query, int requestedLimit) {
+        // Blank and one-character terms never score (see score()), so they are dropped here:
+        // a null, empty or whitespace query then behaves the same way and lists the newest memories.
         List<String> terms = query == null
                 ? List.of()
-                : List.of(query.toLowerCase(Locale.ROOT).trim().split("\\s+"));
+                : Arrays.stream(query.toLowerCase(Locale.ROOT).trim().split("\\s+"))
+                        .filter(term -> term.length() > 1)
+                        .toList();
         int limit = Math.max(1, Math.min(requestedLimit, 25));
         return list().stream()
                 .map(memory -> new ScoredMemory(memory, score(memory, terms)))
