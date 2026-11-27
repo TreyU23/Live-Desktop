@@ -8,6 +8,8 @@ import com.localassistant.os.profile.ProfileLifecycle;
 import com.localassistant.os.service.DashboardContextService;
 import com.openai.client.OpenAIClient;
 import com.openai.core.RequestOptions;
+import com.openai.errors.OpenAIIoException;
+import com.openai.errors.OpenAIServiceException;
 import com.openai.models.Reasoning;
 import com.openai.models.ReasoningEffort;
 import com.openai.models.responses.Response;
@@ -44,6 +46,42 @@ public class OpenAiAgent {
         return properties.getOpenaiModel();
     }
 
+    /**
+     * One model call. Each attempt may use all the time left, and only a failure that happened quickly
+     * (connection error, retryable status) is retried; a client-side timeout is not, because the
+     * abandoned call may still be generated and billed (issue #49).
+     */
+    private Response create(OpenAIClient client, ResponseCreateParams params, long deadline) {
+        for (int attempt = 1; ; attempt++) {
+            long remaining = deadline - System.nanoTime();
+            if (remaining <= 0) throw new AssistantAgent.AgentDeadlineException();
+            RequestOptions options = RequestOptions.builder().timeout(Duration.ofNanos(remaining)).build();
+            // Don't hold the profile lease across the network call; a profile deletion
+            // would otherwise queue behind it and stall every later request (issue #6).
+            try (var suspended = ProfileLifecycle.suspend()) {
+                return client.responses().create(params, options);
+            } catch (RuntimeException error) {
+                // A deletion during the call must not be reported as a timeout or any other error.
+                ProfileLifecycle.rethrowIfDeleted(error);
+                if (System.nanoTime() >= deadline) throw new AssistantAgent.AgentDeadlineException();
+                if (attempt >= AssistantAgent.MODEL_CALL_ATTEMPTS || !retryable(error)) throw error;
+                AssistantAgent.pauseBeforeRetry(deadline);
+            }
+        }
+    }
+
+    static boolean retryable(RuntimeException error) {
+        if (error instanceof OpenAIServiceException service) {
+            return AssistantAgent.RETRYABLE_STATUS.contains(service.statusCode());
+        }
+        if (!(error instanceof OpenAIIoException)) return false;
+        // A timeout surfaces as an I/O error; it is not retried (see create).
+        for (Throwable cause = error; cause != null; cause = cause.getCause()) {
+            if (cause instanceof java.io.InterruptedIOException) return false;
+        }
+        return true;
+    }
+
     String reply(Conversation conversation, String key, long deadline) throws IOException {
         try (var lease = clients.acquire(ProfileContext.currentId(), key)) {
             OpenAIClient client = lease.client();
@@ -67,23 +105,7 @@ public class OpenAiAgent {
 
             for (int turn = 0; turn < AssistantAgent.MAX_MODEL_TURNS; turn++) {
                 ResponseCreateParams params = builder.input(ResponseCreateParams.Input.ofResponse(inputs)).build();
-                long remaining = deadline - System.nanoTime();
-                if (remaining <= 0) throw new AssistantAgent.AgentDeadlineException();
-                // Per-attempt timeout so attempts plus retries fit in the remaining budget.
-                RequestOptions options = RequestOptions.builder()
-                        .timeout(Duration.ofNanos(remaining / AssistantAgent.MODEL_CALL_ATTEMPTS))
-                        .build();
-                Response response;
-                // Don't hold the profile lease across the network call; a profile deletion
-                // would otherwise queue behind it and stall every later request (issue #6).
-                try (var suspended = ProfileLifecycle.suspend()) {
-                    response = client.responses().create(params, options);
-                } catch (RuntimeException error) {
-                    // A deletion during the call must not be reported as a timeout or any other error.
-                    ProfileLifecycle.rethrowIfDeleted(error);
-                    if (System.nanoTime() >= deadline) throw new AssistantAgent.AgentDeadlineException();
-                    throw error;
-                }
+                Response response = create(client, params, deadline);
                 List<ResponseFunctionToolCall> calls = response.output().stream()
                         .filter(item -> item.isFunctionCall())
                         .map(item -> item.asFunctionCall())

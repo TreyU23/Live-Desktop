@@ -19,7 +19,6 @@ import java.net.http.HttpTimeoutException;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.Map;
-import java.util.Set;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
@@ -33,9 +32,6 @@ public class AnthropicAgent {
     static final String API_VERSION = "2023-06-01";
     /** Output budget per model call. Thinking counts toward it, so it is generous. */
     static final int MAX_OUTPUT_TOKENS = 32_000;
-    /** Status codes worth one retry: request timeouts, conflicts, rate limits, overload and server errors. */
-    private static final Set<Integer> kRetryableStatus = Set.of(408, 409, 429, 500, 502, 503, 504, 529);
-    private static final Duration kRetryBackoff = Duration.ofMillis(750);
     static final String kTruncatedNote = "(This reply was cut off because it reached the length limit. Ask me to continue, or for a shorter answer.)";
     static final String kTruncatedWithoutText = "My reply reached the length limit before I could finish it, so nothing was done. Try a shorter request or split it into steps.";
 
@@ -203,7 +199,7 @@ public class AnthropicAgent {
             } catch (IOException error) {
                 ProfileLifecycle.rethrowIfDeleted(error);
                 if (System.nanoTime() >= deadline) throw new AssistantAgent.AgentDeadlineException();
-                if (attempt < AssistantAgent.MODEL_CALL_ATTEMPTS) { pause(deadline); continue; }
+                if (attempt < AssistantAgent.MODEL_CALL_ATTEMPTS) { AssistantAgent.pauseBeforeRetry(deadline); continue; }
                 throw new AnthropicApiException(0, "connection_error", error);
             } catch (InterruptedException error) {
                 Thread.currentThread().interrupt();
@@ -219,8 +215,8 @@ public class AnthropicAgent {
                     throw new AnthropicApiException(502, "invalid_response", null);
                 }
             }
-            if (kRetryableStatus.contains(status) && attempt < AssistantAgent.MODEL_CALL_ATTEMPTS) {
-                pause(deadline);
+            if (AssistantAgent.RETRYABLE_STATUS.contains(status) && attempt < AssistantAgent.MODEL_CALL_ATTEMPTS) {
+                AssistantAgent.pauseBeforeRetry(deadline);
                 continue;
             }
             throw new AnthropicApiException(status, errorType(response.body()), null);
@@ -234,15 +230,6 @@ public class AnthropicAgent {
             return type.matches("[a-z_]{1,64}") ? type : "";
         } catch (Exception ignored) {
             return "";
-        }
-    }
-
-    private static void pause(long deadline) {
-        long wait = Math.min(kRetryBackoff.toNanos(), Math.max(0, (deadline - System.nanoTime()) / 4));
-        try {
-            Thread.sleep(Duration.ofNanos(wait));
-        } catch (InterruptedException error) {
-            Thread.currentThread().interrupt();
         }
     }
 

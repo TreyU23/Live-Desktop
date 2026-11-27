@@ -22,8 +22,21 @@ public class AssistantAgent {
      * above this, so the UI always receives the backend's real outcome (issue #11).
      */
     public static final Duration AGENT_DEADLINE = Duration.ofSeconds(240);
-    /** Matches ProfileClientPool's maxRetries. The OpenAI path still splits what is left between attempts (issue #49). */
+    /** One try plus the retries of {@link ProfileClientPool#MAX_RETRIES}; each attempt may use all the time left. */
     static final int MODEL_CALL_ATTEMPTS = ProfileClientPool.MAX_RETRIES + 1;
+    /** Status codes worth one retry: request timeouts, conflicts, rate limits, overload and server errors. */
+    static final java.util.Set<Integer> RETRYABLE_STATUS = java.util.Set.of(408, 409, 429, 500, 502, 503, 504, 529);
+    private static final Duration kRetryBackoff = Duration.ofMillis(750);
+
+    /** Short pause before a retry, never longer than a quarter of the time left. */
+    static void pauseBeforeRetry(long deadline) {
+        long wait = Math.min(kRetryBackoff.toNanos(), Math.max(0, (deadline - System.nanoTime()) / 4));
+        try {
+            Thread.sleep(Duration.ofNanos(wait));
+        } catch (InterruptedException error) {
+            Thread.currentThread().interrupt();
+        }
+    }
     /** Model calls allowed in one request before it stops with a tool-call limit error. */
     static final int MAX_MODEL_TURNS = 8;
 

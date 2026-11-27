@@ -17,9 +17,12 @@ public final class ProfileClientPool {
     private final HashSet<Entry> active = new HashSet<>();
     private boolean closed;
     private final java.util.function.Function<String, OpenAIClient> factory;
-    /** One retry for transient OpenAI errors; OpenAiAgent sizes per-attempt timeouts from this. */
+    /**
+     * One retry for transient OpenAI errors, made by OpenAiAgent. The SDK's own retries are off: they also
+     * re-send after a client-side timeout, which pays for the abandoned call twice (issue #49).
+     */
     static final int MAX_RETRIES = 1;
-    public ProfileClientPool() { this(key -> OpenAIOkHttpClient.builder().apiKey(key).maxRetries(MAX_RETRIES).build()); }
+    public ProfileClientPool() { this(key -> OpenAIOkHttpClient.builder().apiKey(key).maxRetries(0).build()); }
     ProfileClientPool(java.util.function.Function<String, OpenAIClient> factory) { this.factory = factory; }
     private static final class Entry {
         final String fingerprint;
