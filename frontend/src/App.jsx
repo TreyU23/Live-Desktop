@@ -283,7 +283,9 @@ async function api(path, options = {}, allowTokenRefresh = true) {
   const contentType = response.headers.get("content-type") || "";
   const payload = contentType.includes("application/json") ? await response.json() : null;
   if (!response.ok) {
-    throw new Error(payload?.error || `Request failed (${response.status})`);
+    const failure = new Error(payload?.error || `Request failed (${response.status})`);
+    failure.status = response.status;
+    throw failure;
   }
   return payload;
 }
@@ -410,6 +412,8 @@ export function App() {
   const calendarDate = useRef(localIsoDate(localDateAtOffset()));
   const musicProviderRef = useRef(musicProviderId);
   const conversationSelection = useRef(0);
+  // The "conversation" resource has no fixed URL; this is the thread the tab has open (issue #36).
+  const conversationPath = useRef(null);
   musicProviderRef.current = musicProviderId;
   const activeProfile = profiles.find((profile) => profile.id === profileId) || profiles[0];
 
@@ -789,15 +793,31 @@ export function App() {
     await scheduler.current?.invalidate("conversation");
     if (selection !== conversationSelection.current) return;
     if (!summary) {
+      conversationPath.current = null;
       setSelectedConversation(null);
       return;
     }
     setSelectedConversation(null);
+    conversationPath.current = `/api/conversations/${summary.id}`;
     try {
-      await scheduler.current?.refresh("conversation", `/api/conversations/${summary.id}`);
+      await scheduler.current?.refresh("conversation", conversationPath.current);
     } catch (error) {
+      if (selection !== conversationSelection.current) return;
+      if (error.status === 404) { dropMissingConversation(); return; }
       notify(error.message, "error");
     }
+  };
+
+  // The open conversation no longer exists (for example it was deleted in another tab): close it, clear its
+  // error so nothing offers to refresh it, and reload the list.
+  const dropMissingConversation = () => {
+    conversationSelection.current += 1;
+    conversationPath.current = null;
+    scheduler.current?.forget("conversation");
+    setSelectedConversation(null);
+    clearResourceStatus("conversation");
+    notify("That conversation no longer exists.", "error");
+    scheduler.current?.refresh("conversations").catch(() => {});
   };
 
   // Deletes one conversation for good: the server rewrites its state file without it, and the open copy,
@@ -808,6 +828,7 @@ export function App() {
       await Promise.all(["conversation", "conversations"].map(key => scheduler.current?.invalidate(key)));
       await api(`/api/conversations/${id}`, { method: "DELETE" });
       scheduler.current?.forget("conversation");
+      conversationPath.current = null;
       setSelectedConversation(null);
       notify("Conversation deleted.", "success");
       await scheduler.current?.refresh("conversations").catch(() => {});
@@ -939,11 +960,21 @@ export function App() {
     } catch (error) { notify(error.message, "error"); }
   };
 
+  const clearResourceStatus = key => {
+    delete resourceStates.current[key];
+    setResourceStatus(current => { const { [key]: dropped, ...rest } = current; return rest; });
+  };
   const retry = async key => {
+    // Only the open thread can be reloaded; with none open there is nothing to refresh (issue #36).
+    if (key === "conversation" && !conversationPath.current) { clearResourceStatus(key); return; }
     resourceStates.current[key] = { ...resourceStates.current[key], manual: true, loading: true };
     setResourceStatus(current => ({ ...current, [key]: { ...resourceStates.current[key], loading: true } }));
-    try { await scheduler.current?.refresh(key); } catch (error) { notify(error.message, 'error'); }
-    finally { setResourceStatus(current => ({ ...current, [key]: resourceStates.current[key] })); }
+    try { await scheduler.current?.refresh(key, key === "conversation" ? conversationPath.current : undefined); }
+    catch (error) {
+      if (key === "conversation" && error.status === 404) dropMissingConversation();
+      else notify(error.message, 'error');
+    }
+    finally { if (resourceStates.current[key]) setResourceStatus(current => ({ ...current, [key]: resourceStates.current[key] })); }
   };
   const boundary = (key, name, children) => <ResourceBoundary name={name} status={resourceStates.current[key]} onRetry={() => retry(key)}>{children}</ResourceBoundary>;
   const servicesOnline = health.connected && runtime.frontendOnline;
