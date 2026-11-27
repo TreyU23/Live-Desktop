@@ -37,6 +37,8 @@ public class AssistantAgent {
             Thread.currentThread().interrupt();
         }
     }
+    static final String kTruncatedNote = "(This reply was cut off because it reached the length limit. Ask me to continue, or for a shorter answer.)";
+    static final String kTruncatedWithoutText = "My reply reached the length limit before I could finish it, so nothing was done. Try a shorter request or split it into steps.";
     /** Model calls allowed in one request before it stops with a tool-call limit error. */
     static final int MAX_MODEL_TURNS = 8;
 

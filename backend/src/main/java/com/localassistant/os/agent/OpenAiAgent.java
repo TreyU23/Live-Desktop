@@ -15,7 +15,10 @@ import com.openai.models.ReasoningEffort;
 import com.openai.models.responses.Response;
 import com.openai.models.responses.ResponseCreateParams;
 import com.openai.models.responses.ResponseFunctionToolCall;
+import com.openai.models.responses.ResponseIncludable;
 import com.openai.models.responses.ResponseInputItem;
+import com.openai.models.responses.ResponseOutputItem;
+import com.openai.models.responses.ResponseStatus;
 import java.io.IOException;
 import java.time.Duration;
 import java.util.ArrayList;
@@ -100,28 +103,44 @@ public class OpenAiAgent {
                     .reasoning(Reasoning.builder()
                             .effort(ReasoningEffort.of(properties.getReasoningEffort()))
                             .build())
+                    // With store=false the model's reasoning is only kept if it is sent back, encrypted, between rounds.
+                    .addInclude(ResponseIncludable.REASONING_ENCRYPTED_CONTENT)
                     .store(false);
             for (Class<?> tool : AssistantToolRunner.TOOLS) builder.addTool(tool);
 
             for (int turn = 0; turn < AssistantAgent.MAX_MODEL_TURNS; turn++) {
                 ResponseCreateParams params = builder.input(ResponseCreateParams.Input.ofResponse(inputs)).build();
                 Response response = create(client, params, deadline);
-                List<ResponseFunctionToolCall> calls = response.output().stream()
-                        .filter(item -> item.isFunctionCall())
-                        .map(item -> item.asFunctionCall())
-                        .toList();
+                // A reply that stopped early (status incomplete) may hold a tool call with cut-off arguments;
+                // never run those (issue #44, as for Anthropic in #28).
+                boolean incomplete = response.status().filter(ResponseStatus.INCOMPLETE::equals).isPresent();
+                boolean outputLimit = incomplete && response.incompleteDetails()
+                        .flatMap(Response.IncompleteDetails::reason)
+                        .filter(Response.IncompleteDetails.Reason.MAX_OUTPUT_TOKENS::equals).isPresent();
 
-                if (calls.isEmpty()) {
+                if (incomplete || response.output().stream().noneMatch(item -> item.isFunctionCall())) {
                     String text = response.output().stream()
                             .flatMap(item -> item.message().stream())
                             .flatMap(message -> message.content().stream())
                             .flatMap(content -> content.outputText().stream())
                             .map(output -> output.text())
                             .reduce("", String::concat);
+                    if (outputLimit) {
+                        return text.isBlank()
+                                ? AssistantAgent.kTruncatedWithoutText
+                                : text.stripTrailing() + "\n\n" + AssistantAgent.kTruncatedNote;
+                    }
                     return text.isBlank() ? "I could not produce a text response." : text;
                 }
 
-                for (ResponseFunctionToolCall call : calls) {
+                // Send the reasoning back with the calls it led to, in the order the model produced them.
+                for (ResponseOutputItem item : response.output()) {
+                    if (item.isReasoning()) {
+                        inputs.add(ResponseInputItem.ofReasoning(item.asReasoning()));
+                        continue;
+                    }
+                    if (!item.isFunctionCall()) continue;
+                    ResponseFunctionToolCall call = item.asFunctionCall();
                     inputs.add(ResponseInputItem.ofFunctionCall(call));
                     Object output;
                     try {

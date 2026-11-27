@@ -32,8 +32,6 @@ public class AnthropicAgent {
     static final String API_VERSION = "2023-06-01";
     /** Output budget per model call. Thinking counts toward it, so it is generous. */
     static final int MAX_OUTPUT_TOKENS = 32_000;
-    static final String kTruncatedNote = "(This reply was cut off because it reached the length limit. Ask me to continue, or for a shorter answer.)";
-    static final String kTruncatedWithoutText = "My reply reached the length limit before I could finish it, so nothing was done. Try a shorter request or split it into steps.";
 
     /** Sends one request; separated so tests can replace the network. */
     @FunctionalInterface
@@ -123,8 +121,8 @@ public class AnthropicAgent {
                 if ("max_tokens".equals(stopReason)) {
                     // Thinking shares the output budget, so the cut can land in thinking, text or a tool call (issue #28).
                     return text.isEmpty()
-                            ? kTruncatedWithoutText
-                            : text.toString().stripTrailing() + "\n\n" + kTruncatedNote;
+                            ? AssistantAgent.kTruncatedWithoutText
+                            : text.toString().stripTrailing() + "\n\n" + AssistantAgent.kTruncatedNote;
                 }
                 if (text.isEmpty() && "refusal".equals(stopReason)) {
                     return "Claude declined to answer this request.";

@@ -212,7 +212,7 @@ class AnthropicAgentTest {
                   {"type":"text","text":"Step one, then step  "}]}"""));
 
         assertThat(agent.reply(CONVERSATION, KEY, System.nanoTime() + AssistantAgent.AGENT_DEADLINE.toNanos()))
-                .isEqualTo("Step one, then step\n\n" + AnthropicAgent.kTruncatedNote);
+                .isEqualTo("Step one, then step\n\n" + AssistantAgent.kTruncatedNote);
         assertThat(requests).hasSize(1);
     }
 
@@ -223,7 +223,7 @@ class AnthropicAgentTest {
                   {"type":"tool_use","id":"toolu_2","name":"list_workspace_files","input":{}}]}"""));
 
         assertThat(agent.reply(CONVERSATION, KEY, System.nanoTime() + AssistantAgent.AGENT_DEADLINE.toNanos()))
-                .isEqualTo(AnthropicAgent.kTruncatedWithoutText);
+                .isEqualTo(AssistantAgent.kTruncatedWithoutText);
         verify(tools, never()).run(anyString(), any());
     }
 
