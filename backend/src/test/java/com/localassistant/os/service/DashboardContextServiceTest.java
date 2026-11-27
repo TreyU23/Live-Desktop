@@ -23,6 +23,18 @@ class DashboardContextServiceTest {
     }
 
     @Test
+    void matchesWholeWordsOnly() {
+        DashboardContextService service = serviceWith(mock(WindowsMediaSessionService.class));
+
+        assertThat(service.topicsForPrompt("How do I prevent this program from crashing the frame tracker?")).isEmpty();
+        assertThat(service.topicsForPrompt("Is the process of reviewing a pcb or a pcap slow?")).isEmpty();
+        assertThat(service.topicsForPrompt("Please remember that I like tea")).isEmpty();
+        assertThat(service.topicsForPrompt("How much RAM is free?")).containsExactly("system");
+        assertThat(service.topicsForPrompt("Any events today?")).containsExactly("calendar");
+        assertThat(service.topicsForPrompt("what's playing?")).containsExactly("music");
+    }
+
+    @Test
     void broadDashboardRequestUsesBoundedKnownTopics() {
         DashboardContextService service = serviceWith(mock(WindowsMediaSessionService.class));
 

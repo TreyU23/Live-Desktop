@@ -11,6 +11,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.regex.Pattern;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -18,6 +19,23 @@ public class DashboardContextService {
     private static final Set<String> ALLOWED_TOPICS = Set.of(
             "system", "apps", "phone", "calendar", "music", "runtime", "approvals", "summary");
     private static final long GIB = 1024L * 1024L * 1024L;
+
+    // Whole words or phrases only (optional plural), so "ram" never matches "program" and "event" never
+    // matches "prevent". Matching decides what local data is sent to the model provider.
+    private static final Pattern kOverviewTerms = terms("dashboard", "overview", "everything", "what's happening", "whats happening");
+    private static final Pattern kSystemTerms = terms("system", "computer", "pc", "device", "cpu", "memory", "ram", "storage", "disk",
+            "network", "wi-fi", "wifi", "bluetooth", "focus", "night light", "microphone", "battery saver", "windows version");
+    private static final Pattern kAppsTerms = terms("running app", "recent app", "application", "running process", "what apps", "which apps");
+    private static final Pattern kPhoneTerms = terms("phone", "phone link", "notification", "last sync", "linked device");
+    private static final Pattern kCalendarTerms = terms("calendar", "schedule", "event", "meeting", "appointment", "agenda",
+            "what's on today", "whats on today");
+    private static final Pattern kMusicTerms = terms("music", "song", "artist", "album", "playlist", "now playing", "what's playing",
+            "whats playing", "current track", "this track");
+    private static final Pattern kRuntimeTerms = terms("backend", "frontend", "localhost", "local host", "server", "restart", "shutdown",
+            "offline", "online");
+    private static final Pattern kApprovalTerms = terms("approval", "pending action", "action queue", "queued action");
+    private static final Pattern kSummaryTerms = terms("memories", "conversation count");
+    private static final Pattern kBatteryTerms = terms("battery");
 
     private final SystemService system;
     private final RuntimeService runtime;
@@ -65,19 +83,19 @@ public class DashboardContextService {
     List<String> topicsForPrompt(String prompt) {
         String normalized = prompt == null ? "" : prompt.toLowerCase(Locale.ROOT);
         LinkedHashSet<String> topics = new LinkedHashSet<>();
-        if (containsAny(normalized, "dashboard", "overview", "everything", "what's happening", "whats happening")) {
+        if (containsAny(normalized, kOverviewTerms)) {
             topics.addAll(List.of("summary", "system", "apps", "phone", "calendar", "music", "runtime", "approvals"));
             return List.copyOf(topics);
         }
-        if (containsAny(normalized, "system", "computer", " pc ", "device", "cpu", "memory", "ram", "storage", "disk", "network", "wi-fi", "wifi", "bluetooth", "focus", "night light", "microphone", "battery saver", "windows version")) topics.add("system");
-        if (containsAny(normalized, "running app", "recent app", "application", "process", "what apps", "which apps")) topics.add("apps");
-        if (containsAny(normalized, "phone", "phone link", "notification", "last sync", "linked device")) topics.add("phone");
-        if (containsAny(normalized, "calendar", "schedule", "event", "meeting", "appointment", "agenda", "what's on today", "whats on today")) topics.add("calendar");
-        if (containsAny(normalized, "music", "song", "track", "artist", "album", "playlist", "playing", "pause", "skip")) topics.add("music");
-        if (containsAny(normalized, "backend", "frontend", "localhost", "local host", "server", "restart", "shutdown", "offline", "online")) topics.add("runtime");
-        if (containsAny(normalized, "approval", "pending action", "action queue", "queued action")) topics.add("approvals");
-        if (containsAny(normalized, "memory", "memories", "remember", "conversation count")) topics.add("summary");
-        if (normalized.contains("battery") && !topics.contains("phone")) topics.add("system");
+        if (containsAny(normalized, kSystemTerms)) topics.add("system");
+        if (containsAny(normalized, kAppsTerms)) topics.add("apps");
+        if (containsAny(normalized, kPhoneTerms)) topics.add("phone");
+        if (containsAny(normalized, kCalendarTerms)) topics.add("calendar");
+        if (containsAny(normalized, kMusicTerms)) topics.add("music");
+        if (containsAny(normalized, kRuntimeTerms)) topics.add("runtime");
+        if (containsAny(normalized, kApprovalTerms)) topics.add("approvals");
+        if (containsAny(normalized, kSummaryTerms)) topics.add("summary");
+        if (containsAny(normalized, kBatteryTerms) && !topics.contains("phone")) topics.add("system");
         return List.copyOf(topics);
     }
 
@@ -207,9 +225,17 @@ public class DashboardContextService {
         return LocalDate.now();
     }
 
-    private boolean containsAny(String value, String... needles) {
-        for (String needle : needles) if (value.contains(needle)) return true;
-        return false;
+    private static Pattern terms(String... words) {
+        StringBuilder pattern = new StringBuilder("(?<![\\p{L}\\p{N}])(?:");
+        for (int i = 0; i < words.length; i++) {
+            if (i > 0) pattern.append('|');
+            pattern.append(Pattern.quote(words[i]));
+        }
+        return Pattern.compile(pattern.append(")(?:e?s)?(?![\\p{L}\\p{N}])").toString());
+    }
+
+    private boolean containsAny(String value, Pattern terms) {
+        return terms.matcher(value).find();
     }
 
     private double gib(long bytes) {
