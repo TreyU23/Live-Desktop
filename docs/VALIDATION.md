@@ -38,6 +38,7 @@ Then, from the root:
 npm --prefix frontend run test:browser
 node frontend/tests/browser-mutation-races.mjs
 node frontend/tests/browser-conversation-refresh.mjs
+node frontend/tests/browser-profile-delete.mjs
 node frontend/tests/browser-redesign.mjs
 npm --prefix frontend run test:contrast
 npm --prefix frontend run test:privacy
@@ -51,6 +52,7 @@ Playwright uses Microsoft Edge; `BROWSER_TEST_BASE_URL` selects another test ser
 | `browser-performance.mjs` | Ten-second Calendar delay, independent commits, request budgets, hidden polling, pending feedback, profile headers, deferred/persistent music iframe and an Overview scroll frame budget (median < 16.7 ms, p95 < 25 ms at 1440×900, real timers on a fresh page) |
 | `browser-mutation-races.mjs` | Reads during writes cannot overwrite confirmed results; failed memory saves preserve drafts; successful saves clear drafts despite refresh failure |
 | `browser-conversation-refresh.mjs` | "Refresh conversation" after a failed thread load reloads that thread (never the thread list); a thread deleted elsewhere (404) closes with a notice and offers no refresh or delete |
+| `browser-profile-delete.mjs` | A profile delete whose profile list cannot be saved (storage full) keeps the page and the list and reports it; deleting again is safe, saves the list and switches to the original profile |
 | `browser-redesign.mjs` | Seven views at 1920/1440/1280/768/390/320 px; overflow and side-navigation/drawer placement, Approvals expandable rows (reusable scope, literal content), approval dialog (opens only for new requests, focus contained, Escape returns focus to the composer, Don’t Allow/Allow write through, no one-shot promise, literal content), drafts, keyboard focus, saved appearance and accent presets (including hex migration), no Reduce transparency, loading/zero/stale/retry, calendar and phone panels, and no Content Security Policy violations |
 | `browser-contrast.mjs` | Live theme tokens resolved in the browser, light and dark, all five accent presets: 4.5:1 for text pairs, 3:1 for instrument severity colors and the accent |
 | `browser-privacy.mjs` | Device/Product IDs hidden until **Show IDs** on both System Info tabs; the iCloud app-specific password is masked, sent once to the backend and never echoed into the page, a field or browser storage |

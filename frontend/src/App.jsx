@@ -460,8 +460,14 @@ export function App() {
       await api("/api/profile/data", { method: "DELETE", profileId: id });
       for (const base of [MUSIC_CONNECTION_KEY, THEME_KEY, ACCENT_COLOR_KEY, TRANSPARENCY_KEY]) removeStoredItem(window.localStorage, profileStorageKey(base, id));
       const next = profiles.filter((profile) => profile.id !== id);
-      updateProfiles(next);
-      switchProfile(next[0].id);
+      // The profile's data is already gone. If the list can't be saved it would keep showing a profile
+      // with no data, so stop and say so; deleting it again is safe (the backend ignores missing data).
+      if (!updateProfiles(next)) {
+        notify("The profile's data was deleted, but the profile list could not be updated. Free browser storage and delete it again.", "error");
+        return;
+      }
+      // Only leave when this tab was showing the deleted profile; the original profile always exists.
+      if (id === profileId) switchProfile("default");
     } catch (error) { notify(error.message, "error"); }
   };
 
