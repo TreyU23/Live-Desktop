@@ -175,6 +175,68 @@ public class StateStore {
         });
     }
 
+    /**
+     * The conversation a chat turn should answer in, without saving anything: the stored one, or an unsaved new
+     * one under a server-made id when the id is missing or unknown. {@link #appendTurn} saves it with the first
+     * completed turn, so a request that fails leaves no empty or one-sided conversation behind.
+     */
+    public Conversation conversationForTurn(String requestedId) throws IOException {
+        return locked(() -> {
+            if (requestedId != null && !requestedId.isBlank()) {
+                var existing = state().conversations().stream()
+                        .filter(conversation -> conversation.id().equals(requestedId))
+                        .findFirst()
+                        .map(this::copyConversation);
+                if (existing.isPresent()) return existing.get();
+                if (!isConversationId(requestedId)) throw new InvalidConversationIdException();
+            }
+            String now = Instant.now().toString();
+            return new Conversation(UUID.randomUUID().toString(), "New conversation", List.of(), now, now);
+        });
+    }
+
+    /**
+     * Saves one finished chat turn (the user's message and the reply) in a single commit. A new conversation from
+     * {@link #conversationForTurn} is created here; an existing one that was deleted meanwhile is not brought back.
+     * Returns the saved reply.
+     */
+    public ConversationMessage appendTurn(Conversation turn, String userContent, String assistantContent)
+            throws IOException {
+        return locked(() -> {
+            String now = Instant.now().toString();
+            ConversationMessage user = new ConversationMessage(UUID.randomUUID().toString(), "user", userContent, now);
+            ConversationMessage reply = new ConversationMessage(UUID.randomUUID().toString(), "assistant", assistantContent, now);
+            AppState state = state();
+            var conversations = new ArrayList<Conversation>();
+            boolean found = false;
+            for (Conversation conversation : state.conversations()) {
+                if (!conversation.id().equals(turn.id())) {
+                    conversations.add(conversation);
+                    continue;
+                }
+                found = true;
+                conversations.add(withTurn(conversation, user, reply, now));
+            }
+            if (!found) {
+                // Only a conversation that was never saved may start here; a deleted one stays deleted.
+                if (!turn.messages().isEmpty()) throw new IllegalArgumentException("Conversation not found.");
+                conversations.add(withTurn(new Conversation(turn.id(), turn.title(), List.of(), now, now), user, reply, now));
+            }
+            commit(new AppState(1, conversations, state.memories(), state.actions()));
+            return reply;
+        });
+    }
+
+    private static Conversation withTurn(Conversation conversation, ConversationMessage user, ConversationMessage reply, String now) {
+        var messages = new ArrayList<>(conversation.messages());
+        String title = messages.isEmpty()
+                ? user.content().substring(0, Math.min(72, user.content().length()))
+                : conversation.title();
+        messages.add(user);
+        messages.add(reply);
+        return new Conversation(conversation.id(), title, messages, conversation.createdAt(), now);
+    }
+
     static boolean isConversationId(String value) {
         return value.length() == 36 && CONVERSATION_ID.matcher(value).matches();
     }

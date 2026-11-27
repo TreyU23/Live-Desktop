@@ -64,7 +64,7 @@ class CredentialStoreTest {
     }
 
     @Test void dpapiRoundTripHandlesUnicodeAndRejectsCorruption() throws Exception {
-        Path workspace = new ProfilePaths(properties()).workspaceRoot();
+        Path workspace = new ProfilePaths(properties()).installRoot();
         String secret = "test-secret-\u03bb-\u4e2d\u6587";
         String encrypted = WindowsCredentialProtection.protect(workspace, secret);
         assertThat(WindowsCredentialProtection.unprotect(workspace, encrypted)).isEqualTo(secret);
@@ -94,7 +94,7 @@ class CredentialStoreTest {
         if (!process.waitFor(15, TimeUnit.SECONDS)) { process.destroyForcibly(); throw new AssertionError("Legacy fixture timed out."); }
         assertThat(process.exitValue()).isZero();
         String encrypted = new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8).trim();
-        assertThat(WindowsCredentialProtection.unprotect(new ProfilePaths(properties()).workspaceRoot(), encrypted)).isEqualTo(secret);
+        assertThat(WindowsCredentialProtection.unprotect(new ProfilePaths(properties()).installRoot(), encrypted)).isEqualTo(secret);
     }
 
     private AssistantProperties properties() {

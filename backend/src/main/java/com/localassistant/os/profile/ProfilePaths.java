@@ -13,10 +13,12 @@ public class ProfilePaths {
 
     private final Path dataRoot;
     private final Path workspaceRoot;
+    private final Path installRoot;
 
     public ProfilePaths(AssistantProperties properties) {
         dataRoot = Path.of(properties.getDataDir()).toAbsolutePath().normalize();
         workspaceRoot = Path.of(properties.getWorkspaceRoot()).toAbsolutePath().normalize();
+        installRoot = properties.installRoot();
     }
 
     public Path file(String fileName) {
@@ -63,4 +65,6 @@ public class ProfilePaths {
 
     public boolean currentIsDefault() { return ProfileContext.DEFAULT_PROFILE.equals(ProfileContext.currentId()); }
     public Path workspaceRoot() { return workspaceRoot; }
+    /** Live Desktop's own folder; native binaries load from here, never from the workspace. */
+    public Path installRoot() { return installRoot; }
 }

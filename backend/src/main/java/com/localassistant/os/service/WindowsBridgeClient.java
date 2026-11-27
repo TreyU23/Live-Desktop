@@ -41,7 +41,7 @@ public class WindowsBridgeClient implements AutoCloseable {
 
     @Autowired
     public WindowsBridgeClient(AssistantProperties properties) {
-        this(Path.of(properties.getWorkspaceRoot()).toAbsolutePath().normalize()
+        this(properties.installRoot()
                 .resolve("native/build/Release/live-desktop-windows-bridge.exe"));
     }
 

@@ -205,11 +205,19 @@ function activeProfileId() {
   return profiles.some((profile) => profile.id === saved) ? saved : profiles[0].id;
 }
 
-function profileStorageKey(base, profileId = activeProfileId()) {
+// The profile this tab opened with. The stored choice can change underneath it when another tab
+// switches profiles, so every request from this tab keeps using the profile its UI shows.
+let tabProfile = null;
+function tabProfileId() {
+  if (tabProfile === null) tabProfile = activeProfileId();
+  return tabProfile;
+}
+
+function profileStorageKey(base, profileId = tabProfileId()) {
   return `${base}.${profileId}`;
 }
 
-function readMusicIntegration(profileId = activeProfileId()) {
+function readMusicIntegration(profileId = tabProfileId()) {
   try {
     const scoped = window.localStorage.getItem(profileStorageKey(MUSIC_CONNECTION_KEY, profileId));
     const legacy = profileId === "default" ? window.localStorage.getItem(MUSIC_CONNECTION_KEY) : null;
@@ -255,7 +263,7 @@ function localAccessToken() {
 }
 
 async function api(path, options = {}, allowTokenRefresh = true) {
-  const { profileId = activeProfileId(), headers, ...requestOptions } = options;
+  const { profileId = tabProfileId(), headers, ...requestOptions } = options;
   const method = String(requestOptions.method || "GET").toUpperCase();
   const token = await localAccessToken();
   const response = await fetch(`${API_BASE}${path}`, {
@@ -333,7 +341,7 @@ function ToastBridge({ toast }) {
 
 export function App() {
   const [profiles, setProfiles] = useState(readProfiles);
-  const [profileId] = useState(activeProfileId);
+  const [profileId] = useState(tabProfileId);
   const [activeView, setActiveView] = useState("home");
   const sendPending = useRef(false);
   const controlPending = useRef(false);

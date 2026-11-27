@@ -21,6 +21,8 @@ $env:MAVEN_USER_HOME = Join-Path $projectRoot ".tools\maven-home"
 if (-not $env:DATA_DIR) {
     $env:DATA_DIR = Join-Path $projectRoot "data"
 }
+# Native binaries (credential DLL, Windows bridge, launcher) load from this checkout, never from WORKSPACE_ROOT.
+$env:LIVE_DESKTOP_ROOT = $projectRoot
 if (-not $env:WORKSPACE_ROOT) {
     $env:WORKSPACE_ROOT = $projectRoot
 }

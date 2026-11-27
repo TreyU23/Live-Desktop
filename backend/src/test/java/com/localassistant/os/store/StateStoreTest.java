@@ -66,6 +66,34 @@ class StateStoreTest {
                 .isInstanceOf(StateStore.InvalidConversationIdException.class);
         assertThat(store.conversationSummaries()).hasSize(1);
     }
+    @Test void chatTurnsAreSavedOnlyWhenTheyComplete() throws Exception {
+        var store = store();
+        // A new conversation is only a draft until its first turn completes.
+        var draft = store.conversationForTurn(null);
+        assertThat(store.conversationSummaries()).isEmpty();
+        assertThat(store.conversationForTurn("00000000-0000-4000-8000-000000000123").id())
+                .isNotEqualTo("00000000-0000-4000-8000-000000000123");
+        assertThatThrownBy(() -> store.conversationForTurn("../../evil"))
+                .isInstanceOf(StateStore.InvalidConversationIdException.class);
+
+        var reply = store.appendTurn(draft, "first question", "first answer");
+        assertThat(reply.role()).isEqualTo("assistant");
+        var saved = store.conversationForTurn(draft.id());
+        assertThat(saved.title()).isEqualTo("first question");
+        assertThat(saved.messages()).extracting(message -> message.role() + ":" + message.content())
+                .containsExactly("user:first question", "assistant:first answer");
+
+        store.appendTurn(saved, "second", "again");
+        assertThat(store.conversation(draft.id()).orElseThrow().messages()).hasSize(4);
+        assertThat(store.conversationSummaries()).hasSize(1);
+
+        // A conversation deleted while its reply was running is not brought back.
+        var current = store.conversation(draft.id()).orElseThrow();
+        assertThat(store.deleteConversation(draft.id())).isTrue();
+        assertThatThrownBy(() -> store.appendTurn(current, "late", "reply"))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThat(store.conversationSummaries()).isEmpty();
+    }
     @Test void deletedConversationsLeaveNothingInMemoryOrOnDisk() throws Exception {
         var store = store();
         var keep = store.getOrCreateConversation(null);

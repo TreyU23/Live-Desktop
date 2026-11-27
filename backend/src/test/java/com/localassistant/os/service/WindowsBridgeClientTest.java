@@ -53,7 +53,7 @@ class WindowsBridgeClientTest {
 
     @Test void nativeProviderReportsMissingBridgeAndRejectsUnknownControl() {
         var properties = new AssistantProperties();
-        properties.setWorkspaceRoot(root.toString());
+        properties.overrideInstallRoot(root.toString());
         var service = new WindowsSystemControlService(properties);
         try {
             assertThat(service.snapshot()).containsEntry("available", false);
@@ -63,6 +63,16 @@ class WindowsBridgeClientTest {
         } finally {
             service.closeWorker();
         }
+    }
+
+    @Test void nativeBinariesNeverResolveFromTheAssistantWorkspace() {
+        var properties = new AssistantProperties();
+        properties.setWorkspaceRoot(root.resolve("some-other-project").toString());
+        properties.overrideInstallRoot(root.resolve("install").toString());
+        assertThat(properties.installRoot()).isEqualTo(root.resolve("install").toAbsolutePath().normalize());
+        assertThat(new com.localassistant.os.profile.ProfilePaths(properties).installRoot())
+                .isEqualTo(properties.installRoot())
+                .isNotEqualTo(Path.of(properties.getWorkspaceRoot()).toAbsolutePath().normalize());
     }
 
     @Test

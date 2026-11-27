@@ -47,10 +47,10 @@ class ConcurrentChatTest {
         agent = mock(AssistantAgent.class);
         when(agent.provider()).thenReturn(AssistantProvider.OPENAI);
         when(agent.configured(AssistantProvider.OPENAI)).thenReturn(true);
-        when(store.getOrCreateConversation(any())).thenReturn(CONVERSATION);
+        when(store.conversationForTurn(any())).thenReturn(CONVERSATION);
         when(store.conversation(ID)).thenReturn(Optional.of(CONVERSATION));
-        when(store.addMessage(eq(ID), any(), any()))
-                .thenAnswer(call -> new ConversationMessage("m", call.getArgument(1), call.getArgument(2), "now"));
+        when(store.appendTurn(any(), any(), any()))
+                .thenAnswer(call -> new ConversationMessage("m", "assistant", call.getArgument(2), "now"));
         controller = new AssistantController(store, agent, mock(ActionService.class), mock(MemoryService.class),
                 mock(SystemService.class), mock(RuntimeService.class), mock(ICloudCalendarService.class),
                 mock(WindowsMediaSessionService.class), mock(ProfileCredentialStore.class),
@@ -74,7 +74,7 @@ class ConcurrentChatTest {
             var second = controller.chat(new AssistantController.ChatRequest(ID, "two"));
             assertThat(second.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
             assertThat(((Map<?, ?>) second.getBody()).get("code")).isEqualTo("conversation_busy");
-            verify(store, never()).addMessage(ID, "user", "two");
+            verify(store, never()).appendTurn(any(), eq("two"), any());
 
             release.countDown();
             assertThat(first.get(3, TimeUnit.SECONDS).getStatusCode()).isEqualTo(HttpStatus.OK);
@@ -85,7 +85,7 @@ class ConcurrentChatTest {
         // The claim is released once the turn ends, so the next send goes through.
         when(agent.reply(any())).thenReturn("second reply");
         assertThat(controller.chat(new AssistantController.ChatRequest(ID, "two")).getStatusCode()).isEqualTo(HttpStatus.OK);
-        verify(store, times(1)).addMessage(ID, "user", "two");
+        verify(store, times(1)).appendTurn(any(), eq("two"), eq("second reply"));
     }
 
     @Test
@@ -93,6 +93,9 @@ class ConcurrentChatTest {
         when(agent.reply(any())).thenThrow(new IllegalStateException("model unavailable"));
         assertThat(controller.chat(new AssistantController.ChatRequest(ID, "one")).getStatusCode())
                 .isEqualTo(HttpStatus.BAD_GATEWAY);
+
+        // Issue: a failed turn used to leave the user's message (and a new conversation) behind.
+        verify(store, never()).appendTurn(any(), any(), any());
 
         org.mockito.Mockito.doReturn("ok").when(agent).reply(any());
         assertThat(controller.chat(new AssistantController.ChatRequest(ID, "two")).getStatusCode())

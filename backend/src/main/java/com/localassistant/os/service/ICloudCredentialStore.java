@@ -68,11 +68,11 @@ public class ICloudCredentialStore {
     public synchronized void clearCurrentCache() { cachedCredentials.remove(ProfileContext.currentId()); }
 
     private String protect(String value) throws IOException {
-        return WindowsCredentialProtection.protect(profilePaths.workspaceRoot(), value);
+        return WindowsCredentialProtection.protect(profilePaths.installRoot(), value);
     }
 
     private String unprotect(String value) throws IOException {
-        return WindowsCredentialProtection.unprotect(profilePaths.workspaceRoot(), value);
+        return WindowsCredentialProtection.unprotect(profilePaths.installRoot(), value);
     }
 
     public record Credentials(String email, String appSpecificPassword) {}

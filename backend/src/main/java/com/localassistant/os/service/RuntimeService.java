@@ -15,14 +15,15 @@ public class RuntimeService {
     private static final int FRONTEND_PORT = 4173;
     private static final int BACKEND_PORT = 4317;
 
-    private final Path workspaceRoot;
+    /** Live Desktop's own folder (not the assistant workspace); the launcher lives and runs here. */
+    private final Path installRoot;
     private final Path lifecycleLauncher;
     private final Path lifecycleLog;
 
     public RuntimeService(AssistantProperties properties) {
-        workspaceRoot = Path.of(properties.getWorkspaceRoot()).toAbsolutePath().normalize();
-        lifecycleLauncher = workspaceRoot.resolve("native/build/Release/live-desktop-launcher.exe").normalize();
-        lifecycleLog = workspaceRoot.resolve("data").resolve("runtime-control.log").normalize();
+        installRoot = properties.installRoot();
+        lifecycleLauncher = installRoot.resolve("native/build/Release/live-desktop-launcher.exe").normalize();
+        lifecycleLog = installRoot.resolve("data").resolve("runtime-control.log").normalize();
     }
 
     public RuntimeStatus status() {
@@ -41,7 +42,7 @@ public class RuntimeService {
         if (!System.getProperty("os.name", "").toLowerCase(Locale.ROOT).contains("windows")) {
             throw new IllegalStateException("Project lifecycle controls are available on Windows only.");
         }
-        if (!lifecycleLauncher.startsWith(workspaceRoot) || !Files.isRegularFile(lifecycleLauncher)) {
+        if (!lifecycleLauncher.startsWith(installRoot) || !Files.isRegularFile(lifecycleLauncher)) {
             throw new IllegalStateException("Native lifecycle launcher is unavailable. Build production artifacts first.");
         }
 
@@ -50,9 +51,9 @@ public class RuntimeService {
                 lifecycleLauncher.toString(),
                 normalized,
                 "--root",
-                workspaceRoot.toString(),
+                installRoot.toString(),
                 "--request");
-        builder.directory(workspaceRoot.toFile());
+        builder.directory(installRoot.toFile());
         builder.redirectOutput(ProcessBuilder.Redirect.appendTo(lifecycleLog.toFile()));
         builder.redirectError(ProcessBuilder.Redirect.appendTo(lifecycleLog.toFile()));
         Process process = builder.start();

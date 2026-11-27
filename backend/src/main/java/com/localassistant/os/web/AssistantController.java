@@ -178,19 +178,25 @@ public class AssistantController {
                     .body(Map.of("error", AssistantAgent.missingKeyMessage(provider), "code", "assistant_not_configured"));
         }
         try {
-            Conversation conversation = store.getOrCreateConversation(request.conversationId());
-            // One turn per conversation at a time: append user message, get the reply, append it.
-            try (var claim = inFlight.tryClaim(ProfileContext.currentId(), conversation.id())) {
+            Conversation requested = store.conversationForTurn(request.conversationId());
+            // One turn per conversation at a time. Nothing is saved until the reply exists, so a failed request
+            // leaves no orphaned conversation or unanswered message, and a retry doesn't duplicate the message.
+            try (var claim = inFlight.tryClaim(ProfileContext.currentId(), requested.id())) {
                 if (claim == null) {
                     return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of(
                             "error", "This conversation is still answering another message. Wait for that reply, then send again.",
                             "code", "conversation_busy"));
                 }
-                store.addMessage(conversation.id(), "user", request.message().trim());
-                Conversation current = store.conversation(conversation.id())
-                        .orElseThrow();
-                ConversationMessage message = store.addMessage(
-                        conversation.id(), "assistant", agent.reply(current));
+                // Re-read under the claim: another request may have finished a turn or deleted it meanwhile.
+                Conversation conversation = requested.messages().isEmpty()
+                        ? store.conversation(requested.id()).orElse(requested)
+                        : store.conversation(requested.id()).orElseThrow(StateStore.InvalidConversationIdException::new);
+                String userMessage = request.message().trim();
+                var messages = new java.util.ArrayList<>(conversation.messages());
+                messages.add(new ConversationMessage("pending", "user", userMessage, java.time.Instant.now().toString()));
+                String reply = agent.reply(new Conversation(conversation.id(), conversation.title(), messages,
+                        conversation.createdAt(), conversation.updatedAt()));
+                ConversationMessage message = store.appendTurn(conversation, userMessage, reply);
                 return ResponseEntity.ok(Map.of("conversationId", conversation.id(), "message", message));
             }
         } catch (StateStore.InvalidConversationIdException error) {

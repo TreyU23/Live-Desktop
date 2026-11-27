@@ -26,6 +26,28 @@ public class AssistantProperties {
         this.dataDir = dataDir;
     }
 
+    /**
+     * Live Desktop's own folder, which holds the native binaries the backend loads and runs (credential DLL,
+     * Windows bridge, launcher). It is LIVE_DESKTOP_ROOT, set by the launcher and run-backend.ps1, or else the
+     * parent of the backend working directory. Never the assistant workspace: WORKSPACE_ROOT may point at another
+     * project, and code from it must not be loaded. Deliberately not a bindable property (no getter/setter pair),
+     * so neither .env nor configuration can redirect it.
+     */
+    public java.nio.file.Path installRoot() {
+        String root = installRootOverride;
+        if (root == null || root.isBlank()) root = System.getenv("LIVE_DESKTOP_ROOT");
+        if (root == null || root.isBlank()) root = "..";
+        return java.nio.file.Path.of(root).toAbsolutePath().normalize();
+    }
+
+    /** Tests only: points {@link #installRoot()} at a temporary folder. */
+    public AssistantProperties overrideInstallRoot(String root) {
+        this.installRootOverride = root;
+        return this;
+    }
+
+    private String installRootOverride;
+
     public String getWorkspaceRoot() {
         return workspaceRoot;
     }
