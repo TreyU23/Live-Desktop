@@ -51,28 +51,45 @@ jobs:
             --pattern 'Live-Desktop-windows-x64.zip.sha256' --dir dist
           (cd dist && sha256sum --check Live-Desktop-windows-x64.zip.sha256)
 
-          # The .sha256 asset sits next to the ZIP, so it only catches corruption. From 3.0.3 the
-          # hash is also in the annotated tag's message, and the tag is SSH-signed on the release PC.
-          # Require a verified tag whose hash matches before publishing anything (issue #12).
-          if [[ "$(printf '%s\n' 3.0.3 "$version" | sort -V | head -n1)" == "3.0.3" ]]; then
-            ref="$(gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$RELEASE_TAG")"
-            if [[ "$(jq -r .object.type <<<"$ref")" != "tag" ]]; then
-              echo "$RELEASE_TAG is not an annotated tag" >&2
-              exit 1
-            fi
-            tag="$(gh api "repos/$GITHUB_REPOSITORY/git/tags/$(jq -r .object.sha <<<"$ref")")"
-            if [[ "$(jq -r .verification.verified <<<"$tag")" != "true" ]]; then
-              echo "$RELEASE_TAG signature is not verified: $(jq -r .verification.reason <<<"$tag")" >&2
-              exit 1
-            fi
-            expected="$(jq -r .message <<<"$tag" | sed -nE 's/^Live-Desktop-windows-x64\.zip SHA-256: ([0-9a-f]{64})\s*$/\1/p')"
-            actual="$(sha256sum dist/Live-Desktop-windows-x64.zip | cut -d' ' -f1)"
-            if [[ -z "$expected" || "$expected" != "$actual" ]]; then
-              echo "ZIP hash $actual does not match the signed tag ($expected)" >&2
-              exit 1
-            fi
-            echo "ZIP matches the hash in the verified $RELEASE_TAG tag."
+          # The .sha256 asset sits next to the ZIP, so it only catches corruption. The hash is also in
+          # the annotated tag's message, and the tag is SSH-signed on the release PC. Every version must
+          # have a tag that is signed by the owner's pinned release key (.github/release-signers, read
+          # from the default branch) and whose hash matches before anything is published (issues #12, #35).
+          # GitHub's own "verified" flag is not enough: it accepts any key registered to the tagger's
+          # account, so the signature is checked here against the pinned key instead.
+          ref="$(gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$RELEASE_TAG")"
+          if [[ "$(jq -r .object.type <<<"$ref")" != "tag" ]]; then
+            echo "$RELEASE_TAG is not an annotated tag" >&2
+            exit 1
           fi
+          tag="$(gh api "repos/$GITHUB_REPOSITORY/git/tags/$(jq -r .object.sha <<<"$ref")")"
+          if [[ "$(jq -r .verification.verified <<<"$tag")" != "true" ]]; then
+            echo "$RELEASE_TAG signature is not verified: $(jq -r .verification.reason <<<"$tag")" >&2
+            exit 1
+          fi
+          default_branch="$(gh api "repos/$GITHUB_REPOSITORY" --jq .default_branch)"
+          signers="$RUNNER_TEMP/release-signers"
+          gh api -H "Accept: application/vnd.github.raw" \
+            "repos/$GITHUB_REPOSITORY/contents/.github/release-signers?ref=$default_branch" > "$signers"
+          principal="$(awk 'NF && $1 !~ /^#/ {print $1; exit}' "$signers")"
+          if [[ -z "$principal" ]]; then
+            echo "No pinned release signer found in .github/release-signers" >&2
+            exit 1
+          fi
+          jq -j .verification.payload <<<"$tag" > "$RUNNER_TEMP/tag.payload"
+          jq -j .verification.signature <<<"$tag" > "$RUNNER_TEMP/tag.sig"
+          if ! ssh-keygen -Y verify -f "$signers" -I "$principal" -n git \
+              -s "$RUNNER_TEMP/tag.sig" < "$RUNNER_TEMP/tag.payload"; then
+            echo "$RELEASE_TAG is not signed by the pinned release key" >&2
+            exit 1
+          fi
+          expected="$(jq -r .message <<<"$tag" | sed -nE 's/^Live-Desktop-windows-x64\.zip SHA-256: ([0-9a-f]{64})\s*$/\1/p')"
+          actual="$(sha256sum dist/Live-Desktop-windows-x64.zip | cut -d' ' -f1)"
+          if [[ -z "$expected" || "$expected" != "$actual" ]]; then
+            echo "ZIP hash $actual does not match the signed tag ($expected)" >&2
+            exit 1
+          fi
+          echo "ZIP matches the hash in $RELEASE_TAG, signed by the pinned release key."
           mvn --batch-mode org.apache.maven.plugins:maven-deploy-plugin:3.1.4:deploy-file \
             -DrepositoryId=github \
             -Durl=https://maven.pkg.github.com/treyu23/live-desktop \

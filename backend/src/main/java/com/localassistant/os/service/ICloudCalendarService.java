@@ -237,9 +237,26 @@ public class ICloudCalendarService {
         List<CalendarEvent> result = new ArrayList<>();
         try {
             var calendar = new CalendarBuilder().build(new StringReader(ics));
-            for (VEvent event : calendar.getComponentList().<VEvent>getComponents("VEVENT")) {
+            List<VEvent> events = calendar.getComponentList().<VEvent>getComponents("VEVENT");
+            // An override (RECURRENCE-ID) replaces one occurrence of its UID's series, so that occurrence is
+            // dropped from the master's expansion. This also covers an instance moved off the selected day.
+            Map<String, java.util.Set<Instant>> replaced = new HashMap<>();
+            for (VEvent event : events) {
+                var recurrenceId = event.getRecurrenceId();
+                if (recurrenceId == null || recurrenceId.getDate() == null) continue;
+                String overrideUid = event.getUid().map(Uid::getValue).orElse("");
+                replaced.computeIfAbsent(overrideUid, ignored -> new java.util.HashSet<>())
+                        .add(toZoned(recurrenceId.getDate(), zone).toInstant());
+            }
+            for (VEvent event : events) {
+                // A cancelled event, or a cancelled override of one occurrence, is not scheduled.
+                var status = event.getStatus();
+                if (status != null && "CANCELLED".equalsIgnoreCase(status.getValue())) continue;
                 Optional<? extends net.fortuna.ical4j.model.property.DtStart<?>> startProperty = event.getStartDate();
                 if (startProperty.isEmpty()) continue;
+                boolean isOverride = event.getRecurrenceId() != null;
+                java.util.Set<Instant> skipped = isOverride ? java.util.Set.of()
+                        : replaced.getOrDefault(event.getUid().map(Uid::getValue).orElse(""), java.util.Set.of());
                 Temporal eventStart = startProperty.get().getDate();
                 Period<?> range = periodFor(eventStart, date, zone);
                 @SuppressWarnings({"rawtypes", "unchecked"})
@@ -253,6 +270,7 @@ public class ICloudCalendarService {
                 for (Period<?> occurrence : occurrences) {
                     ZonedDateTime start = toZoned(occurrence.getStart(), zone);
                     ZonedDateTime end = toZoned(occurrence.getEnd(), zone);
+                    if (skipped.contains(start.toInstant())) continue;
                     result.add(new CalendarEvent(uid + "@" + start.toInstant(), title, start.toInstant(),
                             end.toInstant(), eventStart instanceof LocalDate, location, calendarName));
                 }

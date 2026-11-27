@@ -10,7 +10,7 @@ the tag, requires GitHub to report its signature as verified, and compares the h
 message with the local file.
 
 .EXAMPLE
-.\scripts\verify-release.ps1 -Zip .\Live-Desktop-windows-x64.zip -Tag v3.1.2
+.\scripts\verify-release.ps1 -Zip .\Live-Desktop-windows-x64.zip -Tag v3.1.3
 #>
 [CmdletBinding()]
 param(

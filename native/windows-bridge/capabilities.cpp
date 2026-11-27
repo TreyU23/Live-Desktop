@@ -232,7 +232,12 @@ JsonObject media_request(hstring const& operation, JsonObject const& arguments) 
         if (!playing && is_playing) playing = session;
     }
     auto current = media_manager.GetCurrentSession();
-    auto session = matched_playing ? matched_playing : playing ? playing : matched ? matched : provider == L"music" && apple ? apple : current ? current : first;
+    // A selected provider only ever controls its own session (playing first, then paused). Falling back
+    // to another app's session would send play/pause/next to e.g. a browser video. Only the generic
+    // "music" provider may pick whatever is playing, then Apple Music, the current session, or the first.
+    GlobalSystemMediaTransportControlsSession session{nullptr};
+    if (provider == L"music") session = playing ? playing : apple ? apple : current ? current : first;
+    else session = matched_playing ? matched_playing : matched;
     JsonObject result;
     result.Insert(L"available", flag(session != nullptr));
     result.Insert(L"ready", flag(session != nullptr));

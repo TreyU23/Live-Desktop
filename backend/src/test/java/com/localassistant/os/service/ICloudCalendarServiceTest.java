@@ -48,4 +48,55 @@ class ICloudCalendarServiceTest {
         assertThat(events.getFirst().location()).isEqualTo("Teams");
         assertThat(events.getFirst().calendar()).isEqualTo("Work");
     }
+
+    private static final String WEEKLY_WITH_EXCEPTIONS = """
+            BEGIN:VCALENDAR
+            VERSION:2.0
+            PRODID:-//Live Desktop Test//EN
+            BEGIN:VEVENT
+            UID:weekly
+            DTSTART:20260803T100000Z
+            DTEND:20260803T110000Z
+            RRULE:FREQ=WEEKLY;COUNT=4
+            SUMMARY:Weekly
+            END:VEVENT
+            BEGIN:VEVENT
+            UID:weekly
+            RECURRENCE-ID:20260810T100000Z
+            DTSTART:20260810T140000Z
+            DTEND:20260810T150000Z
+            SUMMARY:Weekly (moved)
+            END:VEVENT
+            BEGIN:VEVENT
+            UID:weekly
+            RECURRENCE-ID:20260817T100000Z
+            DTSTART:20260817T100000Z
+            DTEND:20260817T110000Z
+            STATUS:CANCELLED
+            SUMMARY:Weekly (cancelled)
+            END:VEVENT
+            END:VCALENDAR
+            """.replace("\n", "\r\n");
+
+    @Test void aMovedOccurrenceAppearsOnlyAtItsNewTime() {
+        var service = new ICloudCalendarService(null);
+        var events = service.parseEvents(WEEKLY_WITH_EXCEPTIONS, "Work", LocalDate.of(2026, 8, 10), ZoneId.of("UTC"));
+        assertThat(events).hasSize(1);
+        assertThat(events.getFirst().title()).isEqualTo("Weekly (moved)");
+        assertThat(events.getFirst().start()).isEqualTo(java.time.Instant.parse("2026-08-10T14:00:00Z"));
+    }
+
+    @Test void aCancelledOccurrenceIsNotShownAndOtherWeeksAreUnaffected() {
+        var service = new ICloudCalendarService(null);
+        assertThat(service.parseEvents(WEEKLY_WITH_EXCEPTIONS, "Work", LocalDate.of(2026, 8, 17), ZoneId.of("UTC"))).isEmpty();
+        var regular = service.parseEvents(WEEKLY_WITH_EXCEPTIONS, "Work", LocalDate.of(2026, 8, 24), ZoneId.of("UTC"));
+        assertThat(regular).hasSize(1);
+        assertThat(regular.getFirst().title()).isEqualTo("Weekly");
+    }
+
+    @Test void aCancelledEventIsNotShown() {
+        String calendar = "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//Test//EN\r\nBEGIN:VEVENT\r\nUID:gone\r\nDTSTART:20260803T100000Z\r\nDTEND:20260803T110000Z\r\nSTATUS:CANCELLED\r\nSUMMARY:Gone\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n";
+        var service = new ICloudCalendarService(null);
+        assertThat(service.parseEvents(calendar, "Work", LocalDate.of(2026, 8, 3), ZoneId.of("UTC"))).isEmpty();
+    }
 }
