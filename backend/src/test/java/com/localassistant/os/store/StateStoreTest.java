@@ -246,4 +246,41 @@ class StateStoreTest {
         assertThat(stateFile()).exists();
         assertThat(directory.resolve("assistant-state.json.tmp")).doesNotExist();
     }
+
+    // The UI is told about set-aside files from their names alone (issue #50).
+    @Test void setAsideFilesAreReportedNewestFirstAndOnlyByExactName() throws Exception {
+        var store = store();
+        assertThat(store.recoveredFiles()).isEmpty();
+        store.addMemory("nothing damaged", "fact");
+        assertThat(store.recoveredFiles()).isEmpty();
+
+        String[] names = {
+            "assistant-state.json.corrupt-20261101T010101001Z", "assistant-state.json.corrupt-20261127T204512345Z",
+            "assistant-state.json.corrupt-20260101T000000000Z", "assistant-state.json.corrupt-20261015T120000000Z",
+            "assistant-state.json.corrupt-20260601T000000000Z", "assistant-state.json.corrupt-20261201T000000000Z"};
+        for (String name : names) java.nio.file.Files.writeString(directory.resolve(name), "{}");
+        // Look-alikes and leftovers are not reported.
+        for (String other : new String[]{"assistant-state.json.tmp", "assistant-state.json.corrupt-yesterday",
+                "assistant-state.json.corrupt-20261127T204512345Z.bak", "other.json.corrupt-20261127T204512345Z"}) {
+            java.nio.file.Files.writeString(directory.resolve(other), "{}");
+        }
+
+        assertThat(store.recoveredFiles()).containsExactly(
+                "assistant-state.json.corrupt-20261201T000000000Z", "assistant-state.json.corrupt-20261127T204512345Z",
+                "assistant-state.json.corrupt-20261101T010101001Z", "assistant-state.json.corrupt-20261015T120000000Z",
+                "assistant-state.json.corrupt-20260601T000000000Z");
+    }
+
+    @Test void aDamagedFileShowsUpAsARecoveryAndAProfileWithoutAFolderReportsNone() throws Exception {
+        java.nio.file.Files.writeString(stateFile(), "{\"version\":1,\"conversations\":[");
+        var store = store();
+        store.memories();
+
+        assertThat(store.recoveredFiles()).singleElement().asString().startsWith("assistant-state.json.corrupt-");
+        try {
+            ProfileContext.set(SECOND);
+            assertThat(store.recoveredFiles()).isEmpty();
+            assertThat(directory.resolve("profiles")).doesNotExist();
+        } finally { ProfileContext.clear(); }
+    }
 }

@@ -77,16 +77,26 @@ public class AssistantController {
         return Map.of("status", "ok", "provider", provider.id(), "assistantConfigured", agent.configured(provider));
     }
 
+    /**
+     * The profile's settings plus the names of any state files that were set aside because they could not
+     * be read, so the UI can say the data was preserved. Names only, never paths.
+     */
+    private Map<String, Object> settingsWithRecovery() {
+        Map<String, Object> settings = new java.util.LinkedHashMap<>(agent.settings());
+        settings.put("stateRecovery", Map.of("files", store.recoveredFiles()));
+        return settings;
+    }
+
     @GetMapping("/api/profile/settings")
     public Map<String, Object> profileSettings() {
-        return agent.settings();
+        return settingsWithRecovery();
     }
 
     @PostMapping("/api/profile/assistant-provider")
     public ResponseEntity<?> saveAssistantProvider(@RequestBody AssistantProviderRequest request) {
         try {
             profileCredentials.saveProvider(AssistantProvider.fromId(request.provider()));
-            return ResponseEntity.ok(agent.settings());
+            return ResponseEntity.ok(settingsWithRecovery());
         } catch (Exception error) {
             return ResponseEntity.badRequest().body(error(error));
         }
@@ -115,7 +125,7 @@ public class AssistantController {
     private ResponseEntity<?> saveProfileKey(AssistantProvider provider, ApiKeyRequest request) {
         try {
             profileCredentials.saveKey(provider, request == null ? null : request.apiKey());
-            return ResponseEntity.ok(agent.settings());
+            return ResponseEntity.ok(settingsWithRecovery());
         } catch (Exception error) {
             return ResponseEntity.badRequest().body(error(error));
         }
@@ -124,7 +134,7 @@ public class AssistantController {
     private ResponseEntity<?> deleteProfileKey(AssistantProvider provider) {
         try {
             profileCredentials.clearKey(provider);
-            return ResponseEntity.ok(agent.settings());
+            return ResponseEntity.ok(settingsWithRecovery());
         } catch (Exception error) {
             return ResponseEntity.badRequest().body(error(error));
         }

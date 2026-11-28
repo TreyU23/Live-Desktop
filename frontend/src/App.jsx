@@ -132,7 +132,7 @@ const EMPTY_MUSIC_PLAYER = {
   detail: "Start playback once, then Live Desktop can control it through Windows.",
 };
 
-const kEmptyAssistantSettings = { provider: DEFAULT_ASSISTANT_PROVIDER, assistantConfigured: false, openAiConfigured: false, profileApiKey: false, anthropicConfigured: false, profileAnthropicKey: false, models: {} };
+const kEmptyAssistantSettings = { provider: DEFAULT_ASSISTANT_PROVIDER, assistantConfigured: false, openAiConfigured: false, profileApiKey: false, anthropicConfigured: false, profileAnthropicKey: false, models: {}, stateRecovery: { files: [] } };
 
 function emptyMusicPlayerFor(providerId) {
   const provider = MUSIC_PROVIDERS[providerId] || MUSIC_PROVIDERS.apple;
@@ -173,6 +173,8 @@ const MUSIC_CONNECTION_KEY = "live-desktop.apple-music";
 const THEME_KEY = "live-desktop.theme";
 const TRANSPARENCY_KEY = "live-desktop.reduce-transparency";
 const ACCENT_COLOR_KEY = "live-desktop.accent-color";
+// The newest set-aside state file whose notice the user dismissed, per profile (issue #50).
+const STATE_RECOVERY_KEY = "live-desktop.state-recovery";
 const DEFAULT_PROFILE = { id: "default", name: "Local user", avatar: "/assets/user-avatar.png" };
 
 function readProfiles() {
@@ -404,6 +406,9 @@ export function App() {
   const musicConnection = musicIntegration.connections[musicProviderId];
   const [musicPlayer, setMusicPlayer] = useState(() => emptyMusicPlayerFor(musicProviderId));
   const [assistantSettings, setAssistantSettings] = useState(kEmptyAssistantSettings);
+  const [dismissedRecovery, setDismissedRecovery] = useState(() => {
+    try { return window.localStorage.getItem(profileStorageKey(STATE_RECOVERY_KEY, profileId)) || ""; } catch { return ""; }
+  });
   const [resourceStatus, setResourceStatus] = useState({});
   const resourceStates = useRef({});
   const scheduler = useRef(null);
@@ -458,7 +463,7 @@ export function App() {
     if (id === "default" || profiles.length === 1) return;
     try {
       await api("/api/profile/data", { method: "DELETE", profileId: id });
-      for (const base of [MUSIC_CONNECTION_KEY, THEME_KEY, ACCENT_COLOR_KEY, TRANSPARENCY_KEY]) removeStoredItem(window.localStorage, profileStorageKey(base, id));
+      for (const base of [MUSIC_CONNECTION_KEY, THEME_KEY, ACCENT_COLOR_KEY, TRANSPARENCY_KEY, STATE_RECOVERY_KEY]) removeStoredItem(window.localStorage, profileStorageKey(base, id));
       const next = profiles.filter((profile) => profile.id !== id);
       // The profile's data is already gone. If the list can't be saved it would keep showing a profile
       // with no data, so stop and say so; deleting it again is safe (the backend ignores missing data).
@@ -997,6 +1002,12 @@ export function App() {
     </HStack>
   </HStack>;
   const failedResources = Object.entries(resourceStatus).filter(([, value]) => value.error);
+  // The newest state file the backend had to set aside for this profile; a newer one shows the notice again.
+  const recoveredFile = assistantSettings.stateRecovery?.files?.[0] || "";
+  const dismissRecovery = () => {
+    setDismissedRecovery(recoveredFile);
+    savePreference(profileStorageKey(STATE_RECOVERY_KEY, profileId), recoveredFile);
+  };
   const hostName = system.host?.name && system.host.name !== FALLBACK_SYSTEM.host.name ? system.host.name : "This PC";
   return (
     <Theme theme={themes[accent.theme] || themes[defaultThemeSlug]} mode={appearance}>
@@ -1005,6 +1016,10 @@ export function App() {
       banner={<LifecycleBanner state={lifecycleState} />}
       sideNav={<Navigation activeView={activeView} onNavigate={setActiveView} pendingCount={pendingCount} hostName={hostName} connected={health.connected}
         footer={<ProfileMenu profiles={profiles} activeProfile={activeProfile} onSwitch={switchProfile} onManage={() => setProfileMenuOpen(true)} />} />}>
+      {recoveredFile && recoveredFile !== dismissedRecovery ? <Banner key={recoveredFile} status="warning" isDismissable
+        dismissLabel="Dismiss data recovery notice" onDismiss={dismissRecovery}
+        title="Some saved data could not be read"
+        description={`This profile's saved conversations, memories and approvals could not be read, so Live Desktop started it empty. The unreadable file was kept as ${recoveredFile} in this profile's data folder.`} /> : null}
       {failedResources.length ? <Banner status="warning" title="Some resources could not refresh" description="Last available data is retained."
         endContent={<HStack gap={2} wrap="wrap">{failedResources.map(([key]) => <Button key={key} size="sm" label={`Refresh ${key}`} isDisabled={resourceStatus[key].loading} onClick={() => retry(key)} />)}</HStack>} /> : null}
       {/* One column for every view plus the parked provider frame: its auto height lets each Page

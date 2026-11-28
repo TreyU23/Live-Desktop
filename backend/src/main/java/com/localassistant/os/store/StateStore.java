@@ -29,6 +29,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.function.UnaryOperator;
+import java.util.regex.Pattern;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
@@ -38,6 +39,10 @@ public class StateStore {
     private static final Logger kLog = LoggerFactory.getLogger(StateStore.class);
     /** Finished actions kept per profile; older ones are dropped so state and polls stay bounded. */
     static final int MAX_FINISHED_ACTIONS = 1_000;
+    /** Name of a state file set aside by {@link #moveAsideAndStartEmpty}: the file name plus a UTC time stamp. */
+    private static final Pattern kSetAsideName = Pattern.compile("assistant-state\\.json\\.corrupt-\\d{8}T\\d{9}Z");
+    /** Most set-aside files reported to the UI, newest first. */
+    static final int MAX_REPORTED_RECOVERIES = 5;
     static final String kInterruptedMessage = "Interrupted before it finished; the outcome is unknown.";
 
     private final Gson gson = new GsonBuilder().create();
@@ -138,6 +143,28 @@ public class StateStore {
         if (!"approved".equals(action.status())) return action;
         return new AssistantAction(action.id(), action.kind(), "failed", action.arguments(), action.reason(),
                 null, kInterruptedMessage, action.createdAt(), action.updatedAt());
+    }
+
+    /**
+     * Names (never paths) of state files set aside for the current profile, newest first, so the UI can
+     * tell the user that data was preserved. Only names that match the exact pattern count, and nothing is
+     * created for a profile that has no folder.
+     */
+    public List<String> recoveredFiles() {
+        if (!profilePaths.currentExists()) return List.of();
+        Path directory = profilePaths.file("assistant-state.json").getParent();
+        if (directory == null || !Files.isDirectory(directory)) return List.of();
+        try (var files = Files.list(directory)) {
+            return files.filter(Files::isRegularFile)
+                    .map(path -> path.getFileName().toString())
+                    .filter(name -> kSetAsideName.matcher(name).matches())
+                    .sorted(java.util.Comparator.reverseOrder())
+                    .limit(MAX_REPORTED_RECOVERIES)
+                    .toList();
+        } catch (IOException error) {
+            kLog.warn("Could not look for set-aside state files for profile {}.", ProfileContext.currentId(), error);
+            return List.of();
+        }
     }
 
     private static <T> ArrayList<T> nonNull(List<T> values) {
